@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="260" viewBox="0 0 720 260" role="img" aria-label="Markdown Viewer sample image">
+  <rect width="720" height="260" fill="#f6f8fb"/>
+  <rect x="32" y="32" width="196" height="196" rx="8" fill="#ffffff" stroke="#c7d0dd"/>
+  <rect x="260" y="32" width="428" height="196" rx="8" fill="#ffffff" stroke="#c7d0dd"/>
+  <rect x="56" y="64" width="92" height="12" fill="#456990"/>
+  <rect x="56" y="96" width="136" height="10" fill="#9aa8b8"/>
+  <rect x="56" y="122" width="118" height="10" fill="#9aa8b8"/>
+  <rect x="56" y="148" width="148" height="10" fill="#9aa8b8"/>
+  <text x="292" y="88" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#263241">Markdown Preview</text>
+  <text x="292" y="128" font-family="Arial, sans-serif" font-size="18" fill="#52606f">Relative images are resolved from the current Markdown file.</text>
+  <path d="M292 168h300" stroke="#456990" stroke-width="6" stroke-linecap="round"/>
+  <path d="M292 196h228" stroke="#9aa8b8" stroke-width="6" stroke-linecap="round"/>
+</svg>

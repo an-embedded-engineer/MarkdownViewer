@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# .NET build output
+bin/
+obj/
+
+# IDE and editor state
+.idea/
+.vs/
+.vscode/
+
+# User-local .NET/NuGet state
+.dotnet_home/
+*.user
+*.suo
+
+# Logs
+*.log

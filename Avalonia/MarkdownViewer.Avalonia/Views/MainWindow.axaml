@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MarkdownViewer.Avalonia.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="760"
+        x:Class="MarkdownViewer.Avalonia.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Markdown Viewer">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*" ColumnDefinitions="280,*" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+        <Border Grid.Row="0" Grid.ColumnSpan="2"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="10,8">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+                <Button Grid.Column="0" x:Name="OpenFolderButton" Content="Open Folder" Click="OpenFolderButton_OnClick"/>
+                <Button Grid.Column="1" x:Name="ThemeButton" Content="Theme" Click="ThemeButton_OnClick"/>
+                <Button Grid.Column="2" x:Name="ReloadButton" Content="Reload" Click="ReloadButton_OnClick"/>
+                <TextBlock Grid.Column="3"
+                           Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="8,0,0,0"/>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="0"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,1,0"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+            <TreeView x:Name="ExplorerTree"
+                      ItemsSource="{Binding FileTree}"
+                      SelectionChanged="ExplorerTree_OnSelectionChanged"
+                      Padding="6">
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate DataType="vm:FileTreeNodeViewModel"
+                                      ItemsSource="{Binding Children}">
+                        <Grid ColumnDefinitions="20,*" Margin="0,2">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding Icon}"
+                                       FontFamily="Menlo,Consolas,monospace"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Name}"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </Grid>
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+            <NativeWebView x:Name="PreviewWebView"
+                           NavigationCompleted="PreviewWebView_OnNavigationCompleted"
+                           WebMessageReceived="PreviewWebView_OnWebMessageReceived" />
+        </Border>
+    </Grid>
+
+</Window>
