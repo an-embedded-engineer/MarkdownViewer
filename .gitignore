@@ -17,3 +17,6 @@ obj/
 
 # Logs
 *.log
+
+# Published output
+publish/
