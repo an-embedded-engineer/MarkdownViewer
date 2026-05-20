@@ -350,6 +350,27 @@ button {
   background: var(--panel-bg);
 }
 
+.markdown-body .plantuml-diagram {
+  overflow-x: auto;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+}
+
+.markdown-body .plantuml-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-body .plantuml-error {
+  white-space: pre-wrap;
+  color: var(--error-text);
+  border-color: color-mix(in srgb, var(--error-text), var(--border) 45%);
+  background: var(--error-bg);
+}
+
 @media (max-width: 760px) {
   .app-shell {
     min-width: 0;

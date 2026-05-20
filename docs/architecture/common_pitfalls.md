@@ -24,3 +24,10 @@
 
 - `publish/`、Tauriの `dist/`、Rustの `target/`、.NETの `bin/` / `obj/` は生成物である。
 - 起動確認用にローカル作成しても、原則コミットしない。
+
+## 6. PlantUML runtime配置
+
+- `plantuml.jar` と `plantuml.config.json` はローカルruntimeファイルであり、コミットしない。
+- Tauri devでは `markdown-viewer-tauri/src-tauri/`、Tauri bundleでは `.app/Contents/MacOS/`、Avalonia publishでは実行ファイルのdirectoryをruntime directoryとして扱う。
+- Finder起動時のworking directoryは `/` になり得るため、Tauri bundleのjar探索をworking directory前提にしない。
+- Theme切替だけでPlantUML CLIを再実行すると多数図の文書で体感遅延が出るため、SVG再生成はMarkdown本文またはReload更新時に限定する。

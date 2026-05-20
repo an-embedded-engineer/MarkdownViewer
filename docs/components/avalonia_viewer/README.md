@@ -9,14 +9,16 @@ Avalonia UI + C# + NativeWebView による Markdown Viewer MVP 実装。
 - ネイティブデスクトップアプリとしてフォルダを選択する。
 - Explorer風のファイルツリーを表示する。
 - MarkdownをHTMLへ変換し、WebViewで表示する。
-- Mermaid、相対画像、リンク遷移、テーマ切替を扱う。
+- Mermaid、PlantUML、相対画像、リンク遷移、テーマ切替を扱う。
 
 ## 主要要素
 
 - `Views/MainWindow.axaml`: 画面レイアウト。
 - `ViewModels/MainWindowViewModel.cs`: UI状態と操作。
 - `Services/FileTreeService.cs`: ディレクトリ走査。
-- `Services/MarkdownRenderService.cs`: MarkdownからHTML fragmentへの変換。
+- `Services/MarkdownRenderService.cs`: MarkdownからHTML fragmentへの非同期変換。Mermaid / PlantUML fenceをプレビュー用HTMLへ差し替える。
+- `Services/PlantUmlRenderService.cs`: `java -jar plantuml.jar -tsvg -pipe` によるPlantUML SVG生成。
+- `Services/PlantUmlRuntimeResolver.cs`: `plantuml.config.json` または runtime directory の `plantuml.jar` を解決する。
 - `Services/HtmlTemplateService.cs`: WebViewへ渡すHTML文書生成。
 - `Models/FileTreeNode.cs`: Explorer表示用データモデル。
 
@@ -26,6 +28,7 @@ Avalonia UI + C# + NativeWebView による Markdown Viewer MVP 実装。
 - Avalonia.Controls.WebView
 - Markdig
 - CommunityToolkit.Mvvm
+- Java / `plantuml.jar`（PlantUML表示時のみ）
 
 ## 設計文書
 

@@ -9,13 +9,13 @@ Tauri v2 + React + TypeScript + Rust による Markdown Viewer MVP 実装。
 - Tauri dialog pluginでフォルダを選択する。
 - Rust commandでファイルツリー構築とMarkdown読み込みを行う。
 - ReactでExplorer、Toolbar、Markdown previewを表示する。
-- `markdown-it` と `mermaid` でMarkdown/Mermaidを描画する。
+- `markdown-it`、`mermaid`、Rust側PlantUML commandでMarkdown/Mermaid/PlantUMLを描画する。
 
 ## 主要要素
 
-- `src/App.tsx`: React UI、状態管理、Markdown rendering、Mermaid再描画。
+- `src/App.tsx`: React UI、状態管理、Markdown rendering、PlantUML描画依頼、Mermaid再描画。
 - `src/App.css`: Light / Dark themeと2ペインUI。
-- `src-tauri/src/lib.rs`: `scan_directory`、`read_text_file` command。
+- `src-tauri/src/lib.rs`: `scan_directory`、`read_text_file`、`render_plantuml_diagrams` command。
 - `src-tauri/tauri.conf.json`: Tauri設定とasset protocol。
 - `src-tauri/capabilities/default.json`: plugin permission。
 
@@ -28,6 +28,7 @@ Tauri v2 + React + TypeScript + Rust による Markdown Viewer MVP 実装。
 - markdown-it
 - mermaid
 - Rust / serde
+- Java / `plantuml.jar`（PlantUML表示時のみ）
 
 ## 設計文書
 

@@ -11,7 +11,7 @@ components:
   - "PlantUML runtime setup"
 status: "draft"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "draft"
 completion_status: "not_started"
 related_commits:
   - "6d0c0ec : Phase 0 Define PlantUML rendering feature"
@@ -35,5 +35,5 @@ related_commits:
 | Phase 0 Requirements | Done |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-05-20) |
-| Phase 3 Implementation and docs review | Not started |
+| Phase 3 Implementation and docs review | Implementation draft in progress |
 | Phase 4 Verification and completion | Not started |

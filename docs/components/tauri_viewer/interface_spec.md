@@ -27,6 +27,21 @@ root配下を走査し、Explorer表示用のツリーを返す。
 
 root配下のMarkdownファイルをUTF-8テキストとして読み込む。
 
+### `render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRenderResponse, String>`
+
+PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。Java processを起動できないなどcommand全体の失敗は `Err(String)` とする。jar未設定、PlantUML構文エラー、timeoutなど図ごとの失敗は `PlantUmlDiagramResult` の `ok: false` として返す。
+
+`PlantUmlRenderResponse`:
+
+- `diagrams: PlantUmlDiagramResult[]`
+- `firstError: string | null`
+
+`PlantUmlDiagramResult`:
+
+- `ok: boolean`
+- `html: string`
+- `error: string | null`
+
 ## Frontend Types
 
 `FileTreeNode`:
@@ -36,3 +51,5 @@ root配下のMarkdownファイルをUTF-8テキストとして読み込む。
 - `relativePath: string`
 - `nodeType: "directory" | "markdown" | "image"`
 - `children: FileTreeNode[]`
+
+PlantUML frontend typesはTauri commandの `PlantUmlRenderResponse` / `PlantUmlDiagramResult` とcamelCaseで対応する。
