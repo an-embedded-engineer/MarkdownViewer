@@ -51,11 +51,12 @@ function App() {
     diagrams: [],
   });
   const previewRef = useRef<HTMLDivElement>(null);
+  const emptyPlantUmlDiagrams = useMemo<PlantUmlDiagramResult[]>(() => [], []);
 
   const selectedFileName = selectedFilePath ? getFileName(selectedFilePath) : "";
   const plantUmlRenderKey = selectedFilePath ? `${selectedFilePath}:${previewRevision}` : "";
   const plantUmlDiagrams =
-    plantUmlRenderState.key === plantUmlRenderKey ? plantUmlRenderState.diagrams : [];
+    plantUmlRenderState.key === plantUmlRenderKey ? plantUmlRenderState.diagrams : emptyPlantUmlDiagrams;
 
   async function openFolder() {
     setErrorMessage(null);
@@ -255,7 +256,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [previewRevision, theme]);
+  }, [previewRevision, theme, plantUmlDiagrams]);
 
   useEffect(() => {
     if (!pendingAnchor || !previewRef.current) {

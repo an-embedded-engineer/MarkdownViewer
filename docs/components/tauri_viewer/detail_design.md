@@ -4,7 +4,7 @@
 
 `App.tsx` がroot path、file tree、selected file、Markdown本文、theme、error、preview revisionを保持する。
 
-`previewRevision` はMarkdown本文が同一でもReload時にMermaidを再描画するための更新番号である。
+`previewRevision` はMarkdown本文が同一でもReload時にMermaidとPlantUMLを再描画するための更新番号である。
 
 ## 処理フロー
 
@@ -15,13 +15,13 @@
 5. `markdown-it` でHTML化する。
 6. PlantUMLコードブロックはReactが抽出し、`render_plantuml_diagrams` commandでRust側に描画を依頼する。
 7. `markdown-it` のfence rendererがPlantUML描画結果を `.plantuml-diagram` または `.plantuml-error` として出力する。
-8. Mermaidコードブロックは `.mermaid` DOMとして出力し、プレビュー更新後に `mermaid.run` を実行する。
+8. Mermaidコードブロックは `.mermaid` DOMとして出力し、プレビュー更新後に `mermaid.run` を実行する。PlantUML結果の反映でDOMが再生成された場合もMermaidを再描画する。
 
 ## PlantUML
 
 PlantUML表示はRust側の `render_plantuml_diagrams` commandで行う。ReactはMarkdown本文から `plantuml` / `puml` fenced code blockを抽出し、source配列としてcommandへ渡す。Rust commandは各sourceを順次 `java -jar <plantuml.jar> -tsvg -pipe` へ渡し、SVG HTMLまたはエラーHTMLを返す。
 
-`plantuml.jar` はコミットしない。Tauri devでは `markdown-viewer-tauri/src-tauri/` をruntime directoryとして先に探索し、次にRust実行ファイルのdirectoryを見る。macOS bundleでは `<app>.app/Contents/MacOS/` をruntime directoryとし、Finder起動時のworking directoryには依存しない。
+`plantuml.jar` はコミットしない。Tauri devでは `markdown-viewer-tauri/src-tauri/` をruntime directoryとして先に探索し、次にcurrent working directory、Rust実行ファイルのdirectoryを見る。macOS bundleでは `<app>.app/Contents/MacOS/` をruntime directoryとし、Finder起動時のworking directoryには依存しない。
 
 `plantuml.config.json` がある場合は `plantUmlJarPath` を読み、相対pathはconfig fileのdirectory基準で解決する。configがない場合はruntime directoryの `plantuml.jar` を見る。
 

@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::thread;
 use std::time::{Duration, Instant};
 
 #[derive(Serialize)]
@@ -243,14 +244,33 @@ fn render_plantuml_svg(source: &str) -> Result<String, String> {
         .spawn()
         .map_err(|error| format!("Failed to start Java: {error}"))?;
 
+    let mut stdout_reader = Some(
+        child
+            .stdout
+            .take()
+            .map(|output| read_plantuml_pipe(output, "stdout"))
+            .ok_or_else(|| "Failed to open PlantUML stdout.".to_string())?,
+    );
+    let mut stderr_reader = Some(
+        child
+            .stderr
+            .take()
+            .map(|output| read_plantuml_pipe(output, "stderr"))
+            .ok_or_else(|| "Failed to open PlantUML stderr.".to_string())?,
+    );
+
     {
         let stdin = child
             .stdin
             .as_mut()
             .ok_or_else(|| "Failed to open PlantUML stdin.".to_string())?;
-        stdin
-            .write_all(normalize_plantuml_source(source).as_bytes())
-            .map_err(|error| format!("Failed to write PlantUML source: {error}"))?;
+        if let Err(error) = stdin.write_all(normalize_plantuml_source(source).as_bytes()) {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = join_plantuml_pipe(&mut stdout_reader);
+            let _ = join_plantuml_pipe(&mut stderr_reader);
+            return Err(format!("Failed to write PlantUML source: {error}"));
+        }
     }
     drop(child.stdin.take());
 
@@ -260,18 +280,8 @@ fn render_plantuml_svg(source: &str) -> Result<String, String> {
             .try_wait()
             .map_err(|error| format!("Failed to wait for PlantUML: {error}"))?
         {
-            let mut stdout = Vec::new();
-            let mut stderr = Vec::new();
-            if let Some(mut output) = child.stdout.take() {
-                output
-                    .read_to_end(&mut stdout)
-                    .map_err(|error| format!("Failed to read PlantUML stdout: {error}"))?;
-            }
-            if let Some(mut error_output) = child.stderr.take() {
-                error_output
-                    .read_to_end(&mut stderr)
-                    .map_err(|error| format!("Failed to read PlantUML stderr: {error}"))?;
-            }
+            let stdout = join_plantuml_pipe(&mut stdout_reader)?;
+            let stderr = join_plantuml_pipe(&mut stderr_reader)?;
 
             if !status.success() {
                 let error = String::from_utf8_lossy(&stderr).trim().to_string();
@@ -292,11 +302,40 @@ fn render_plantuml_svg(source: &str) -> Result<String, String> {
         if started.elapsed() >= PLANTUML_RENDER_TIMEOUT {
             let _ = child.kill();
             let _ = child.wait();
+            let _ = join_plantuml_pipe(&mut stdout_reader);
+            let _ = join_plantuml_pipe(&mut stderr_reader);
             return Err("PlantUML render timed out.".into());
         }
 
         std::thread::sleep(Duration::from_millis(20));
     }
+}
+
+fn read_plantuml_pipe<R>(
+    mut output: R,
+    stream_name: &'static str,
+) -> thread::JoinHandle<Result<Vec<u8>, String>>
+where
+    R: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let mut buffer = Vec::new();
+        output
+            .read_to_end(&mut buffer)
+            .map_err(|error| format!("Failed to read PlantUML {stream_name}: {error}"))?;
+        Ok(buffer)
+    })
+}
+
+fn join_plantuml_pipe(
+    reader: &mut Option<thread::JoinHandle<Result<Vec<u8>, String>>>,
+) -> Result<Vec<u8>, String> {
+    let reader = reader
+        .take()
+        .ok_or_else(|| "PlantUML output reader was already consumed.".to_string())?;
+    reader
+        .join()
+        .map_err(|_| "Failed to read PlantUML output: reader thread panicked.".to_string())?
 }
 
 fn resolve_plantuml_runtime() -> Result<PlantUmlRuntimeOptions, String> {
@@ -364,12 +403,13 @@ fn plantuml_runtime_directories() -> Result<Vec<PathBuf>, String> {
     }
 
     let mut directories = Vec::new();
-    if let Ok(current_dir) = std::env::current_dir() {
-        directories.push(current_dir);
-    }
 
     #[cfg(debug_assertions)]
     directories.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        directories.push(current_dir);
+    }
 
     if let Some(directory) = exe_dir {
         directories.push(directory);

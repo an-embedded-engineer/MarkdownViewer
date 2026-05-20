@@ -41,7 +41,7 @@ java -version
 runtime directory:
 
 - Avalonia開発実行: コマンド実行時のworking directory、または実行assemblyのdirectory。
-- Tauri開発実行: `markdown-viewer-tauri/src-tauri/`、またはRust実行ファイルのdirectory。
+- Tauri開発実行: `markdown-viewer-tauri/src-tauri/`、current working directory、Rust実行ファイルのdirectoryの順。
 - Tauri macOS bundle: `<app>.app/Contents/MacOS/`。
 - publish済みAvalonia: 実行ファイルのdirectory。
 
@@ -116,6 +116,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - Explorer から Markdown 選択
 - Markdown プレビュー表示
 - Mermaid 描画
+- Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること
 - PlantUML 描画
 - Light / Dark 切替
 - Reload 後の再描画

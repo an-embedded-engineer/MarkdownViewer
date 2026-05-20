@@ -16,6 +16,7 @@
 - Tauri command 呼び出しは `invoke<T>()` の型引数で戻り値を明示する。
 - Rendererが生成するHTMLは `html: false` を前提とし、Markdown内HTMLを許可しない。
 - PlantUMLはReactでfence抽出とplaceholder差し替えを行い、Java process実行はRust commandへ寄せる。Theme切替だけではPlantUML commandを再実行しない。
+- Mermaid / PlantUML のfence言語判定はinfo stringの先頭tokenを小文字化して行う。`mermaid`, `plantuml`, `puml` の後ろに追加情報があっても先頭tokenを言語として扱う。
 
 ## Rust / Tauri
 

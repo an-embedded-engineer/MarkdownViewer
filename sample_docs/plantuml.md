@@ -2,6 +2,14 @@
 
 This document is used to verify PlantUML rendering in both desktop viewers.
 
+Mermaid must continue rendering when PlantUML diagrams finish.
+
+```mermaid
+flowchart LR
+    Markdown[Markdown file] --> Mermaid[Mermaid renderer]
+    Markdown --> PlantUML[PlantUML renderer]
+```
+
 ```plantuml
 @startuml
 actor User

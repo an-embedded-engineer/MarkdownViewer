@@ -99,7 +99,7 @@ runtime directory:
 - publish されたアプリ: 実行ファイルのディレクトリ。
 - 開発実行: 現在の working directory を先に見て、その後に実行ファイルのディレクトリを見る。これにより、publish 後の配置規約を保ちながら開発時の設定も扱いやすくする。
 - Avalonia 開発実行: `dotnet run --project Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj` の working directory と、実行 assembly の base directory を探索対象にする。
-- Tauri 開発実行: `markdown-viewer-tauri/src-tauri/` を明示的な runtime directory として先に探索し、その後に Rust 実行ファイルの directory を探索する。`npm run tauri dev` の呼び出し元 working directory に依存しない。
+- Tauri 開発実行: `markdown-viewer-tauri/src-tauri/` を明示的な runtime directory として先に探索し、その後に current working directory、Rust 実行ファイルの directory を探索する。`npm run tauri dev` の呼び出し元 working directory に依存しない。
 - Tauri bundle: macOS `.app` では `<app>.app/Contents/MacOS/` を runtime directory とする。Finder 起動時の working directory は `/` になり得るため、bundle 実行では working directory を jar 探索の根拠にしない。
 
 config file 形式:
@@ -132,13 +132,13 @@ Tauri:
 - `render_plantuml_diagrams` command を追加する。Markdown 読み込み response へ統合する案は採用しない。
 - ファイル読み込みと PlantUML 実行は React ではなく Rust 側に置く。
 - `src/App.tsx` は Markdown 本文から PlantUML fence を抽出し、`invoke<PlantUmlRenderResponse>("render_plantuml_diagrams", ...)` で Rust 側へ渡す。返却された SVG / error HTML を placeholder へ差し替えてから Markdown HTML へ変換する。
-- React は `previewRevision` と selected file path をキーに PlantUML render request を発行し、Mermaid は従来通り HTML 反映後に `mermaid.run` で描画する。
+- React は `previewRevision` と selected file path をキーに PlantUML render request を発行し、Mermaid は従来通り HTML 反映後に `mermaid.run` で描画する。PlantUML 結果の反映で preview DOM が再生成された場合も Mermaid を再描画する。
 - Rust command は `Result<PlantUmlRenderResponse, String>` を返し、プロセス起動不能など command 全体の失敗は banner、図ごとの失敗は response 内の diagram result として inline 表示する。
 - `src/App.css` に `.plantuml-diagram` と `.plantuml-error` を追加する。
 
 Docs / samples:
 
-- 共有確認用として `sample_docs/plantuml.md` をリポジトリ直下に追加する。Avalonia / Tauri の手動確認はいずれもリポジトリ直下または `sample_docs/` を含むフォルダを開いて同じ Markdown を使う。
+- 共有確認用として `sample_docs/plantuml.md` をリポジトリ直下に追加する。サンプルには Mermaid と PlantUML を同居させ、Avalonia / Tauri の手動確認はいずれもリポジトリ直下または `sample_docs/` を含むフォルダを開いて同じ Markdown を使う。
 - component docs と development workflow のセットアップ説明を更新する。
 
 ## 設計方針
@@ -244,8 +244,8 @@ Phase 3 で以下を更新する。
 
 手動確認:
 
-- Mermaid と PlantUML のサンプルを含むフォルダを Avalonia で開く。
-- 同じフォルダを Tauri で開く。
+- Mermaid と PlantUML が同居するサンプルを含むフォルダを Avalonia で開き、両方の図が表示されることを確認する。
+- Mermaid と PlantUML が同居する同じフォルダを Tauri で開き、両方の図が表示されることを確認する。
 - PlantUML SVG がインライン表示されることを確認する。
 - jar 未配置時に原因が分かるメッセージが表示されることを確認する。
 - PlantUML 構文エラーが該当図の近くに表示されることを確認する。

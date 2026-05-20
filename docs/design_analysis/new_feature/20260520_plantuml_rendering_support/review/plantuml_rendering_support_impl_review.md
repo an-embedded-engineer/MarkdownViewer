@@ -40,7 +40,7 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 3 実装レビュー。Phas
 
 合わせて、Mermaid と PlantUML の両方を含む Markdown を `sample_docs/` に 1 件追加し、手動確認観点に「Mermaid と PlantUML が同居するファイルで両方が描画される」を明記する。
 **severity**: High
-**対応**: 未対応
+**対応**: 対応済み。`markdown-viewer-tauri/src/App.tsx` の Mermaid `useEffect` 依存関係へ `plantUmlDiagrams` を追加し、PlantUML 結果反映で `dangerouslySetInnerHTML` 配下の DOM が再生成された後も `mermaid.run` を再実行するようにした。`sample_docs/plantuml.md` に Mermaid と PlantUML の同居サンプルを追加し、`docs/rules/development_workflow.md` と impl 文書へ同居確認観点を追記した。
 
 ### 1.2 Tauri/Rust: 大きな SVG の場合に PlantUML プロセス出力読み出しが deadlock する
 
@@ -59,7 +59,7 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 3 実装レビュー。Phas
 
 timeout は別の watchdog thread か `Instant::now() - started` の polling で維持できる。Avalonia の `CancellationTokenSource(RenderTimeout)` 相当を Rust 側でも揃えるとなお揃いやすい。
 **severity**: High
-**対応**: 未対応
+**対応**: 対応済み。`markdown-viewer-tauri/src-tauri/src/lib.rs` で stdout / stderr を子プロセス実行中に別 thread で並行 drain する `read_plantuml_pipe` / `join_plantuml_pipe` を追加した。timeout 時は process を kill / wait したうえで reader thread を回収するため、大きな SVG でも pipe buffer 詰まりで `try_wait()` が進まない状態を避ける。
 
 ### 1.3 Tauri: Mermaid fence regex の info-string 厳密性が緩んだ
 
@@ -68,7 +68,7 @@ timeout は別の watchdog thread か `Instant::now() - started` の polling で
 **差異**: ` ```mermaid foo bar ` のような info string 付き fence が、新たに Mermaid 描画対象として扱われるようになった。一方、Tauri の markdown-it fence rule (`App.tsx:464`) は `info.trim().split(/\s+/)[0]?.toLowerCase()` で先頭トークンだけ比較しており、こちらは挙動が変わらない。Avalonia と Tauri で fence info string 解釈が分岐し、同じ Markdown が片方で Mermaid と認識され片方で plain code block になる可能性がある。
 **推奨対応**: 両実装で同じ厳密性を採用する。例えば設計書 (もしくは `docs/architecture/code_patterns.md`) で「fence info string は先頭トークンのみで言語を判定する」と明記し、Avalonia の regex も `(?<language>mermaid|plantuml|puml)[ \t]*\r?\n` に合わせる。
 **severity**: Medium
-**対応**: 未対応
+**対応**: 対応済み。既存 Tauri 実装と Avalonia 実装の実態に合わせ、fence info string の先頭 token を小文字化して `mermaid` / `plantuml` / `puml` と照合する仕様を `docs/architecture/code_patterns.md` へ明記した。
 
 ### 1.4 Avalonia: PlantUML 描画 source の stdin エンコーディングが未指定
 
@@ -77,7 +77,7 @@ timeout は別の watchdog thread か `Instant::now() - started` の polling で
 **差異**: macOS / Linux の default code page は UTF-8 のため現状環境では問題が出ない。一方、Windows 環境では code page 932 (Shift_JIS) などになり、非 ASCII の PlantUML source (日本語ラベル、エイリアス等) が PlantUML 側で誤ってデコードされる。本プロジェクトは macOS arm64 を主開発環境としているが、Tauri / Avalonia ともにクロスプラットフォーム前提で書かれており、将来 Windows 検証時に不可解な描画崩れの原因になり得る。
 **推奨対応**: `ProcessStartInfo.StandardInputEncoding = Encoding.UTF8` を追加する。または `process.StandardInput.BaseStream` に `new StreamWriter(stream, Encoding.UTF8)` で wrap する。1 行追加で完結する。
 **severity**: Low
-**対応**: 未対応
+**対応**: 対応済み。`Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRenderService.cs` に `StandardInputEncoding = Encoding.UTF8` を追加した。
 
 ---
 
@@ -88,14 +88,14 @@ timeout は別の watchdog thread か `Instant::now() - started` の polling で
 **不足**: `sample_docs/plantuml.md` は PlantUML 2 fence のみで構成されている。設計レビュー §1.1 の指摘 (本文書 1.1) の再現確認、および acceptance criteria の Mermaid 維持要件の手動確認材料が無い。
 **推奨対応**: `sample_docs/` 配下に Mermaid と PlantUML を 1 ファイルに含むサンプルを追加するか、`sample_docs/plantuml.md` に Mermaid block を追加する。`docs/rules/development_workflow.md` の手動確認に「Mermaid と PlantUML を同居させた Markdown で両方が描画される」を追加する。
 **severity**: Medium
-**対応**: 未対応 (本文書 1.1 と一体で対応すること)
+**対応**: 対応済み。`sample_docs/plantuml.md` に Mermaid block を追加し、PlantUML sequence / puml class diagram と同一 Markdown 内で確認できるようにした。`docs/rules/development_workflow.md` の手動確認にも「Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること」を追記した。
 
 ### 2.2 PlantUML 描画失敗時の StatusMessage 表示が impl 文書に明示されていない
 
 **不足**: Avalonia の `MainWindowViewModel.OpenMarkdownAsync` は `RenderToHtmlFragmentAsync` を await し、その中で PlantUML 失敗は inline error に置き換わるだけで StatusMessage には反映されない。設計書「エラー動作」(design 184-186 行) は「banner / status には最初の代表エラー 1 件のみを表示し、詳細は inline error を正とする」としているが、Avalonia 実装は banner 表示を一切行わず、Tauri 実装のみ `firstError` を `setErrorMessage` で銀盤に表示する。Avalonia / Tauri の挙動差が impl 文書 (`plantuml_rendering_support_feature_impl.md`) や `docs/components/avalonia_viewer/detail_design.md` に書かれていない。
 **推奨対応**: 設計を Avalonia の挙動に合わせる (status へは出さない) ことを意図しているならば impl 文書と Avalonia detail_design に明記する。設計通り「最初の代表エラーは status / banner にも出す」のが正なら Avalonia でも `_currentBodyHtml` を保持しつつ `StatusMessage = firstError;` を設定する変更を入れる。挙動差そのものは Low だが、文書整合性を担保するうえで Phase 3 で扱う対象になる。
 **severity**: Low
-**対応**: 未対応
+**対応**: 未対応。低優先度として Phase 4 に持ち越す。Avalonia は現状 inline error を正とし、Tauri は代表エラーを banner にも出す実装差があるため、Phase 4 の動作確認結果に合わせて設計または実装を揃える。
 
 ### 2.3 Tauri runtime directory 探索順の挙動が detail_design と Rust 実装で僅かにズレる
 
@@ -107,7 +107,7 @@ timeout は別の watchdog thread か `Instant::now() - started` の polling で
 つまり、cwd → src-tauri/ → exe parent の順で先頭は cwd である。設計書「Runtime 設定」(design 101-102 行) では「Tauri 開発実行: `markdown-viewer-tauri/src-tauri/` を明示的な runtime directory として先に探索し、その後に Rust 実行ファイルの directory を探索する」と書かれており、cwd 優先は明示されていない。
 **推奨対応**: 実装通り cwd を最優先する設計を意図しているなら `docs/components/tauri_viewer/detail_design.md` と設計書「Runtime 設定」を「cwd → src-tauri/ → exe parent」の順序へ揃える。設計書通り src-tauri/ を最優先するなら実装の挿入順を入れ替える。recommended は実装側を `markdown-viewer-tauri/src-tauri/` 優先に揃えること (Finder 起動時に cwd が `/` になっても src-tauri/ で解決できる前提を保つため)。
 **severity**: Medium
-**対応**: 未対応
+**対応**: 対応済み。実装・設計・component docs を `markdown-viewer-tauri/src-tauri/`、current working directory、Rust 実行ファイル directory の順に揃えた。macOS bundle では従来通り `<app>.app/Contents/MacOS/` のみを runtime directory とし、Finder 起動時の working directory に依存しない。
 
 ### 2.4 PlantUML jar / config ファイルの runtime 解決例外条件が impl 文書に未記載
 
@@ -164,13 +164,13 @@ timeout は別の watchdog thread か `Instant::now() - started` の polling で
 | SVG sanitizer: `<script>` 要素と `on*` event handler attribute 除去を Avalonia / Tauri 両方で実装 | ✓ 整合 |
 | エラー表示: 各 fence ごとに `.plantuml-error`、Tauri は `firstError` を banner にも反映 | ✓ 整合 (Avalonia の banner 反映は §2.2 参照) |
 | `PlantUmlRuntimeOptions` の `JarPath` / `ConfigPath` 契約、runtime error の分類 (`JarNotFound` / `ConfigInvalid`) | ✓ 整合 (Phase 2 Low 2.3) |
-| Avalonia / Tauri 開発実行と Tauri bundle の runtime directory が `docs/rules/development_workflow.md` と impl で対応 (順序は §2.3 参照) | △ |
-| 共有確認用 `sample_docs/plantuml.md` がリポジトリ直下に追加され、`plantuml` と `puml` を含む | ✓ 整合 (Mermaid 混在は §2.1 参照) |
+| Avalonia / Tauri 開発実行と Tauri bundle の runtime directory が `docs/rules/development_workflow.md` と impl で対応 | ✓ 整合 |
+| 共有確認用 `sample_docs/plantuml.md` がリポジトリ直下に追加され、`mermaid` / `plantuml` / `puml` を含む | ✓ 整合 |
 | `docs/rules/development_workflow.md` に PlantUML setup、runtime directory、PlantUML `1.2026.3` / `openjdk 24.0.2` 動作確認、手動確認の PlantUML 追加が反映 | ✓ 整合 (Phase 2 Low 3.2) |
 | `docs/architecture/overview.md` / `code_patterns.md` / `common_pitfalls.md` に PlantUML を追記 | ✓ 整合 |
 | `docs/components/avalonia_viewer/` (README / detail_design / interface_spec) に Service 構成と非同期 API を追記 | ✓ 整合 |
-| `docs/components/tauri_viewer/` (README / detail_design / interface_spec) に PlantUML command 契約と runtime directory を追記 | ✓ 整合 (順序差は §2.3 参照) |
-| 設計レビュー §1.1〜§1.4 Medium 4 件、§2.1〜§2.4 / §3.1〜§3.4 Low 8 件のすべてが実装または文書に反映 (本文書 §1.3 / §2.3 で軽微な再修正対象あり) | ✓ おおむね整合 |
+| `docs/components/tauri_viewer/` (README / detail_design / interface_spec) に PlantUML command 契約と runtime directory を追記 | ✓ 整合 |
+| 設計レビュー §1.1〜§1.4 Medium 4 件、§2.1〜§2.4 / §3.1〜§3.4 Low 8 件のすべてが実装または文書に反映 | ✓ 整合 |
 | `meta.md` `impl_status=draft` で Phase 3 レビュー依頼準備済み | ✓ 整合 |
 | Phase 3 検証コマンド `dotnet build` / `npm run build` / `cargo fmt -- --check` / `cargo check` が成功 (ユーザ報告) | ✓ 整合 |
 | PlantUML 1.2026.3 と Java openjdk 24.0.2 で `java -jar ... -tsvg -pipe` smoke test が成功 (ユーザ報告) | ✓ 整合 |
@@ -213,3 +213,30 @@ timeout は別の watchdog thread か `Instant::now() - started` の polling で
 - 低優先度 §1.4 / §2.2 / §2.4 / §3.1〜§3.4 の 7 件は Phase 3 中の対応が望ましいが、Phase 4-a / 4-b に持ち越しても致命的な阻害要因にはならない。Phase 4 へ持ち越す場合は impl 文書または `meta.md` に明示すること。
 
 未解決指摘は本文書に列挙したとおり。High 2 件の対応完了後に再レビューを依頼することを推奨する。
+
+---
+
+## 7. 指摘対応状況更新 (2026-05-21)
+
+Phase 3実装レビュー後、High 2件と Medium 3件を対応した。
+
+| 項目 | 対応状況 |
+|------|----------|
+| 1.1 Tauri Mermaid 消失 regression | 対応済み。PlantUML結果反映後もMermaidを再描画する。 |
+| 1.2 Rust stdout/stderr deadlock | 対応済み。stdout / stderrを子process実行中に別threadでdrainする。 |
+| 1.3 Mermaid fence regex厳密性差 | 対応済み。info string先頭tokenを言語判定に使う仕様として文書化した。 |
+| 2.1 Mermaid同居サンプル不足 | 対応済み。`sample_docs/plantuml.md` にMermaid blockを追加した。 |
+| 2.3 Tauri runtime directory探索順 | 対応済み。実装・設計・component docsを `src-tauri/`、current working directory、実行ファイルdirectoryの順に揃えた。 |
+| 1.4 Avalonia stdin encoding未指定 | 対応済み。`StandardInputEncoding = Encoding.UTF8` を追加した。 |
+
+低優先度の 2.2 / 2.4 / 3.1 / 3.2 / 3.3 / 3.4 は Phase 4 での確認またはfollow-upとして残す。Phase 3完了承認の阻害要因ではない。
+
+再検証:
+
+- `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj --no-restore`: 成功。
+- `npm run build` in `markdown-viewer-tauri/`: 成功。Mermaid chunk size warningあり。
+- `cargo check` in `markdown-viewer-tauri/src-tauri/`: 成功。
+- `cargo fmt -- --check` in `markdown-viewer-tauri/src-tauri/`: 成功。
+- `git diff --check`: 成功。
+
+再レビュー依頼対象: この対応差分を含む次 commit。
