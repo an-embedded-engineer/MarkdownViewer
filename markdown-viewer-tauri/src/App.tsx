@@ -1,0 +1,539 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import MarkdownIt from "markdown-it";
+import mermaid from "mermaid";
+import "./App.css";
+
+type FileNodeType = "directory" | "markdown" | "image";
+
+type FileTreeNode = {
+  name: string;
+  path: string;
+  relativePath: string;
+  nodeType: FileNodeType;
+  children: FileTreeNode[];
+};
+
+type Theme = "light" | "dark";
+
+const markdownExtensions = new Set(["md", "markdown"]);
+const externalUrlPattern = /^(https?:)?\/\//i;
+
+function App() {
+  const [rootPath, setRootPath] = useState<string | null>(null);
+  const [fileTree, setFileTree] = useState<FileTreeNode | null>(null);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [selectedMarkdown, setSelectedMarkdown] = useState("");
+  const [previewRevision, setPreviewRevision] = useState(0);
+  const [theme, setTheme] = useState<Theme>("light");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const selectedFileName = selectedFilePath ? getFileName(selectedFilePath) : "";
+
+  async function openFolder() {
+    setErrorMessage(null);
+
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      recursive: true,
+      title: "Open Markdown Folder",
+    });
+
+    if (typeof selected !== "string") {
+      return;
+    }
+
+    await loadRoot(selected);
+  }
+
+  async function loadRoot(path: string) {
+    try {
+      const tree = await invoke<FileTreeNode>("scan_directory", {
+        rootPath: path,
+      });
+      setRootPath(path);
+      setFileTree(tree);
+
+      const initialFile = findReadme(tree) ?? findFirstMarkdown(tree);
+      if (initialFile) {
+        await loadMarkdown(path, initialFile.path);
+      } else {
+        setSelectedFilePath(null);
+        setSelectedMarkdown("");
+        setPreviewRevision((revision) => revision + 1);
+      }
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  async function reload() {
+    if (!rootPath) {
+      return;
+    }
+
+    try {
+      const tree = await invoke<FileTreeNode>("scan_directory", {
+        rootPath,
+      });
+      setFileTree(tree);
+
+      if (selectedFilePath) {
+        await loadMarkdown(rootPath, selectedFilePath);
+      }
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  async function loadMarkdown(currentRootPath: string, filePath: string, anchor?: string) {
+    try {
+      const markdown = await invoke<string>("read_text_file", {
+        rootPath: currentRootPath,
+        path: filePath,
+      });
+      setSelectedFilePath(filePath);
+      setSelectedMarkdown(markdown);
+      setPreviewRevision((revision) => revision + 1);
+      setPendingAnchor(anchor ?? null);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  async function handlePreviewClick(event: React.MouseEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    const anchor = target.closest("a");
+    const href = anchor?.getAttribute("href");
+
+    if (!href) {
+      return;
+    }
+
+    if (href.startsWith("#")) {
+      event.preventDefault();
+      scrollToAnchor(href.slice(1), previewRef.current);
+      return;
+    }
+
+    if (externalUrlPattern.test(href) || href.startsWith("mailto:")) {
+      event.preventDefault();
+      await openUrl(href);
+      return;
+    }
+
+    if (!rootPath || !selectedFilePath) {
+      return;
+    }
+
+    const [rawPath, rawAnchor] = href.split("#");
+    if (!isMarkdownPath(rawPath)) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextPath = resolveSiblingPath(selectedFilePath, safeDecode(rawPath));
+    await loadMarkdown(rootPath, nextPath, rawAnchor ? safeDecode(rawAnchor) : undefined);
+  }
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: theme === "dark" ? "dark" : "default",
+    });
+
+    const container = previewRef.current;
+    if (!container) {
+      return;
+    }
+
+    const nodes = container.querySelectorAll<HTMLElement>(".mermaid");
+    if (nodes.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    mermaid.run({ nodes }).catch((error) => {
+      if (!cancelled) {
+        setErrorMessage(`Mermaid render failed: ${toErrorMessage(error)}`);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewRevision, theme]);
+
+  useEffect(() => {
+    if (!pendingAnchor || !previewRef.current) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      scrollToAnchor(pendingAnchor, previewRef.current);
+      setPendingAnchor(null);
+    }, 80);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingAnchor, previewRevision]);
+
+  return (
+    <main className="app-shell">
+      <Toolbar
+        rootPath={rootPath}
+        selectedFileName={selectedFileName}
+        theme={theme}
+        onOpenFolder={openFolder}
+        onReload={reload}
+        onToggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
+      />
+
+      <section className="workspace">
+        <aside className="explorer-pane" aria-label="Explorer">
+          <div className="pane-title">Explorer</div>
+          {fileTree ? (
+            <FileTree
+              node={fileTree}
+              selectedFilePath={selectedFilePath}
+              onSelect={(node) => rootPath && loadMarkdown(rootPath, node.path)}
+            />
+          ) : (
+            <div className="empty-state">Open a folder to browse Markdown files.</div>
+          )}
+        </aside>
+
+        <section className="preview-pane" aria-label="Markdown Preview">
+          {errorMessage && <div className="error-banner">{errorMessage}</div>}
+          {selectedFilePath ? (
+            <MarkdownPreview
+              key={`${selectedFilePath}-${theme}-${previewRevision}`}
+              markdown={selectedMarkdown}
+              selectedFilePath={selectedFilePath}
+              previewRef={previewRef}
+              onClick={handlePreviewClick}
+            />
+          ) : (
+            <div className="preview-empty">No Markdown file selected.</div>
+          )}
+        </section>
+      </section>
+    </main>
+  );
+}
+
+type ToolbarProps = {
+  rootPath: string | null;
+  selectedFileName: string;
+  theme: Theme;
+  onOpenFolder: () => void;
+  onReload: () => void;
+  onToggleTheme: () => void;
+};
+
+function Toolbar({
+  rootPath,
+  selectedFileName,
+  theme,
+  onOpenFolder,
+  onReload,
+  onToggleTheme,
+}: ToolbarProps) {
+  return (
+    <header className="toolbar">
+      <button type="button" onClick={onOpenFolder}>
+        Open Folder
+      </button>
+      <button type="button" onClick={onToggleTheme}>
+        Theme: {theme === "light" ? "Light" : "Dark"}
+      </button>
+      <button type="button" disabled={!rootPath} onClick={onReload}>
+        Reload
+      </button>
+      <div className="path-display" title={rootPath ?? ""}>
+        <span>{rootPath ?? "No folder selected"}</span>
+        {selectedFileName && <strong>{selectedFileName}</strong>}
+      </div>
+    </header>
+  );
+}
+
+type FileTreeProps = {
+  node: FileTreeNode;
+  selectedFilePath: string | null;
+  onSelect: (node: FileTreeNode) => void;
+};
+
+function FileTree({ node, selectedFilePath, onSelect }: FileTreeProps) {
+  return (
+    <div className="file-tree">
+      <TreeNode node={node} selectedFilePath={selectedFilePath} onSelect={onSelect} level={0} />
+    </div>
+  );
+}
+
+type TreeNodeProps = FileTreeProps & {
+  level: number;
+};
+
+function TreeNode({ node, selectedFilePath, onSelect, level }: TreeNodeProps) {
+  const [expanded, setExpanded] = useState(level < 1);
+  const isDirectory = node.nodeType === "directory";
+  const isSelected = selectedFilePath === node.path;
+
+  if (isDirectory) {
+    return (
+      <div>
+        <button
+          type="button"
+          className="tree-row directory-row"
+          style={{ paddingLeft: 12 + level * 14 }}
+          onClick={() => setExpanded((value) => !value)}
+          title={node.path}
+        >
+          <span className="tree-icon">{expanded ? "v" : ">"}</span>
+          <span className="tree-label">{node.name}</span>
+        </button>
+        {expanded &&
+          node.children.map((child) => (
+            <TreeNode
+              key={child.path}
+              node={child}
+              selectedFilePath={selectedFilePath}
+              onSelect={onSelect}
+              level={level + 1}
+            />
+          ))}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={`tree-row file-row ${isSelected ? "selected" : ""}`}
+      style={{ paddingLeft: 12 + level * 14 }}
+      disabled={node.nodeType !== "markdown"}
+      onClick={() => onSelect(node)}
+      title={node.path}
+    >
+      <span className="tree-icon">{node.nodeType === "markdown" ? "MD" : "IMG"}</span>
+      <span className="tree-label">{node.name}</span>
+    </button>
+  );
+}
+
+type MarkdownPreviewProps = {
+  markdown: string;
+  selectedFilePath: string;
+  previewRef: React.RefObject<HTMLDivElement | null>;
+  onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
+};
+
+function MarkdownPreview({ markdown, selectedFilePath, previewRef, onClick }: MarkdownPreviewProps) {
+  const html = useMemo(
+    () => renderMarkdown(markdown, selectedFilePath),
+    [markdown, selectedFilePath],
+  );
+
+  return (
+    <article
+      ref={previewRef}
+      className="markdown-body"
+      onClick={onClick}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+function renderMarkdown(markdown: string, selectedFilePath: string) {
+  const md = new MarkdownIt({
+    html: false,
+    linkify: true,
+    typographer: true,
+  });
+
+  const defaultFence = md.renderer.rules.fence?.bind(md.renderer);
+  md.renderer.rules.fence = (tokens, idx, options, env, renderer) => {
+    const token = tokens[idx];
+    const language = token.info.trim().split(/\s+/)[0]?.toLowerCase();
+
+    if (language === "mermaid") {
+      return `<div class="mermaid">${escapeHtml(token.content)}</div>`;
+    }
+
+    return defaultFence?.(tokens, idx, options, env, renderer) ?? "";
+  };
+
+  const defaultImage = md.renderer.rules.image?.bind(md.renderer);
+  md.renderer.rules.image = (tokens, idx, options, env, renderer) => {
+    const token = tokens[idx];
+    const srcIndex = token.attrIndex("src");
+
+    if (srcIndex >= 0 && token.attrs) {
+      const src = token.attrs[srcIndex][1];
+      if (src && isRelativeResource(src)) {
+        const assetPath = resolveSiblingPath(selectedFilePath, safeDecode(src));
+        token.attrs[srcIndex][1] = convertFileSrc(assetPath);
+      }
+
+      token.attrSet("loading", "lazy");
+    }
+
+    return defaultImage?.(tokens, idx, options, env, renderer) ?? renderer.renderToken(tokens, idx, options);
+  };
+
+  md.renderer.rules.heading_open = (tokens, idx, options, _env, renderer) => {
+    const nextToken = tokens[idx + 1];
+    if (nextToken?.type === "inline") {
+      tokens[idx].attrSet("id", slugify(nextToken.content));
+    }
+
+    return renderer.renderToken(tokens, idx, options);
+  };
+
+  return md.render(markdown);
+}
+
+function findReadme(node: FileTreeNode): FileTreeNode | null {
+  if (node.nodeType === "markdown" && node.name.toLowerCase() === "readme.md") {
+    return node;
+  }
+
+  for (const child of node.children) {
+    const match = findReadme(child);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function findFirstMarkdown(node: FileTreeNode): FileTreeNode | null {
+  if (node.nodeType === "markdown") {
+    return node;
+  }
+
+  for (const child of node.children) {
+    const match = findFirstMarkdown(child);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function isMarkdownPath(path: string) {
+  const extension = path.split(".").pop()?.toLowerCase();
+  return extension ? markdownExtensions.has(extension) : false;
+}
+
+function isRelativeResource(path: string) {
+  return (
+    !path.startsWith("#") &&
+    !path.startsWith("data:") &&
+    !path.startsWith("file:") &&
+    !externalUrlPattern.test(path) &&
+    !isAbsolutePath(path)
+  );
+}
+
+function isAbsolutePath(path: string) {
+  return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+function resolveSiblingPath(filePath: string, relativePath: string) {
+  if (isAbsolutePath(relativePath)) {
+    return normalizePath(relativePath);
+  }
+
+  const separator = filePath.includes("\\") ? "\\" : "/";
+  const separatorIndex = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
+  const directory = separatorIndex === 0 ? separator : filePath.slice(0, separatorIndex);
+  return normalizePath(`${directory}${separator}${relativePath}`);
+}
+
+function normalizePath(path: string) {
+  const usesBackslash = /^[A-Za-z]:[\\/]/.test(path) || path.includes("\\");
+  const separator = usesBackslash ? "\\" : "/";
+  const parts = path.split(/[\\/]+/);
+  const output: string[] = [];
+  let prefix = "";
+
+  if (path.startsWith("/")) {
+    prefix = "/";
+  } else if (/^[A-Za-z]:$/.test(parts[0])) {
+    prefix = `${parts.shift()}\\`;
+  }
+
+  for (const part of parts) {
+    if (!part || part === ".") {
+      continue;
+    }
+    if (part === "..") {
+      output.pop();
+      continue;
+    }
+    output.push(part);
+  }
+
+  return `${prefix}${output.join(separator)}`;
+}
+
+function getFileName(path: string) {
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}\s-]/gu, "")
+    .replace(/\s+/g, "-");
+}
+
+function scrollToAnchor(anchor: string, container: HTMLElement | null) {
+  if (!anchor || !container) {
+    return;
+  }
+
+  const target = container.querySelector(`#${CSS.escape(anchor)}`);
+  target?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function toErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+export default App;
