@@ -9,15 +9,19 @@ components:
   - "Avalonia Viewer"
   - "Tauri Viewer"
   - "PlantUML runtime setup"
-status: "draft"
+status: "implemented"
 design_status: "done"
-impl_status: "draft"
+impl_status: "done"
 completion_status: "not_started"
 related_commits:
   - "6d0c0ec : Phase 0 Define PlantUML rendering feature"
   - "a33db00 : Phase 2 Draft PlantUML rendering design"
   - "201c0cf : Phase 2 Design review (conditional approval)"
   - "010ff41 : Phase 2 Address PlantUML design review feedback"
+  - "ac29f0b : Phase 2 Approve PlantUML rendering design"
+  - "7c4acc6 : Phase 3 Implement PlantUML rendering support"
+  - "07ce356 : Phase 3 Implementation review (conditional approval)"
+  - "632019e : Phase 3 Address PlantUML implementation review feedback"
 ---
 
 # PlantUML Rendering Support Meta
@@ -35,5 +39,5 @@ related_commits:
 | Phase 0 Requirements | Done |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-05-20) |
-| Phase 3 Implementation and docs review | Implementation draft in progress |
+| Phase 3 Implementation and docs review | Done (approved 2026-05-21) |
 | Phase 4 Verification and completion | Not started |

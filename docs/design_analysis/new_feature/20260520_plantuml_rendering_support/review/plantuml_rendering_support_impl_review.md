@@ -1,13 +1,16 @@
 # PlantUML 表示対応 実装レビュー
 
 **レビュー日**: 2026-05-21
-**対象実装コミット**: `7c4acc65a0ae9eaafbf16703360f355ddb29d59c`
+**再確認日**: 2026-05-21
+**初回レビュー対象コミット**: `7c4acc65a0ae9eaafbf16703360f355ddb29d59c`
+**再確認対象コミット**: `632019ed4773a249dba3ce7d296d986b738cc337`
 **対象設計**: `docs/design_analysis/new_feature/20260520_plantuml_rendering_support/design/plantuml_rendering_support_feature_design.md`
 **対象設計レビュー**: `docs/design_analysis/new_feature/20260520_plantuml_rendering_support/review/plantuml_rendering_support_design_review.md`
 **対象実装記録**: `docs/design_analysis/new_feature/20260520_plantuml_rendering_support/impl/plantuml_rendering_support_feature_impl.md`
 **対象 meta**: `docs/design_analysis/new_feature/20260520_plantuml_rendering_support/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-001
 **レビュー観点出典**: `ai-review-response-workflow` skill 同梱 `references/procedure/review_checkpoints.md` および `new-feature-workflow` の `phase_3_impl_and_docs_focus.md`
+**判定**: **承認 (Approved)**。Phase 4 進行可。残作業は Low 6 件で、Phase 4-a / 4-b の動作確認と completion に紐付けて扱う。
 
 ---
 
@@ -240,3 +243,46 @@ Phase 3実装レビュー後、High 2件と Medium 3件を対応した。
 - `git diff --check`: 成功。
 
 再レビュー依頼対象: この対応差分を含む次 commit。
+
+---
+
+## 8. レビュー担当による再確認結果 (2026-05-21, commit `632019e`)
+
+実装差分・恒久ドキュメント・impl 文書を再確認した。High 2 件と Medium 3 件は実装または恒久ドキュメントへ反映されており、レビュー担当としても解消を承認する。
+
+### High の対応確認
+
+- **1.1 Tauri Mermaid 消失 regression**: `markdown-viewer-tauri/src/App.tsx:259` の Mermaid `useEffect` の deps が `[previewRevision, theme, plantUmlDiagrams]` へ拡張された。`plantUmlDiagrams` は `useMemo` 化された `emptyPlantUmlDiagrams` を空集合として使うことで参照安定性が確保され、PlantUML 結果が変化したときだけ Mermaid effect が再走する。PlantUML 描画 (pending → result) の各 setState で `dangerouslySetInnerHTML` が DOM を上書きしても、その直後の Mermaid effect で `.mermaid` 要素に対して `mermaid.run` が再実行される。Mermaid + PlantUML 同居サンプル (`sample_docs/plantuml.md`) が追加されたことで、Phase 4-a の手動確認でも再現できる。✓ 解消確認。
+- **1.2 Rust stdout/stderr deadlock**: `markdown-viewer-tauri/src-tauri/src/lib.rs:247-260` で `child.stdout.take()` / `child.stderr.take()` を取り出し、`read_plantuml_pipe` (`lib.rs:314-328`) で `thread::spawn` した reader thread に `read_to_end` を担わせる。stdin への source 書き込みは reader thread が走った後に実行されるため、Java が SVG を stdout に書く間も親プロセスは drain を継続でき、pipe buffer overflow が原因の deadlock を回避する。timeout 経路 (`lib.rs:302-308`) では `child.kill()` → `child.wait()` → `join_plantuml_pipe` の順で reader thread を回収するため、kill 後の thread leak も発生しない。stdin 書き込み失敗時の cleanup (`lib.rs:267-273`) でも同じ手順で thread を回収する。Avalonia の `ReadToEndAsync` 並行 drain と振る舞いが揃った。✓ 解消確認。
+
+### Medium の対応確認
+
+- **1.3 Mermaid fence regex 厳密性差**: `docs/architecture/code_patterns.md` の TypeScript / React 節に「Mermaid / PlantUML のfence言語判定はinfo stringの先頭tokenを小文字化して行う」旨が追記された。実装上、Tauri は `info.trim().split(/\s+/)[0]?.toLowerCase()` で先頭 token を切り出して比較するため文書通り。Avalonia の `DiagramFenceRegex` は ` ```mermaid<空白あり> ` のような通常の info string パターンを正しく言語として扱い、文書記述と整合する。連結記法 (` ```mermaidsequence ` のように空白なしで追記する) は Markdown 上でも一般的な書式ではないため、文書化による整合で実用上の差異は解消とみなせる。✓ 解消確認。
+- **2.1 Mermaid 同居サンプル不足**: `sample_docs/plantuml.md` に Mermaid flowchart block が追加され、`mermaid` / `plantuml` / `puml` の 3 種類を 1 ファイルで確認できる構成になった。`docs/rules/development_workflow.md` の手動確認チェックリストに「Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること」が追記され、設計書 (`feature_design.md`) の「テスト・ユーザ確認観点」も同居前提の文言へ更新された。Phase 4-a で High 1.1 の対応を再現確認できる材料がそろった。✓ 解消確認。
+- **2.3 Tauri runtime directory 探索順**: `lib.rs:405-416` で `CARGO_MANIFEST_DIR` (debug 時) → `current_dir` → `current_exe` parent の順に挿入される。macOS bundle 判定 (`is_macos_app_executable_directory`) で先に拾うため、bundled 起動は `<app>.app/Contents/MacOS/` のみ。`docs/components/tauri_viewer/detail_design.md`、`docs/rules/development_workflow.md`、設計書 (`feature_design.md`)、`impl/plantuml_rendering_support_feature_impl.md` の 4 箇所すべてが「`markdown-viewer-tauri/src-tauri/` → current working directory → Rust 実行ファイル directory の順」で揃っている。✓ 解消確認。
+
+### Low の対応確認
+
+- **1.4 Avalonia stdin encoding 未指定**: `Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRenderService.cs:65` に `StandardInputEncoding = Encoding.UTF8` が追加された。Windows などの非 UTF-8 default code page 環境でも、PlantUML source は UTF-8 で stdin へ書き込まれる。✓ 解消確認。
+- **2.2 Avalonia banner 反映欠如の文書化**: 未対応。Phase 4 持ち越し。
+- **2.4 5 エラーシナリオの期待表示の記録**: 未対応。Phase 4 動作確認時に impl 文書または development_workflow へ追記する想定。
+- **3.1 Rust `_config_path` 未使用**: 未対応。コード上の見通し改善で、Phase 4 / completion で扱う。
+- **3.2 jar 解決の memoization**: 未対応。性能最適化として follow-up に残す。
+- **3.3 Placeholder 衝突可能性**: 未対応。Mermaid 旧実装からの継承で、follow-up に残す。
+- **3.4 ADR 候補化判定の最終結論**: 未対応。Phase 4-c completion で判定し、結論を `docs/adr/` または `meta.md` の follow-up に残す。
+
+### 整合性追加確認
+
+- `git diff` 上での実装差分と impl 文書 (§「設計レビュー指摘への対応」) の対応が一致する。
+- `meta.md` の `related_commits` には Phase 3 関連 commit が反映待ち。`design_status=done`、`impl_status=draft` のまま。impl 完了後は本承認に合わせて `impl_status=done`、`status=implemented` への遷移と Phase 3 主要 commit (`7c4acc6` / `07ce356` / `632019e`) の `related_commits` 追記が必要 (本レビューと同時に meta を更新する)。
+- 再検証コマンド (`dotnet build` / `npm run build` / `cargo check` / `cargo fmt -- --check` / `git diff --check`) の成功はユーザ報告通り。Mermaid chunk size の warning は既存事象として継続。
+
+### 判定
+
+**承認 (Approved)**。
+
+- 設計レビュー Medium 4 件 / Low 8 件、本実装レビュー High 2 件 / Medium 3 件 / Low 1 件の合計 18 件が実装または恒久ドキュメントへ反映済み。
+- 残る Low 6 件 (2.2 / 2.4 / 3.1 / 3.2 / 3.3 / 3.4) は Phase 4 (-a 動作確認 / -b 完了処理 / -c マージ前) で扱う follow-up として impl 文書 §「設計レビュー指摘への対応」と本文書 §5 表に明示済み。Phase 3 完了の阻害要因にはならない。
+- Phase 4-a のユーザ動作確認では、`sample_docs/plantuml.md` を Avalonia と Tauri の双方で開き、(1) Mermaid と PlantUML の両方が描画されること、(2) Light / Dark 切替で PlantUML CLI を再実行せず描画が崩れないこと、(3) `plantuml.jar` を一時的に置き換えた場合のエラー表示が動作すること、を確認することを推奨する。
+
+未解決指摘なし (Phase 3 で扱う対象としては解消済み)。本承認をもって Phase 3 実装レビューを完了とする。
