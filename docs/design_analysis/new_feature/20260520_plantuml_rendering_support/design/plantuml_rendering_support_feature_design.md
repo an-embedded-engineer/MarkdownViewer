@@ -98,6 +98,9 @@ runtime directory:
 
 - publish されたアプリ: 実行ファイルのディレクトリ。
 - 開発実行: 現在の working directory を先に見て、その後に実行ファイルのディレクトリを見る。これにより、publish 後の配置規約を保ちながら開発時の設定も扱いやすくする。
+- Avalonia 開発実行: `dotnet run --project Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj` の working directory と、実行 assembly の base directory を探索対象にする。
+- Tauri 開発実行: `markdown-viewer-tauri/src-tauri/` を明示的な runtime directory として先に探索し、その後に Rust 実行ファイルの directory を探索する。`npm run tauri dev` の呼び出し元 working directory に依存しない。
+- Tauri bundle: macOS `.app` では `<app>.app/Contents/MacOS/` を runtime directory とする。Finder 起動時の working directory は `/` になり得るため、bundle 実行では working directory を jar 探索の根拠にしない。
 
 config file 形式:
 
@@ -109,27 +112,33 @@ config file 形式:
 
 `plantuml.config.json` と `plantuml.jar` はローカル runtime ファイルとして扱い、Phase 3 で `.gitignore` へ追加する。
 
+`.gitignore` は root 直下用に `/plantuml.jar` と `/plantuml.config.json` を追加し、実行ディレクトリごとの配置は各実行ディレクトリ側の既存生成物除外規則または個別 `.gitignore` で扱う。Phase 3 では Tauri 開発実行用に `markdown-viewer-tauri/src-tauri/plantuml.jar` と `markdown-viewer-tauri/src-tauri/plantuml.config.json` も除外対象に含める。
+
 ## 影響範囲
 
 Avalonia:
 
 - `Services/` 配下に `PlantUmlRuntimeOptions` / resolver service を追加する。
 - `Services/` 配下に `PlantUmlRenderService` を追加する。
-- `MarkdownRenderService` を非同期化し、`plantuml` placeholder に対応する。
+- `IMarkdownRenderService` は `Task<string> RenderToHtmlFragmentAsync(string markdown, CancellationToken cancellationToken)` を公開する。既存の同期 `RenderToHtmlFragment` は project 内公開 API として残さず、新しい非同期 API に一本化する。
+- `MarkdownRenderService` は Markdown fence の抽出、placeholder 管理、Mermaid / PlantUML 用 HTML 差し替えを担当する。
+- `PlantUmlRenderService` は `PlantUmlRuntimeResolver` で jar を解決し、PlantUML CLI 実行、timeout、stdout / stderr / exit code の解釈だけを担当する。
 - `MainWindowViewModel.OpenMarkdownAsync` で PlantUML 対応済み render path を await する。
 - `HtmlTemplateService` の preview CSS に `.plantuml-diagram` と `.plantuml-error` を追加する。
 
 Tauri:
 
 - `src-tauri/src/lib.rs` に render request / response 用の serializable model を追加する。
-- `render_plantuml_diagrams` command を追加する、または Markdown 読み込み response に図描画結果を統合する。
+- `render_plantuml_diagrams` command を追加する。Markdown 読み込み response へ統合する案は採用しない。
 - ファイル読み込みと PlantUML 実行は React ではなく Rust 側に置く。
-- `src/App.tsx` で PlantUML fence を renderer 結果へ差し替えてから Markdown HTML へ変換する。
+- `src/App.tsx` は Markdown 本文から PlantUML fence を抽出し、`invoke<PlantUmlRenderResponse>("render_plantuml_diagrams", ...)` で Rust 側へ渡す。返却された SVG / error HTML を placeholder へ差し替えてから Markdown HTML へ変換する。
+- React は `previewRevision` と selected file path をキーに PlantUML render request を発行し、Mermaid は従来通り HTML 反映後に `mermaid.run` で描画する。
+- Rust command は `Result<PlantUmlRenderResponse, String>` を返し、プロセス起動不能など command 全体の失敗は banner、図ごとの失敗は response 内の diagram result として inline 表示する。
 - `src/App.css` に `.plantuml-diagram` と `.plantuml-error` を追加する。
 
 Docs / samples:
 
-- 既存 sample docs 領域、または必要に応じて共有 sample 領域へ PlantUML サンプル Markdown を追加する。
+- 共有確認用として `sample_docs/plantuml.md` をリポジトリ直下に追加する。Avalonia / Tauri の手動確認はいずれもリポジトリ直下または `sample_docs/` を含むフォルダを開いて同じ Markdown を使う。
 - component docs と development workflow のセットアップ説明を更新する。
 
 ## 設計方針
@@ -152,6 +161,8 @@ java -jar <plantuml.jar> -tsvg -pipe
 
 図の source は stdin へ書き込む。SVG は stdout から読み取る。stderr と exit code はエラー表示用に取得する。
 
+stdout / stderr は UTF-8 として扱う。C# 側は `ProcessStartInfo.StandardOutputEncoding` / `StandardErrorEncoding` に `Encoding.UTF8` を指定し、Rust 側は `Command::output()` の byte 出力を `String::from_utf8_lossy` で UI 表示可能な文字列へ変換する。
+
 timeout:
 
 - 1 図あたり 10 秒で timeout する。
@@ -172,6 +183,8 @@ concurrency:
 
 resolver 全体のエラーは、各 PlantUML fence に同じインラインエラーとして表示し、既存の status / error banner が使える画面ではそこにも反映する。
 
+複数の PlantUML fence が同時に失敗した場合、inline error は各 fence に表示する。banner / status には最初の代表エラー 1 件のみを表示し、詳細は inline error を正とする。
+
 Reload や theme switch 後に古い SVG を残したり、空白のまま失敗を隠したりしない。
 
 ### セキュリティと sanitization
@@ -181,6 +194,7 @@ Reload や theme switch 後に古い SVG を残したり、空白のまま失敗
 - ネットワーク server は呼び出さない。
 - renderer は shell 展開を通さず、`java` を引数配列で直接起動する。
 - `plantuml.jar` path はファイルとして解決できることを確認し、Markdown 本文からは推定しない。
+- PlantUML が出力した SVG はそのまま DOM に入れる前に、少なくとも `<script>` 要素と `on*` event handler 属性を除去する。初期実装では sanitizer を Avalonia / Tauri それぞれの host-side renderer に置き、将来共通化の必要が出た時点で抽象化する。
 
 ### Theme 動作
 
@@ -188,6 +202,9 @@ Phase 3 では theme 対応を単純に保つ。
 
 - PlantUML の dark-mode option は初期実装では使わない。
 - SVG を `.plantuml-diagram` で包み、viewer の背景・border 変数に合わせる。
+- Theme 切替時は PlantUML SVG を再生成せず、既存 SVG を保持して CSS のみ更新する。PlantUML 図の色自体は変えない。
+- Avalonia は `ToggleTheme` 時に Markdown 再読み込みで PlantUML CLI を再実行しないよう、現在の Markdown 本文と PlantUML render result を再利用して HTML template だけを再構築する。
+- Tauri は `theme` 変更だけでは `render_plantuml_diagrams` を再実行しない。selected file path、Markdown 本文、Reload による `previewRevision` 更新時のみ PlantUML CLI を実行する。
 - PlantUML dark-mode は図の意味や色表現に影響するため、後続拡張として扱う。
 
 ## 互換性・移行方針
@@ -199,6 +216,8 @@ PlantUML 表示を使うユーザーは、以下のどちらかを行う。
 - runtime directory に `plantuml.jar` を置く。
 - `plantuml.config.json` を作成し、`plantUmlJarPath` に jar path を記載する。
 
+`PlantUmlRuntimeOptions` は `JarPath` と `ConfigPath` を持つ小さなデータ契約とし、resolver は jar 未検出、config 不正、Java 起動不可を区別できる error を返す。Java availability は起動時には検査せず、最初の PlantUML 描画時に `java -jar` の起動失敗として検出し、UI 表示可能な英語エラーへ変換する。
+
 ## 恒久ドキュメント更新予定先
 
 Phase 3 で以下を更新する。
@@ -206,8 +225,10 @@ Phase 3 で以下を更新する。
 - `docs/rules/development_workflow.md`: PlantUML ローカルセットアップと確認手順。
 - `docs/components/avalonia_viewer/README.md`
 - `docs/components/avalonia_viewer/detail_design.md`
+- `docs/components/avalonia_viewer/interface_spec.md`
 - `docs/components/tauri_viewer/README.md`
 - `docs/components/tauri_viewer/detail_design.md`
+- `docs/components/tauri_viewer/interface_spec.md`
 - `docs/architecture/overview.md`
 - `docs/architecture/code_patterns.md`
 - `docs/architecture/common_pitfalls.md`
@@ -230,6 +251,8 @@ Phase 3 で以下を更新する。
 - PlantUML 構文エラーが該当図の近くに表示されることを確認する。
 - Reload 後も Mermaid が表示されることを確認する。
 - Light / Dark 切替で PlantUML 出力が重なったり見えなくなったりしないことを確認する。
+- Light / Dark 切替だけでは PlantUML CLI が再実行されないこと、または体感上の遅延が増えないことを確認する。
+- 動作確認に使った PlantUML jar のバージョンを `docs/rules/development_workflow.md` へ記録する。
 
 ## リスクと follow-up
 
@@ -246,3 +269,4 @@ follow-up 候補:
 - PlantUML dark-mode option。
 - `plantuml.jar` path の設定 UI。
 - Java / PlantUML version を表示する確認 command。
+- ローカル CLI で図を生成する設計判断を ADR 化するかの判定。

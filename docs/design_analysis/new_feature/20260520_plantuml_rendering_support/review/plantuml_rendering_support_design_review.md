@@ -24,7 +24,7 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 2 設計レビュー。`pla
 **差異**: 公開 API の戻り値型と命名が変わるが、設計書には新シグネチャ案 (例 `Task<string> RenderToHtmlFragmentAsync(string markdown, CancellationToken)`) も後方互換扱いの方針も書かれていない。`MarkdownRenderService` 自身が `PlantUmlRenderService` を所有して非同期化するのか、`MainWindowViewModel` が両 Service を呼び分けるオーケストレータとなり Render Service は同期のまま残すのかが Phase 3 で揺らぐ恐れがある。
 **推奨対応**: Phase 3 着手前に、(a) 新インタフェース署名、(b) `MarkdownRenderService` と `PlantUmlRenderService` の責務分担 (placeholder 抽出側 / 実行側 / 差し替え orchestrator のどこが本体か)、(c) 既存同期メソッドを残すか撤去するか、を設計書「設計方針」または「影響範囲」へ追記する。SRP と「特定クラス固有 / 抽象化層 / 汎用層」の配置精査 (review_checkpoints.md §2) を明示するため。
 **severity**: Medium
-**対応**: 未対応
+**対応**: 対応済み。設計書の「影響範囲」に `IMarkdownRenderService.RenderToHtmlFragmentAsync(string markdown, CancellationToken cancellationToken)` へ一本化する方針、既存同期 API を残さない方針、`MarkdownRenderService` と `PlantUmlRenderService` の責務分担を追記した。
 
 ### 1.2 Tauri 側の境界選択が二案併記のまま
 
@@ -32,7 +32,7 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 2 設計レビュー。`pla
 **差異**: 採用案 / 不採用案いずれの形式でもなく、二案併記で残っている。前者は (markdown-it でいったん HTML 化 → fence 抽出 → Rust command 呼び出し → 差し替え) という多段オーケストレーションを React 側に置くことになり、後者は `read_text_file` 相当の契約自体を拡張することになる。境界選択は React と Rust 双方のテスト観点と互換性に影響する。
 **推奨対応**: Phase 3 で採用案を一つに固定し、設計書「採用案」または「設計方針」に追記する。React は再描画条件 (Mermaid と同じ `previewRevision` パイプライン) と整合する形を取り、Rust は `Result<T, String>` 契約 (language_rules.md Rust §1) を保つ案が既存パターンと整合しやすい。判断理由 (Tauri command boundary に寄せる方が `language_rules.md` の「Tauri command はファイルシステムや OS 連携の境界として扱う」と一致する) も併記する。
 **severity**: Medium
-**対応**: 未対応
+**対応**: 対応済み。Tauri 側は `render_plantuml_diagrams` command を採用し、Markdown 読み込み response 統合案は不採用とする方針へ設計書を更新した。React / Rust の責務境界と `Result<PlantUmlRenderResponse, String>` 契約も追記した。
 
 ### 1.3 Tauri の runtime directory 定義が不足
 
@@ -43,7 +43,7 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 2 設計レビュー。`pla
 - 既存 `docs/architecture/common_pitfalls.md` の「Publish 生成物」の規約 (`publish/` 配下) と Tauri bundle の物理パスの関係が曖昧。
 **推奨対応**: 設計書「Runtime 設定 / runtime directory」に Tauri 側の具体例を追加する。最低限、(1) dev: `markdown-viewer-tauri/src-tauri/` を cwd 相当として扱うか、cargo binary dir をどう扱うか、(2) bundled: `.app/Contents/MacOS/` 相当を runtime dir とする、を明文化する。`docs/components/tauri_viewer/detail_design.md` への反映予定先 (Phase 3) にもこの規約を含める。
 **severity**: Medium
-**対応**: 未対応
+**対応**: 対応済み。設計書の「Runtime 設定」に、Avalonia 開発実行、Tauri dev、Tauri macOS bundle の runtime directory を具体化し、Finder 起動時の working directory に依存しない方針を追記した。
 
 ### 1.4 Theme 切替時の再レンダリング挙動が未定義
 
@@ -54,7 +54,7 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 2 設計レビュー。`pla
 - B. Theme 切替時にも SVG を再生成し、その間 placeholder を表示する。
 あわせて「テスト・ユーザ確認観点」の Light / Dark 切替確認の合格条件を「PlantUML 出力が重なったり見えなくなったりしない」だけでなく「再描画にかかる時間」まで観測できる形に補足する。
 **severity**: Medium
-**対応**: 未対応
+**対応**: 対応済み。設計書の「Theme 動作」に、theme 切替だけでは PlantUML SVG を再生成せず CSS のみ更新する方針を追記した。Avalonia / Tauri それぞれの再利用条件と、手動確認で CLI 再実行や体感遅延を確認する観点も追加した。
 
 ---
 
@@ -65,28 +65,28 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 2 設計レビュー。`pla
 **不足**: 設計は「`plantuml.config.json` と `plantuml.jar` を `.gitignore` へ追加する」(design 110 行) と書いているが、現状の `.gitignore` (リポジトリ直下) は単純な glob 列挙 (`bin/`, `obj/`, `publish/` 等) で構成されている。`plantuml.jar` を bare filename で書くと意図しないサブディレクトリの同名ファイルもすべて除外する。Avalonia の publish output (`publish/avalonia/raw/` 配下) は既に `publish/` で除外されるため Tauri 側に置く配置場合と整合する必要がある。
 **推奨対応**: 設計書「Runtime 設定」または「影響範囲」に、追加する `.gitignore` パターンの具体的な書式 (例: `plantuml.jar`、`plantuml.config.json`、または `/plantuml.jar` のように root のみへ限定する案) を記述する。Tauri / Avalonia でユーザが jar を置く想定パスを 1, 2 件列挙し、それらが除外対象に含まれることを示す。
 **severity**: Low
-**対応**: 未対応
+**対応**: Phase 3 対応予定として設計書へ反映済み。root 直下の `/plantuml.jar` / `/plantuml.config.json` と、Tauri 開発実行用の `markdown-viewer-tauri/src-tauri/plantuml.jar` / `plantuml.config.json` を除外対象にする方針を追記した。
 
 ### 2.2 PlantUML サンプル Markdown 配置先が曖昧
 
 **不足**: 「既存 sample docs 領域、または必要に応じて共有 sample 領域へ PlantUML サンプル Markdown を追加する」(design 131-132 行) としか書かれていない。`docs/` 配下と `markdown-viewer-tauri/` 内のどちらに置くか、Avalonia / Tauri 両方で同じファイルを開けるよう想定するのかが不明。手動確認手順 (design 226-228 行) との接続も曖昧。
 **推奨対応**: Phase 3 着手前に配置先を 1 つ決め、設計書 (または `docs/components/<viewer>/detail_design.md` への反映予定) に追記する。Avalonia / Tauri 双方の手動確認で同じファイルを開ける構成 (リポジトリ直下の `samples/` 等) が後続 follow-up の確認にも使いやすい。
 **severity**: Low
-**対応**: 未対応
+**対応**: Phase 3 対応予定として設計書へ反映済み。共有確認用サンプルは `sample_docs/plantuml.md` に固定し、Avalonia / Tauri の手動確認で同じ Markdown を使う方針を追記した。
 
 ### 2.3 `PlantUmlRuntimeOptions` の契約と Java pre-check の有無
 
 **不足**: 「`Services/` 配下に `PlantUmlRuntimeOptions` / resolver service を追加する」(design 116 行) とあるが、`PlantUmlRuntimeOptions` がレコードか class か、resolver の戻り値型 (成功時の `JarPath` と失敗時のエラー種別) が示されていない。また「Java 未導入」を「原因が分かるエラー」(design 14 行) として表示する要件があるのに、`java -version` の pre-check を行うのか、初回 `java -jar` 失敗を ProcessException から判別するのかが書かれていない。
 **推奨対応**: `PlantUmlRuntimeOptions` の構造 (例: `record PlantUmlRuntimeOptions(string JarPath)` と `enum PlantUmlRuntimeError { JarNotFound, ConfigInvalid, JavaUnavailable }`)、resolver の `Result<T, Error>` 相当の契約、Java availability の検査タイミング (起動時 / 初回描画時 / 描画失敗時のメッセージ生成時) を Phase 3 で確定し、設計書または `docs/components/<viewer>/interface_spec.md` への反映予定に含める。
 **severity**: Low
-**対応**: 未対応
+**対応**: Phase 3 対応予定として設計書へ反映済み。`PlantUmlRuntimeOptions` の契約、resolver error の分類、Java availability を初回描画時に検出する方針を追記した。
 
 ### 2.4 ADR 候補化の判断記録
 
 **不足**: 「ローカル CLI を呼び出してドキュメント表示の一部を生成する」判断は、再利用可能性のある横断判断 (将来 Graphviz/dot や他のローカル CLI を呼ぶ拡張で同じトレードオフが発生する) で、`docs/adr/README.md` §2 の起票条件のうち「複数案件で再利用される可能性が高い」「誤ると同種の設計ミスを繰り返しやすい」の二つに触れる。設計書「リスクと follow-up」にこの ADR 候補化の判断記録がない。
 **推奨対応**: ADR 化が必要かを Phase 3 もしくは Phase 4 で改めて判定する旨を follow-up に追記する。今すぐ ADR を起票する必要はないが、判断記録がないと将来の類似機能 (例: Graphviz, kroki cli, 他の図形 CLI) で同じ議論を繰り返す。
 **severity**: Low
-**対応**: 未対応
+**対応**: Phase 3 または Phase 4 の follow-up 判定として設計書へ反映済み。ADR 化要否を follow-up 候補に追加した。
 
 ---
 
@@ -96,25 +96,25 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 2 設計レビュー。`pla
 
 **推奨対応**: 設計書「セキュリティと sanitization」に、PlantUML 出力 SVG に対する追加防御 (例: `<script>` / `on*` 属性の除去、もしくは `<svg>` を `<iframe srcdoc>` で隔離) の採否を明記する。今回はローカル PlantUML から生成された SVG を信頼する設計だが、PlantUML がカスタム HTML を埋め込む `<text>`/`<a>` パターンを将来追加した場合や、ローカルとはいえユーザが第三者の Markdown を開くケースを考慮し、防御を採用しないなら理由を、採用するなら境界 (Avalonia / Tauri 共通の sanitizer 層) を残す。
 **severity**: Low
-**対応**: 未対応
+**対応**: Phase 3 対応予定として設計書へ反映済み。PlantUML SVG を DOM に入れる前に `<script>` 要素と `on*` event handler 属性を除去する defense-in-depth 方針を追記した。
 
 ### 3.2 PlantUML / Java バージョンの記録
 
 **推奨対応**: 「ローカル環境では `openjdk 24.0.2`」(design 7 行) とあるが、PlantUML 側の動作確認バージョンが書かれていない。Phase 3 で動作確認した PlantUML のバージョン (例: `plantuml-1.2024.3.jar`) を恒久ドキュメント `docs/rules/development_workflow.md` のセットアップ節へ「動作確認済み」として明示すると、jar 入れ替え時の再現性が上がる。設計書の「リスクと follow-up」または「テスト・ユーザ確認観点」へ「動作確認した PlantUML バージョンを `development_workflow.md` に記載する」を追加する。
 **severity**: Low
-**対応**: 未対応
+**対応**: Phase 3 対応予定として設計書へ反映済み。動作確認に使った PlantUML jar のバージョンを `docs/rules/development_workflow.md` へ記録する確認観点を追記した。
 
 ### 3.3 Tauri command 失敗時のエラー対応箇所
 
 **推奨対応**: 設計書「エラー動作」(design 166-175 行) は inline error と既存 status / error banner の両方に出すと書いているが、Tauri 側の既存 banner (`src/App.tsx` の `setErrorMessage`) は単一文字列を持つ。複数図で同時に解決エラーが出た場合に最初のメッセージで上書きされる挙動と整合するか、Phase 3 で確認する旨を残す。Avalonia 側 (`StatusMessage`) も同じ前提。「resolver 全体のエラーは各 fence にインライン + banner 1 件」で十分か、複数 fence の同時失敗を 1 件にまとめる前提かを明記する。
 **severity**: Low
-**対応**: 未対応
+**対応**: Phase 3 対応予定として設計書へ反映済み。複数図失敗時は inline error を各 fence に表示し、banner / status は代表エラー 1 件のみとする方針を追記した。
 
 ### 3.4 stdout encoding と大規模 SVG
 
 **推奨対応**: PlantUML CLI は UTF-8 で SVG を stdout に出力する。`Process.StandardOutput` (C#) / `Command::output()` (Rust) が UTF-8 で解釈する設定 (C# 側は `StandardOutputEncoding = Encoding.UTF8`) を明示しておくと、地域別 default encoding によるバグを防げる。「設計方針 / プロセス実行」へ 1 行追加する程度の改善。
 **severity**: Low
-**対応**: 未対応
+**対応**: Phase 3 対応予定として設計書へ反映済み。stdout / stderr を UTF-8 として扱い、C# / Rust それぞれの変換方針を追記した。
 
 ---
 

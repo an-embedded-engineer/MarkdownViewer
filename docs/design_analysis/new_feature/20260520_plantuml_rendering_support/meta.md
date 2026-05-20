@@ -10,7 +10,7 @@ components:
   - "Tauri Viewer"
   - "PlantUML runtime setup"
 status: "draft"
-design_status: "draft"
+design_status: "in_review"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits:
@@ -31,6 +31,6 @@ related_commits:
 |-------|--------|
 | Phase 0 Requirements | Done |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | Design draft ready |
+| Phase 2 Design review | Review feedback reflected; awaiting follow-up confirmation |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4 Verification and completion | Not started |
