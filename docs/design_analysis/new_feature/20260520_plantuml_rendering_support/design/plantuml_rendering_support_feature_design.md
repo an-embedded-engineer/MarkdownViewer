@@ -1,103 +1,105 @@
-# PlantUML Rendering Support Feature Design
+# PlantUML 表示対応 機能設計
 
-## Background, Requirements, and Completion Criteria
+## 背景・要求・完了条件
 
-MarkdownViewer already renders Markdown and Mermaid diagrams in both implementations. Project design documents may also contain `plantuml` fenced code blocks, but those blocks currently remain plain code and cannot be inspected as diagrams from the viewer.
+MarkdownViewer は現在、Avalonia 版と Tauri 版の両方で Markdown と Mermaid 図を表示できる。一方、プロジェクトの設計文書には `plantuml` fenced code block が含まれることがあり、現状では通常のコードブロックとして表示されるため、ビューア上で図として確認できない。
 
-The feature adds local PlantUML rendering to both viewers while keeping `plantuml.jar` outside the repository. Java is already available in the current development environment (`openjdk 24.0.2`). `plantuml.jar` must be supplied by the user or local environment.
+本機能では、`plantuml.jar` をリポジトリに含めず、ローカル環境の Java と `plantuml.jar` を使って PlantUML 図を表示する。現在の開発環境では Java として `openjdk 24.0.2` が利用可能である。`plantuml.jar` はユーザーまたはローカル環境が用意する前提とする。
 
-Completion criteria:
+完了条件:
 
-- ` ```plantuml ` fenced code blocks render inline in Avalonia preview.
-- ` ```plantuml ` fenced code blocks render inline in Tauri preview.
-- `plantuml.jar` is not committed to the repository.
-- A missing Java runtime, missing jar, or PlantUML syntax error is shown as an actionable preview or status error.
-- Existing Markdown, Mermaid, local image, link navigation, reload, and theme switching behavior continues to work.
-- Required validation commands from `docs/rules/development_workflow.md` complete.
+- ` ```plantuml ` fenced code block が Avalonia プレビュー内でインライン表示される。
+- ` ```plantuml ` fenced code block が Tauri プレビュー内でインライン表示される。
+- `plantuml.jar` をコミット対象に含めない。
+- Java 未導入、jar 未配置、PlantUML 構文エラーを、空白や古い表示ではなく原因が分かるエラーとして表示する。
+- 既存の Markdown、Mermaid、ローカル画像、リンク遷移、Reload、テーマ切替が維持される。
+- `docs/rules/development_workflow.md` で定義された検証コマンドが完了する。
 
-## Target Scope and Non-Scope
+## 対象範囲と非対象
 
-In scope:
+対象:
 
-- Render Markdown fenced code blocks whose language is `plantuml` or `puml`.
-- Use local Java and a local `plantuml.jar`.
-- Generate SVG using the PlantUML command line.
-- Add a deterministic runtime resolver for `plantuml.jar`.
-- Add permanent setup, usage, and limitation documentation.
-- Add sample Markdown content for manual verification.
+- language が `plantuml` または `puml` の Markdown fenced code block を図として表示する。
+- ローカル Java とローカル `plantuml.jar` を使う。
+- PlantUML CLI で SVG を生成する。
+- `plantuml.jar` の決定的な解決ルールを追加する。
+- セットアップ、利用方法、制約を恒久ドキュメントへ反映する。
+- 手動確認用のサンプル Markdown を追加する。
 
-Out of scope:
+非対象:
 
-- Bundling Java.
-- Committing `plantuml.jar`.
-- Calling a network PlantUML server.
-- Building a PlantUML editor.
-- Supporting non-SVG PlantUML outputs in the viewer.
-- Adding a settings UI in this feature.
+- Java runtime の同梱。
+- `plantuml.jar` のリポジトリ管理。
+- ネットワーク上の PlantUML server 呼び出し。
+- PlantUML エディタ機能。
+- SVG 以外の PlantUML 出力形式。
+- 設定 UI の追加。
 
-## Adopted Approach
+## 採用案
 
-PlantUML diagrams are rendered by host-side services:
+PlantUML 図はホスト側サービスで描画する。
 
-- Avalonia: C# service executes `java -jar <plantuml.jar> -tsvg -pipe`.
-- Tauri: Rust command executes `java -jar <plantuml.jar> -tsvg -pipe`.
-- The Markdown layer converts each `plantuml` / `puml` fence into a placeholder.
-- The host renderer replaces placeholders with SVG HTML or an inline error block before the final preview is displayed.
+- Avalonia: C# service が `java -jar <plantuml.jar> -tsvg -pipe` を実行する。
+- Tauri: Rust command が `java -jar <plantuml.jar> -tsvg -pipe` を実行する。
+- Markdown 層は `plantuml` / `puml` fence をプレースホルダへ変換する。
+- ホスト側 renderer がプレースホルダを SVG HTML またはインラインエラーへ差し替えてから最終プレビューを表示する。
 
-The official PlantUML command line supports SVG output and standard input / output processing with `-pipe`, which avoids temporary diagram output files. References:
+PlantUML 公式 CLI は SVG 出力と `-pipe` による標準入出力処理をサポートしている。これにより、一時的な図ファイルを Markdown と同じディレクトリへ生成せずに統合できる。
+
+参照:
 
 - https://plantuml.com/command-line
 - https://plantuml.com/svg
 
-## Rejected Approaches
+## 不採用案
 
-### PlantUML Server
+### PlantUML server を使う
 
-Rejected because this viewer is intended to work for local project documents without introducing a network dependency or sending local design content to another process outside the machine.
+ローカルドキュメントをオフラインで閲覧できることを優先するため不採用とする。設計文書の内容をネットワーク越しの別プロセスへ送る依存も増やさない。
 
-### Commit `plantuml.jar`
+### `plantuml.jar` をコミットする
 
-Rejected because the jar is a third-party binary and should be managed as a local runtime dependency. The repository will document where to place or configure it instead.
+`plantuml.jar` は第三者バイナリであり、ローカル runtime 依存として管理すべきため不採用とする。配置場所と設定方法をドキュメント化する。
 
-### Browser-Side PlantUML Rendering
+### ブラウザ側で PlantUML を描画する
 
-Rejected because the existing viewer stack has no PlantUML JavaScript renderer equivalent to Mermaid. Calling Java from the browser side would also blur the Tauri and Avalonia security boundaries.
+Mermaid と同等の PlantUML JavaScript renderer を既存 stack に持たないため不採用とする。ブラウザ側から Java を呼び出す構成は Tauri / Avalonia のセキュリティ境界も曖昧にする。
 
-### Pre-Generating Diagram Files Beside Markdown
+### Markdown と同じ場所へ図ファイルを事前生成する
 
-Rejected because it mutates the selected documentation tree and creates generated artifacts that are easy to commit accidentally.
+選択したドキュメントツリーを変更し、生成物を誤ってコミットしやすくなるため不採用とする。
 
 ## Before / After
 
 Before:
 
-- Mermaid fences are rendered as diagrams.
-- PlantUML fences are shown as regular code blocks.
-- No setup path exists for `plantuml.jar`.
+- Mermaid fence は図として表示される。
+- PlantUML fence は通常のコードブロックとして表示される。
+- `plantuml.jar` のセットアップ導線がない。
 
 After:
 
-- Mermaid fences continue to render through the existing path.
-- PlantUML fences render as inline SVG diagrams when Java and `plantuml.jar` are available.
-- PlantUML failures appear near the relevant diagram or in the existing status/error surface.
-- Local runtime setup is documented and ignored by source control.
+- Mermaid fence は既存経路で引き続き表示される。
+- Java と `plantuml.jar` が利用可能な場合、PlantUML fence がインライン SVG として表示される。
+- PlantUML の失敗は該当図の近く、または既存の status / error 表示に出る。
+- ローカル runtime セットアップはドキュメント化され、source control から除外される。
 
-## Runtime Configuration
+## Runtime 設定
 
-Use a single resolver contract in both implementations:
+両実装で同じ resolver 契約を使う。
 
-1. Look for `plantuml.config.json` in the runtime directory.
-2. If present, read `plantUmlJarPath`.
-3. Resolve relative `plantUmlJarPath` values relative to the config file directory.
-4. If no config path is available, look for `plantuml.jar` in the same runtime directory.
-5. If neither resolves to a file, report a missing PlantUML runtime error.
+1. runtime directory の `plantuml.config.json` を探す。
+2. 見つかった場合は `plantUmlJarPath` を読む。
+3. `plantUmlJarPath` が相対パスなら config file のディレクトリ基準で解決する。
+4. config で jar path が得られない場合は、同じ runtime directory の `plantuml.jar` を探す。
+5. どちらもファイルとして解決できない場合は、PlantUML runtime 未設定エラーを返す。
 
-Runtime directory:
+runtime directory:
 
-- Published app: executable directory.
-- Development run: current working directory first, then executable directory. This keeps local development practical while preserving the published app convention.
+- publish されたアプリ: 実行ファイルのディレクトリ。
+- 開発実行: 現在の working directory を先に見て、その後に実行ファイルのディレクトリを見る。これにより、publish 後の配置規約を保ちながら開発時の設定も扱いやすくする。
 
-Config file shape:
+config file 形式:
 
 ```json
 {
@@ -105,103 +107,103 @@ Config file shape:
 }
 ```
 
-`plantuml.config.json` and `plantuml.jar` will be documented as local runtime files and added to `.gitignore` in Phase 3.
+`plantuml.config.json` と `plantuml.jar` はローカル runtime ファイルとして扱い、Phase 3 で `.gitignore` へ追加する。
 
-## Impact Range
+## 影響範囲
 
 Avalonia:
 
-- Add `PlantUmlRuntimeOptions` / resolver service under `Services/`.
-- Add `PlantUmlRenderService` under `Services/`.
-- Update `MarkdownRenderService` to support async rendering and `plantuml` placeholders.
-- Update `MainWindowViewModel.OpenMarkdownAsync` to await the PlantUML-capable render path.
-- Update preview CSS in `HtmlTemplateService` for `.plantuml-diagram` and `.plantuml-error`.
+- `Services/` 配下に `PlantUmlRuntimeOptions` / resolver service を追加する。
+- `Services/` 配下に `PlantUmlRenderService` を追加する。
+- `MarkdownRenderService` を非同期化し、`plantuml` placeholder に対応する。
+- `MainWindowViewModel.OpenMarkdownAsync` で PlantUML 対応済み render path を await する。
+- `HtmlTemplateService` の preview CSS に `.plantuml-diagram` と `.plantuml-error` を追加する。
 
 Tauri:
 
-- Add a serializable render request / response model in `src-tauri/src/lib.rs`.
-- Add `render_plantuml_diagrams` command or combine diagram rendering with Markdown read response.
-- Keep file reading and PlantUML execution in Rust, not React.
-- Update `src/App.tsx` to replace PlantUML fences with renderer results before Markdown HTML conversion.
-- Update `src/App.css` for `.plantuml-diagram` and `.plantuml-error`.
+- `src-tauri/src/lib.rs` に render request / response 用の serializable model を追加する。
+- `render_plantuml_diagrams` command を追加する、または Markdown 読み込み response に図描画結果を統合する。
+- ファイル読み込みと PlantUML 実行は React ではなく Rust 側に置く。
+- `src/App.tsx` で PlantUML fence を renderer 結果へ差し替えてから Markdown HTML へ変換する。
+- `src/App.css` に `.plantuml-diagram` と `.plantuml-error` を追加する。
 
-Docs and samples:
+Docs / samples:
 
-- Add a PlantUML sample Markdown file to each sample docs area that already exists or to a shared sample location if introduced.
-- Update component docs and development workflow setup notes.
+- 既存 sample docs 領域、または必要に応じて共有 sample 領域へ PlantUML サンプル Markdown を追加する。
+- component docs と development workflow のセットアップ説明を更新する。
 
-## Design Policy
+## 設計方針
 
-### Rendering Format
+### 描画形式
 
-SVG is the only viewer output for this feature. SVG integrates naturally with the existing WebView / browser preview, avoids base64 PNG handling, and preserves text clarity under zoom.
+本機能の viewer 出力は SVG のみにする。SVG は既存の WebView / browser preview と相性がよく、base64 PNG 管理が不要で、拡大時の視認性も保ちやすい。
 
-### PlantUML Source Wrapping
+### PlantUML source wrapping
 
-The renderer accepts the fenced block body. If the block does not contain `@start...` / `@end...`, the implementation wraps it with `@startuml` and `@enduml` before invoking PlantUML. If explicit start/end directives are present, the source is passed through unchanged.
+renderer は fenced block の本文を受け取る。本文に `@start...` / `@end...` が含まれない場合は、実行前に `@startuml` と `@enduml` で包む。明示的な start / end directive が含まれる場合はそのまま渡す。
 
-### Process Execution
+### プロセス実行
 
-The renderer invokes:
+renderer は以下を実行する。
 
 ```bash
 java -jar <plantuml.jar> -tsvg -pipe
 ```
 
-The diagram source is written to stdin. SVG is read from stdout. stderr and exit code are captured for actionable errors.
+図の source は stdin へ書き込む。SVG は stdout から読み取る。stderr と exit code はエラー表示用に取得する。
 
-Timeout:
+timeout:
 
-- Apply a per-diagram timeout of 10 seconds.
-- On timeout, kill the process and show a PlantUML timeout error.
+- 1 図あたり 10 秒で timeout する。
+- timeout 時はプロセスを終了し、PlantUML timeout エラーを表示する。
 
-Concurrency:
+concurrency:
 
-- Render PlantUML blocks sequentially per preview load for the initial implementation.
-- This avoids parallel Java process spikes and keeps error association simple.
+- 初期実装では 1 回の preview load 内で PlantUML block を順次描画する。
+- 複数 Java process の同時起動を避け、エラーと対象図の対応を単純に保つ。
 
-### Error Behavior
+### エラー動作
 
-Per-diagram errors render as:
+図ごとのエラーは以下の形で表示する。
 
 ```html
 <pre class="plantuml-error">PlantUML render failed: ...</pre>
 ```
 
-Global resolver errors use the same inline error block for each PlantUML fence and the existing status/error banner where available.
+resolver 全体のエラーは、各 PlantUML fence に同じインラインエラーとして表示し、既存の status / error banner が使える画面ではそこにも反映する。
 
-The viewer must not silently leave stale SVG output after reload or theme switch.
+Reload や theme switch 後に古い SVG を残したり、空白のまま失敗を隠したりしない。
 
-### Security and Sanitization
+### セキュリティと sanitization
 
-- Markdown HTML remains disabled in the Tauri `markdown-it` path.
-- PlantUML SVG is generated locally from trusted local Markdown content selected by the user.
-- No network server is called.
-- The renderer does not pass user content through shell expansion; it must start `java` directly with argument arrays.
-- `plantuml.jar` path must resolve to a file and must not be inferred from Markdown content.
+- Tauri の `markdown-it` path では Markdown 内 HTML を引き続き無効化する。
+- PlantUML SVG は、ユーザーが選択したローカル Markdown からローカル生成される前提とする。
+- ネットワーク server は呼び出さない。
+- renderer は shell 展開を通さず、`java` を引数配列で直接起動する。
+- `plantuml.jar` path はファイルとして解決できることを確認し、Markdown 本文からは推定しない。
 
-### Theme Behavior
+### Theme 動作
 
-Phase 3 should keep theme handling simple:
+Phase 3 では theme 対応を単純に保つ。
 
-- Render SVG without PlantUML dark-mode by default.
-- Wrap SVG in `.plantuml-diagram` with the viewer background and border variables.
-- Treat deeper PlantUML dark-mode support as follow-up because it can change diagram semantics and styling beyond the current viewer theme contract.
+- PlantUML の dark-mode option は初期実装では使わない。
+- SVG を `.plantuml-diagram` で包み、viewer の背景・border 変数に合わせる。
+- PlantUML dark-mode は図の意味や色表現に影響するため、後続拡張として扱う。
 
-## Compatibility and Migration
+## 互換性・移行方針
 
-Existing documents require no migration. Existing Mermaid fences remain on the current Mermaid renderer path. Documents without PlantUML blocks do not execute Java and do not require `plantuml.jar`.
+既存ドキュメントの migration は不要。既存 Mermaid fence は現在の Mermaid renderer path を維持する。PlantUML block を含まない文書では Java を起動せず、`plantuml.jar` も不要である。
 
-Users who want PlantUML support must either:
+PlantUML 表示を使うユーザーは、以下のどちらかを行う。
 
-- Place `plantuml.jar` in the runtime directory, or
-- Create `plantuml.config.json` with `plantUmlJarPath`.
+- runtime directory に `plantuml.jar` を置く。
+- `plantuml.config.json` を作成し、`plantUmlJarPath` に jar path を記載する。
 
-## Permanent Documentation Updates
+## 恒久ドキュメント更新予定先
 
-Update these documents in Phase 3:
+Phase 3 で以下を更新する。
 
-- `docs/rules/development_workflow.md`: PlantUML local setup and validation sample.
+- `docs/rules/development_workflow.md`: PlantUML ローカルセットアップと確認手順。
 - `docs/components/avalonia_viewer/README.md`
 - `docs/components/avalonia_viewer/detail_design.md`
 - `docs/components/tauri_viewer/README.md`
@@ -210,37 +212,37 @@ Update these documents in Phase 3:
 - `docs/architecture/code_patterns.md`
 - `docs/architecture/common_pitfalls.md`
 
-## Test and User Verification
+## テスト・ユーザ確認観点
 
-Automated / command checks:
+自動 / command 確認:
 
 - `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj`
-- `npm run build` in `markdown-viewer-tauri/`
-- `cargo check` in `markdown-viewer-tauri/src-tauri/`
-- `cargo fmt -- --check` in `markdown-viewer-tauri/src-tauri/` if Rust code is changed.
+- `markdown-viewer-tauri/` で `npm run build`
+- `markdown-viewer-tauri/src-tauri/` で `cargo check`
+- Rust code を変更した場合は `markdown-viewer-tauri/src-tauri/` で `cargo fmt -- --check`
 
-Manual checks:
+手動確認:
 
-- Open a folder containing Mermaid and PlantUML samples in Avalonia.
-- Open the same folder in Tauri.
-- Confirm PlantUML SVG renders inline.
-- Confirm missing jar produces an actionable message.
-- Confirm invalid PlantUML syntax is shown near the failed diagram.
-- Confirm Mermaid still renders after reload.
-- Confirm Light / Dark switching does not overlap or hide PlantUML output.
+- Mermaid と PlantUML のサンプルを含むフォルダを Avalonia で開く。
+- 同じフォルダを Tauri で開く。
+- PlantUML SVG がインライン表示されることを確認する。
+- jar 未配置時に原因が分かるメッセージが表示されることを確認する。
+- PlantUML 構文エラーが該当図の近くに表示されることを確認する。
+- Reload 後も Mermaid が表示されることを確認する。
+- Light / Dark 切替で PlantUML 出力が重なったり見えなくなったりしないことを確認する。
 
-## Risks and Follow-Up
+## リスクと follow-up
 
-Risks:
+リスク:
 
-- Java process startup may make large documents with many diagrams slow.
-- PlantUML syntax or Graphviz-dependent diagrams may fail depending on local PlantUML capabilities.
-- SVG emitted by PlantUML may not match viewer dark theme colors.
-- Config file discovery differs between dev and published launch contexts if runtime directory assumptions are not documented clearly.
+- Java process の起動コストにより、多数の図を含む文書で表示が遅くなる可能性がある。
+- PlantUML 構文や Graphviz 依存の図は、ローカル PlantUML の機能や環境により失敗する可能性がある。
+- PlantUML が出力する SVG の色が viewer の dark theme と完全には一致しない可能性がある。
+- 開発実行と publish 後の起動 context が異なるため、runtime directory の説明が曖昧だと設定ミスにつながる。
 
-Follow-up candidates:
+follow-up 候補:
 
-- Diagram cache keyed by source hash, jar path, and theme.
-- Optional PlantUML dark-mode rendering.
-- Settings UI for `plantuml.jar` path.
-- Version check command that displays Java and PlantUML versions.
+- source hash、jar path、theme を key にした diagram cache。
+- PlantUML dark-mode option。
+- `plantuml.jar` path の設定 UI。
+- Java / PlantUML version を表示する確認 command。
