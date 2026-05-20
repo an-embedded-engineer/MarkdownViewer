@@ -1,0 +1,53 @@
+# TODO
+
+## TODO-2026-001 PlantUML Rendering Support
+
+- Status: `in_progress`
+- Category: `new-feature`
+- Created: `2026-05-20`
+- Target users:
+  - Developers and coding agents who review Markdown design documents outside VSCode.
+  - Project maintainers comparing Avalonia and Tauri Markdown Viewer implementations.
+- User value:
+  - Markdown documents containing PlantUML fenced code blocks can be viewed as diagrams in both desktop viewers.
+  - Existing Mermaid, Markdown preview, theme switching, reload, and local navigation behavior remains usable.
+- Use cases:
+  - Open a folder containing Markdown design documents with `plantuml` code fences.
+  - Select a Markdown file and see PlantUML diagrams rendered inline in the preview.
+  - Diagnose missing Java or missing PlantUML runtime configuration from a clear viewer error.
+- Scope:
+  - Establish local Java / `plantuml.jar` runtime expectations.
+  - Add PlantUML rendering integration to Avalonia Viewer.
+  - Add PlantUML rendering integration to Tauri Viewer.
+  - Add sample Markdown content and permanent documentation for setup, usage, and limitations.
+- Non-goals:
+  - Bundling a Java runtime.
+  - Implementing a network PlantUML server dependency.
+  - Supporting every PlantUML output format beyond the viewer-ready format selected during design.
+- Preconditions:
+  - Java is available on the host machine.
+  - `plantuml.jar` is available through the configured project or user-level path decided in design.
+- Acceptance criteria:
+  - ` ```plantuml ` fenced code blocks render inline in Avalonia preview.
+  - ` ```plantuml ` fenced code blocks render inline in Tauri preview.
+  - Missing Java or missing `plantuml.jar` produces an actionable error instead of silently showing stale or blank output.
+  - Existing Mermaid samples still render after the change.
+  - Light / Dark preview styling remains coherent for rendered PlantUML output.
+  - Avalonia build completes with `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj`.
+  - Tauri frontend build completes with `npm run build` in `markdown-viewer-tauri/`.
+  - Tauri Rust check completes with `cargo check` in `markdown-viewer-tauri/src-tauri/`.
+- Impacted components:
+  - `Avalonia/MarkdownViewer.Avalonia/Services/MarkdownRenderService.cs`
+  - `Avalonia/MarkdownViewer.Avalonia/Services/HtmlTemplateService.cs`
+  - `Avalonia/MarkdownViewer.Avalonia/ViewModels/MainWindowViewModel.cs`
+  - `markdown-viewer-tauri/src/App.tsx`
+  - `markdown-viewer-tauri/src-tauri/src/lib.rs`
+  - `docs/components/avalonia_viewer/`
+  - `docs/components/tauri_viewer/`
+  - `docs/rules/development_workflow.md`
+- Integration points:
+  - Markdown fenced code block conversion pipeline.
+  - Preview HTML / DOM rendering lifecycle.
+  - Tauri command boundary for host-side rendering.
+  - Avalonia service boundary for host-side rendering.
+  - Error display paths already used for Markdown and Mermaid failures.
