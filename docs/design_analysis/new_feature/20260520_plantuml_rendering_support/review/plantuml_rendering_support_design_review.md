@@ -1,11 +1,14 @@
 # PlantUML 表示対応 設計レビュー
 
 **レビュー日**: 2026-05-20
+**再確認日**: 2026-05-20
 **対象ドキュメント**: `docs/design_analysis/new_feature/20260520_plantuml_rendering_support/design/plantuml_rendering_support_feature_design.md`
 **対象 meta**: `docs/design_analysis/new_feature/20260520_plantuml_rendering_support/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-001
-**対象コミット**: `48126dc4ce581d9c428ddddcf02d671e655350d2`
+**初回レビュー対象コミット**: `48126dc4ce581d9c428ddddcf02d671e655350d2`
+**再確認対象コミット**: `010ff41091fbde5914a773f5cd542c2f5bfbc595`
 **レビュー観点出典**: `ai-review-response-workflow` skill 同梱 `references/procedure/review_checkpoints.md` および `new-feature-workflow` の `phase_2_design_focus.md`
+**判定**: **承認 (Approved)**。Phase 3 進行可。
 
 ---
 
@@ -164,10 +167,37 @@ TODO-2026-001 (PlantUML Rendering Support) の Phase 2 設計レビュー。`pla
 - Avalonia と Tauri の責務境界: 既存アーキテクチャ (Avalonia は `Services/` 配下に Service、Tauri は Rust command を OS 境界として扱う) と整合する。
 - PlantUML CLI 実行 / timeout / エラー表示 / SVG 埋め込み / セキュリティ: 仕様が明示され、shell 展開を通さない、Markdown から jar path を推定しない、stderr / exit code を捕捉する、エラーを inline + banner に出す、SVG のみに限定する、といった安全寄りの決定がそろっている。
 
-一方で、Phase 3 実装に入る前に「中」優先度の 4 件 (1.1 非同期 API、1.2 Tauri 境界、1.3 Tauri runtime dir、1.4 theme 切替) は設計書側で確定させることを推奨する。これらを未確定のまま Phase 3 に進むと、`MarkdownRenderService` の責務分割、React / Rust の責務境界、UX の体感性能、jar 解決の再現性のいずれかで手戻りが発生する可能性が高い。
+初回レビューの「条件付き承認」では、Phase 3 実装に入る前に「中」優先度 4 件 (1.1 非同期 API、1.2 Tauri 境界、1.3 Tauri runtime dir、1.4 theme 切替) を設計書側で確定させることを前提条件としていた。
 
-判定: **条件付き承認**。
-- 1.1 / 1.2 / 1.3 / 1.4 の 4 点を設計書または `meta.md` の design 側へ追記し、`design_status` を `done` に切り替えた段階で Phase 3 への進行を承認する。
-- 「低」優先度の指摘 (2.1〜2.4、3.1〜3.4) は Phase 3 着手時に併せて反映してよい。Phase 3 で対応する場合は、設計書ではなく `docs/components/<viewer>/detail_design.md` や `docs/rules/development_workflow.md` への反映で構わない。
+### 再確認結果 (2026-05-20, commit `010ff41`)
 
-レビューに伴う未解決指摘は本文書の通り。承認は中優先度 4 件の反映完了を前提条件とする。
+設計書 (`design/plantuml_rendering_support_feature_design.md`) と review 文書 (本文書 §1〜§3 各項の **対応** 欄) を再確認した。
+
+**中優先度 (1.1〜1.4) の確定**:
+- 1.1: `IMarkdownRenderService` を `Task<string> RenderToHtmlFragmentAsync(string markdown, CancellationToken cancellationToken)` に一本化し、`MarkdownRenderService` (fence 抽出・placeholder 管理・差し替え) と `PlantUmlRenderService` (jar resolver・CLI 実行・timeout・stdout/stderr/exit code 解釈) の責務分担が設計書「影響範囲」へ追記された。✓ 反映確認。
+- 1.2: Tauri 側は `render_plantuml_diagrams` command を採用、Markdown 読み込み response 統合案は不採用とすることが設計書「影響範囲」へ明記された。`Result<PlantUmlRenderResponse, String>` 契約と React 側の `previewRevision` 連携も追記済み。✓ 反映確認。
+- 1.3: Avalonia 開発実行、Tauri dev (`markdown-viewer-tauri/src-tauri/` を明示的 runtime directory として先行探索)、Tauri macOS bundle (`<app>.app/Contents/MacOS/`、Finder 起動時の working directory に依存しない) が設計書「Runtime 設定」へ追記された。✓ 反映確認。
+- 1.4: Theme 切替時は PlantUML SVG を再生成せず CSS のみ更新する方針、Avalonia 側の HTML template 再構築のみで PlantUML CLI を再実行しない方針、Tauri 側で `theme` 変更が `render_plantuml_diagrams` を起動しない方針が設計書「Theme 動作」へ追記された。手動確認観点 (Light/Dark 切替で CLI 再実行されない / 体感遅延が増えない) も追加。✓ 反映確認。
+
+**低優先度 (2.1〜2.4、3.1〜3.4) の反映**:
+- 2.1: `.gitignore` に `/plantuml.jar` / `/plantuml.config.json` と Tauri 開発実行用 path を追加する方針を「Runtime 設定」へ追記。✓
+- 2.2: 共有確認用サンプルを `sample_docs/plantuml.md` に固定。✓
+- 2.3: `PlantUmlRuntimeOptions` の `JarPath` / `ConfigPath` 契約、resolver の jar 未検出 / config 不正 / Java 起動不可の error 区別、Java availability を初回描画時に検出する方針を「互換性・移行方針」へ追記。✓
+- 2.4: ADR 候補化判定を follow-up に追加。✓
+- 3.1: PlantUML SVG の `<script>` 要素および `on*` event handler 属性を除去する defense-in-depth を「セキュリティと sanitization」へ追記。✓
+- 3.2: 動作確認に使った PlantUML jar の version を `docs/rules/development_workflow.md` へ記録する観点を手動確認に追記。✓
+- 3.3: 複数 fence 同時失敗時の inline error + banner 1 件代表エラー方針を「エラー動作」へ追記。✓
+- 3.4: stdout / stderr UTF-8 取扱い (C# は `Encoding.UTF8` 指定、Rust は `String::from_utf8_lossy`) を「プロセス実行」へ追記。✓
+
+**整合性確認の補強**:
+- 設計書「恒久ドキュメント更新予定先」に `docs/components/avalonia_viewer/interface_spec.md` と `docs/components/tauri_viewer/interface_spec.md` が追加され、Phase 3 で `PlantUmlRuntimeOptions` / `PlantUmlRenderResponse` の I/F を component docs にも反映する道筋が引かれている。
+
+### 判定
+
+**承認 (Approved)**。
+
+- すべてのレビュー指摘 (高/中/低 計 12 件) に **対応** または **Phase 3 対応予定として設計書 / review 文書ステータス反映済み** の記録が付き、未解決指摘はゼロ。
+- `meta.md` の `design_status` を `done` に更新可能な状態。
+- Phase 3 (実装・恒久ドキュメント反映) への進行を承認する。Phase 3 着手時は、本 review 文書の Low 指摘で「Phase 3 対応予定」とされた箇所 (`.gitignore` パターン、`sample_docs/plantuml.md`、`PlantUmlRuntimeOptions` 契約、SVG sanitizer、PlantUML version 記録、Tauri banner / status の整合、stdout 取扱い) を実装・恒久ドキュメント反映に含めること。
+
+未解決指摘なし。本レビューでの承認をもって Phase 2 設計レビューを完了とする。

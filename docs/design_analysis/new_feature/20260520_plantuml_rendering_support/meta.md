@@ -10,11 +10,14 @@ components:
   - "Tauri Viewer"
   - "PlantUML runtime setup"
 status: "draft"
-design_status: "in_review"
+design_status: "done"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits:
   - "6d0c0ec : Phase 0 Define PlantUML rendering feature"
+  - "a33db00 : Phase 2 Draft PlantUML rendering design"
+  - "201c0cf : Phase 2 Design review (conditional approval)"
+  - "010ff41 : Phase 2 Address PlantUML design review feedback"
 ---
 
 # PlantUML Rendering Support Meta
@@ -31,6 +34,6 @@ related_commits:
 |-------|--------|
 | Phase 0 Requirements | Done |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | Review feedback reflected; awaiting follow-up confirmation |
+| Phase 2 Design review | Done (approved 2026-05-20) |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4 Verification and completion | Not started |
