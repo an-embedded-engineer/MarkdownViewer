@@ -286,3 +286,108 @@ Phase 3実装レビュー後、High 2件と Medium 3件を対応した。
 - Phase 4-a のユーザ動作確認では、`sample_docs/plantuml.md` を Avalonia と Tauri の双方で開き、(1) Mermaid と PlantUML の両方が描画されること、(2) Light / Dark 切替で PlantUML CLI を再実行せず描画が崩れないこと、(3) `plantuml.jar` を一時的に置き換えた場合のエラー表示が動作すること、を確認することを推奨する。
 
 未解決指摘なし (Phase 3 で扱う対象としては解消済み)。本承認をもって Phase 3 実装レビューを完了とする。
+
+---
+
+## 9. Phase 4-a 追加実装レビュー (2026-05-21)
+
+**追加実装対象コミット**: `cf18d24` (Add PlantUML rendering loading indicators) / `6c0ff27` (Refine PlantUML loading feedback) / `2249c63` (Update PlantUML loading feedback meta)
+**meta 更新コミット**: `e454baf` (Update PlantUML feature meta)
+**比較基準**: `732fbc4` (Phase 3 Approve PlantUML rendering implementation)
+**レビュー観点出典**: `references/procedure/review_checkpoints.md` および `new-feature-workflow` Phase 3 / Phase 4 共通観点
+
+### 経緯
+
+Phase 4-a ユーザー動作確認で、Avalonia / Tauri 双方とも PlantUML 描画 (Java process 起動) に体感数秒の待機が発生し、ユーザーには「クリック直後に何も起きていないように見える」状態が問題になった。追加要望に応じて以下の UI フィードバックと Rust command の非同期化を実装した。
+
+- Avalonia: `MainWindowViewModel.OpenMarkdownAsync` で `IsBusy=true` と `StatusMessage="Rendering <path>..."` を設定し、`MainWindow.axaml` にツールバー下の indeterminate `ProgressBar` とプレビュー領域のオーバーレイ (テキスト + indeterminate progress) を追加。
+- Tauri: `App.tsx` に `isMarkdownLoading` state と `isPlantUmlRendering` 派生値を追加し、プレビュー上部に `Loading Markdown...` / `Rendering PlantUML diagrams...` の sticky `loading-banner` を表示。
+- Tauri Rust: `render_plantuml_diagrams` を `async fn` 化し、`tauri::async_runtime::spawn_blocking` で blocking work を分離して async runtime の executor が詰まらないようにした。
+
+`cf18d24` で初版を入れたあと、ユーザー追加フィードバック「Avalonia の進捗バーが Reload ボタンに近接して見た目が悪い」「Tauri は macOS 標準の待機カーソルに見える」を受けて `6c0ff27` で Avalonia の `ProgressBar` をツールバー下部の専用行へ移動し、Tauri に Markdown 読み込み中の明示バナー + `spawn_blocking` を追加した。`2249c63` は meta の commit 履歴反映。
+
+### 1. Avalonia の読み込み中表示と既存 UI の干渉
+
+**観点**: `MainWindow.axaml` の進捗 UI が Reload / Theme / Open Folder などの既存ボタンと干渉しないこと。
+**確認**:
+- `MainWindow.axaml:23-26` の toolbar grid は `RowDefinitions="Auto,4"` / `ColumnDefinitions="Auto,Auto,Auto,*"` に拡張され、ボタン列 (Row 0) と progress bar (Row 1, ColumnSpan=4, Height=4) が分離された。Reload / Theme / Open Folder ボタンは Row 0 に残り、ProgressBar の上に乗らない。
+- `MainWindow.axaml:69-95` のプレビュー領域は `Grid` で `NativeWebView` の上に `IsBusy=true` 連動の overlay Border を重ねる。overlay は WebView 全面を覆い、内側に `StatusMessage` + indeterminate progress を表示する中央カードを持つ。WebView の navigation handler はそのまま稼働しており、`PreviewWebView_OnNavigationCompleted` イベント発火経路を阻害しない。
+- 既存の `ExplorerTree` (Grid.Row=1, Grid.Column=0) には影響しない。
+- 残課題: Reload ボタンは `IsEnabled` を `!IsBusy` などに bind しておらず、busy 中もクリック可能。`ReloadAsync()` は `OpenFolderAsync` を await したあとに `OpenMarkdownAsync` を await する構造で、in-flight な `OpenMarkdownAsync` は cancellation token を持たないため、Reload を連打すると複数の `OpenMarkdownAsync` が並行する可能性が残る。これは本追加実装で持ち込まれた問題ではない (Phase 3 時点から存在) ので Low 扱いとし、完了レビューまでに `IsBusy` 連動 `IsEnabled` への切り替えか cancellation 経路の整備を検討する余地として記録する。
+
+**判定**: 干渉なし。既存 UI と progress UI が物理的に重ならず、`Padding="10,8"` + `RowSpacing="6"` でツールバーの密度も適切。
+
+### 2. Tauri の読み込み中表示
+
+**観点**: Markdown 読み込み中 / PlantUML 描画中の表示が期待通り出ること。
+**確認**:
+- `App.tsx:49` で `isMarkdownLoading` state を追加し、`loadMarkdown` (App.tsx:121-138) で `try` 直前に `setIsMarkdownLoading(true)`、`finally` で `false` に戻している。`read_text_file` invoke が失敗しても finally で解除されるため state が残らない。
+- `App.tsx:61-63` で `isPlantUmlRendering` を `plantUmlDiagrams.some((d) => !d.ok && d.error === null)` として導出。これは pending 状態 (App.tsx:194-201 で `ok: false, html: pending, error: null`) のみが該当し、success (`ok=true, error=null`) や failure (`ok=false, error=message`) では false になる。banner の出現条件は意図通り。
+- `App.tsx:307-316` で preview-pane 上部に sticky banner を出す。`isMarkdownLoading` が優先され、後段で `isPlantUmlRendering && <banner/>` に切り替わる JSX 構造。Markdown 読み込みが終わって PlantUML 描画が始まった時点でバナーのテキストが切り替わる。`role="status"` を付けており accessibility 観点でも妥当。
+- `App.css:228-237` で `.loading-banner` が定義され、`position: sticky; top: 0; z-index: 2; background: var(--accent-soft); color: var(--text)` でテーマ変数に追従する。Light / Dark どちらでも視認可能。
+- 既存 `.error-banner` (App.css:218-226) と同じ z-index=2 で重なるが、両者は別 DOM ノード (`errorMessage && <div className="error-banner"/>` と `isMarkdownLoading ? ... : isPlantUmlRendering && ...`) として独立に表示されるため、DOM 順 (error-banner → loading-banner) で縦に積まれる。許容範囲。
+
+**判定**: 期待通り。`Loading Markdown...` → `Rendering PlantUML diagrams...` → 解除、の遷移が自然に成立する。
+
+### 3. `spawn_blocking` 化の確認
+
+**観点**: PlantUML Java process 待機で Tauri 側の async runtime が詰まらないこと。
+**確認**:
+- `lib.rs:93-98` で `render_plantuml_diagrams` が `async fn` に変わり、`tauri::async_runtime::spawn_blocking(move || render_plantuml_diagrams_blocking(sources))` でブロッキング作業を分離。`.await.map_err(|e| format!("PlantUML render task failed: {e}"))?` で `JoinError` も UI 表示可能なエラーへ変換。
+- `lib.rs:100-118` の `render_plantuml_diagrams_blocking` が従来の同期実装本体。順次 `render_plantuml_diagram` を呼び、`first_error` を集約する点は変わらず。
+- Java process の `try_wait` / `sleep(20ms)` polling と pipe reader thread (Phase 3 で導入) は `spawn_blocking` 内で実行されるため、tokio の executor を block しない。これにより `Loading Markdown...` → `Rendering PlantUML diagrams...` バナー切り替えや、Mermaid の `useEffect` トリガなど、フロント側の UI 更新が Java 待機中も発火可能になる。
+- 副次効果として、`invoke<PlantUmlRenderResponse>("render_plantuml_diagrams", ...)` の呼び出しは引き続き Promise を返し、フロント側コードは変更不要。
+
+**判定**: 期待通りの非同期化。blocking thread pool への移譲で UI 更新が PlantUML 描画中も継続する。
+
+### 4. Mermaid / PlantUML 同居・theme 切替・reload の回帰確認
+
+**観点**: Phase 3 で解消した Mermaid + PlantUML 同居挙動、theme 切替時の CLI 再実行抑制、Reload 経路が損なわれていないこと。
+**確認**:
+- `App.tsx:268` の Mermaid `useEffect` の deps は `[previewRevision, theme, plantUmlDiagrams]` のまま。`plantUmlDiagrams` が pending → result で参照変化するたびに mermaid.run が再走し、PlantUML 結果反映後の DOM 上書き後も Mermaid SVG が復活する経路は維持されている。
+- Theme 切替: `App.tsx:177-178` の `useEffect` は `data-theme` 属性のみ更新する。Mermaid `useEffect` は `theme` 変化で再走するが、PlantUML 用 `useEffect` (App.tsx:180-237) の deps には `theme` が含まれていないため、`render_plantuml_diagrams` は再 invoke されない。設計通り。
+- Reload: `App.tsx:103-115` の `reload` は `scan_directory` → `loadMarkdown` の順で呼び出し、`loadMarkdown` 内で `setIsMarkdownLoading(true)/false` を回す。`previewRevision++` で PlantUML `useEffect` が再 trigger され、新しい SVG を取得する。
+- Avalonia 側: `ToggleTheme()` (`MainWindowViewModel.cs:141-150`) は `IsBusy` を変更しないまま `_currentBodyHtml` を再利用してプレビューを更新する。overlay と progress は出ない。`ReloadAsync()` (95-108) は `OpenFolderAsync` → `OpenMarkdownAsync` の経路を通り、`OpenMarkdownAsync` 内で `IsBusy=true/false` を回す。
+- `sample_docs/plantuml.md` の構成 (mermaid → plantuml → puml) は変更されていない。Mermaid 同居検証材料は維持。
+
+**判定**: 既存挙動の回帰なし。Mermaid + PlantUML 同居サンプルでの手動確認は引き続き有効。
+
+### 5. 文書整合・language rules
+
+**観点**: `docs/rules/language_rules.md` に従い、本文は日本語、UI 文言は英語で揃っていること。impl 文書と detail_design に追加実装が反映されていること。
+**確認**:
+- UI 文言: `Loading Markdown...`、`Rendering PlantUML diagrams...`、`Rendering {path}...`、`PlantUML render pending...` はすべて英語。`StatusMessage = $"Rendering {Path.GetRelativePath(RootPath, path)}..."` の `{path}` 部分は relative path 文字列で言語非依存。
+- 文書: `docs/components/avalonia_viewer/detail_design.md` (処理フローに「描画中状態へ切り替え」「描画中状態を解除」を追加、PlantUML 節に `IsBusy` / `StatusMessage` の説明を追加) と `docs/components/tauri_viewer/detail_design.md` (`spawn_blocking` 経由の blocking work、pending banner の説明を追加) が日本語で記述されている。
+- impl 文書 `plantuml_rendering_support_feature_impl.md` は Avalonia / Tauri / Phase 4-a 検証コマンドの各節に追加実装内容を反映済み。`spawn_blocking` 採用、Markdown 読み込みバナー、PlantUML 描画バナー、検証ログがすべて記録されている。
+- `docs/rules/development_workflow.md` の手動確認チェックリストに「PlantUML 描画中に読み込み中表示が出ること」が追加されている。
+
+**判定**: 言語規則と文書整合とも問題なし。
+
+### 6. `plantuml.jar` / publish 生成物の混入確認
+
+**観点**: 生成物がリポジトリにコミットされていないこと。
+**確認**: `git ls-files | grep -E "plantuml\.jar|plantuml\.config\.json|^publish/"` の出力なし。`.gitignore` の Phase 3 設定 (`/plantuml.jar`、`/plantuml.config.json`、`markdown-viewer-tauri/src-tauri/plantuml.{jar,config.json}`、`publish/`) で適切に除外されている。
+**判定**: 問題なし。
+
+### 7. 改善提案 (Low、Phase 4 / completion で扱う候補)
+
+| # | 内容 | severity |
+|---|------|----------|
+| 9.A | Avalonia: 描画中 (`IsBusy=true`) は Reload / Open Folder / Theme ボタンの `IsEnabled` を false にして連打を抑止すると、UX が一段安定する。完了レビュー (Phase 4-c) もしくは follow-up での対応を推奨。 | Low |
+| 9.B | Tauri: PlantUML 描画 pending 中の inline placeholder が `.plantuml-error` styling (赤系) のままで、上部の `loading-banner` (accent-soft、青系) と視覚的に不整合。pending 専用クラス (例: `.plantuml-loading`) を追加して、結果待ちは accent-soft、最終失敗は error 色で表示すると意図が伝わりやすい。 | Low |
+| 9.C | Tauri: `App.tsx:308-316` で `isMarkdownLoading` と `isPlantUmlRendering` のバナーは `else if` で排他なため、Markdown 読み込み直後に PlantUML 描画が始まる遷移は自然だが、Markdown 読み込み + PlantUML 描画が同時に発生し得るケース (Reload 時など) では Markdown 側だけが表示される。多くの場合は Markdown 読み込みが先に完了するため実害は小さいが、両方を併記するか「Loading...」一本に集約するかは Phase 4-c で再評価する。 | Low |
+| 9.D | Avalonia: overlay Border の `Background` は `SystemControlBackgroundChromeMediumLowBrush` を直接使うため WebView を不透明に隠す。半透明化 (例: opacity 0.6 + Background 透明) でプレビュー残像を見せたいかどうかは UX の方向性次第。現状でも実害なし。 | Low |
+
+これらはいずれも Phase 4-a の追加実装によって新たに導入された致命的な欠陥ではなく、UX 改善の余地として記録する。本追加実装の承認可否には影響しない。
+
+### 8. 判定
+
+**承認 (Approved)**。
+
+- 主目的の「PlantUML 描画中に読み込み中フィードバックを示す」を Avalonia / Tauri 双方で実装済み。
+- 既存 UI / 既存挙動 (Mermaid 同居、theme 切替、Reload) の回帰なし。
+- `spawn_blocking` 採用により Tauri 側の async runtime が PlantUML Java process 待機で詰まらない設計に整理された。
+- 言語規則、生成物の非コミット、impl / detail_design / development_workflow の整合はすべて確認済み。
+- 残課題 9.A〜9.D は Low で、Phase 4-c 完了レビューまでの follow-up としてのみ扱う。
+
+これで Phase 4-a の追加実装も含めて Phase 3 実装内容の整合は保たれている。Phase 4-b (差分レポート生成・コミット) → Phase 4-c (マージ前承認) へ進む準備が整った。Phase 4-c 完了レビュー時に 9.A〜9.D の扱い (取り込むか follow-up として残すか) を判断することを推奨する。
