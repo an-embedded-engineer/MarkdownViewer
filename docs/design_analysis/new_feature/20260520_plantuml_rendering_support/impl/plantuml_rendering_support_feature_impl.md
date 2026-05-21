@@ -20,11 +20,13 @@
 ### Tauri
 
 - `render_plantuml_diagrams` commandを追加し、PlantUML source配列をSVG HTMLまたはエラーHTMLへ変換する。
+- `render_plantuml_diagrams` commandは `spawn_blocking` でJava process待機をblocking workとして分離する。
 - Rust側でruntime directory探索、`plantuml.config.json` 読み込み、timeout、UTF-8 stdout/stderr処理、SVG sanitizerを実装した。
 - Rust側はPlantUML stdout / stderrを別threadで並行drainし、大きなSVGでもpipe bufferでdeadlockしないようにした。
 - React側はMarkdown本文から `plantuml` / `puml` fenceを抽出し、`previewRevision` とselected file path単位でPlantUML commandを呼ぶ。
 - PlantUML結果の反映でpreview DOMが再生成された場合もMermaidを再描画し、Mermaid / PlantUML同居文書で両図が維持されるようにした。
 - Theme切替だけではPlantUML commandを再実行せず、既存結果を使って再描画する。
+- Markdown読み込み中は `Loading Markdown...` バナーを表示する。
 - PlantUML描画結果待ちの図がある間は、プレビュー上部に描画中バナーを表示する。
 - `App.css` に `.plantuml-diagram` / `.plantuml-error` の表示スタイルを追加した。
 
@@ -77,8 +79,6 @@ Phase 3実装レビュー指摘対応後に以下を再実行した。
 - `cargo check` in `markdown-viewer-tauri/src-tauri/`: 成功。
 - `cargo fmt -- --check` in `markdown-viewer-tauri/src-tauri/`: 成功。
 - `git diff --check`: 成功。
-- `cargo fmt -- --check` in `markdown-viewer-tauri/src-tauri/`: 成功。
-- `git diff --check`: 成功。
 
 Phase 4-aユーザー確認では、publish済みTauri `.app` と publish済みAvalonia `.app` の双方でPlantUML描画を確認済み。追加フィードバックとして「PlantUML描画に時間がかかるため、ファイル選択後に読み込み中表示が必要」と判明したため、以下を追加実装して再検証した。
 
@@ -87,6 +87,17 @@ Phase 4-aユーザー確認では、publish済みTauri `.app` と publish済みA
 - `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj --no-restore`: 成功。sandbox内ではAvalonia telemetry log書き込み権限で失敗したため、同一コマンドを権限付きで再実行した。
 - `npm run build` in `markdown-viewer-tauri/`: 成功。Mermaid由来のchunk size warningは既存課題として継続。
 - `cargo check` in `markdown-viewer-tauri/src-tauri/`: 成功。
+
+Phase 4-aの追加確認で、Avaloniaは読み込み中表示がReloadボタンと近接して見た目が悪いこと、Tauriはファイル選択時にmacOS標準の待機カーソルに見えることが判明した。以下を追加対応した。
+
+- Avalonia: 上部バーの進捗表示をボタン列の右隣からヘッダー下部の横長progressへ移し、Reloadボタンと重ならない配置にした。
+- Tauri: Markdown読み込み中の明示バナーを追加し、PlantUML描画commandを `spawn_blocking` でblocking workとして分離した。
+- `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj`: 成功。`--no-restore` では直前のRelease publish後にDebug用DiagnosticsSupport参照が解決されず失敗したため、通常buildでrestoreを含めて再実行した。
+- `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj -c Release --no-restore`: 成功。
+- `npm run build` in `markdown-viewer-tauri/`: 成功。Mermaid由来のchunk size warningは既存課題として継続。
+- `cargo check` in `markdown-viewer-tauri/src-tauri/`: 成功。
+- `cargo fmt -- --check` in `markdown-viewer-tauri/src-tauri/`: 成功。
+- `git diff --check`: 成功。
 
 ## 既知制約
 

@@ -46,6 +46,7 @@ function App() {
   const [theme, setTheme] = useState<Theme>("light");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  const [isMarkdownLoading, setIsMarkdownLoading] = useState(false);
   const [plantUmlRenderState, setPlantUmlRenderState] = useState<PlantUmlRenderState>({
     key: "",
     diagrams: [],
@@ -119,6 +120,7 @@ function App() {
   }
 
   async function loadMarkdown(currentRootPath: string, filePath: string, anchor?: string) {
+    setIsMarkdownLoading(true);
     try {
       const markdown = await invoke<string>("read_text_file", {
         rootPath: currentRootPath,
@@ -131,6 +133,8 @@ function App() {
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsMarkdownLoading(false);
     }
   }
 
@@ -301,7 +305,11 @@ function App() {
 
         <section className="preview-pane" aria-label="Markdown Preview">
           {errorMessage && <div className="error-banner">{errorMessage}</div>}
-          {isPlantUmlRendering && (
+          {isMarkdownLoading ? (
+            <div className="loading-banner" role="status">
+              Loading Markdown...
+            </div>
+          ) : isPlantUmlRendering && (
             <div className="loading-banner" role="status">
               Rendering PlantUML diagrams...
             </div>

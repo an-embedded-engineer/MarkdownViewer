@@ -91,7 +91,15 @@ fn read_text_file(root_path: String, path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRenderResponse, String> {
+async fn render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRenderResponse, String> {
+    tauri::async_runtime::spawn_blocking(move || render_plantuml_diagrams_blocking(sources))
+        .await
+        .map_err(|error| format!("PlantUML render task failed: {error}"))?
+}
+
+fn render_plantuml_diagrams_blocking(
+    sources: Vec<String>,
+) -> Result<PlantUmlRenderResponse, String> {
     let mut diagrams = Vec::with_capacity(sources.len());
     let mut first_error = None;
 
