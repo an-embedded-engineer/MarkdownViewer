@@ -5,7 +5,8 @@
 - Namespace はフォルダ構造に対応させる。
 - Model は `Models/`、UI状態は `ViewModels/`、処理は `Services/` に置く。
 - ViewModel は `CommunityToolkit.Mvvm` の `ObservableObject` / command を使う。
-- ファイルツリーやMarkdown変換などの処理は Service に分離し、ViewModelから呼び出す。
+- ファイルツリー、Markdown変換、PlantUML CLI実行などの処理は Service に分離し、ViewModelから呼び出す。
+- PlantUMLは `MarkdownRenderService` がfence抽出とHTML差し替えを担当し、`PlantUmlRenderService` がCLI実行、`PlantUmlRuntimeResolver` がjar解決を担当する。
 - XAMLコードビハインドはView初期化とフレームワーク連携に限定する。
 
 ## TypeScript / React
@@ -14,13 +15,16 @@
 - Markdown rendering、Mermaid描画、リンク処理、パス解決は関数として分ける。
 - Tauri command 呼び出しは `invoke<T>()` の型引数で戻り値を明示する。
 - Rendererが生成するHTMLは `html: false` を前提とし、Markdown内HTMLを許可しない。
+- PlantUMLはReactでfence抽出とplaceholder差し替えを行い、Java process実行はRust commandへ寄せる。Theme切替だけではPlantUML commandを再実行しない。
+- Mermaid / PlantUML のfence言語判定はinfo stringの先頭tokenを小文字化して行う。`mermaid`, `plantuml`, `puml` の後ろに追加情報があっても先頭tokenを言語として扱う。
 
 ## Rust / Tauri
 
 - フロントエンドから直接ファイルシステムを読まず、Rust command に寄せる。
-- `scan_directory` はExplorer用ツリー構築、`read_text_file` はMarkdown本文読み込みに責務を限定する。
+- `scan_directory` はExplorer用ツリー構築、`read_text_file` はMarkdown本文読み込み、`render_plantuml_diagrams` はPlantUML描画に責務を限定する。
 - 返却モデルは `serde::Serialize` を使い、TypeScript側の型と対応させる。
 - 除外ディレクトリや拡張子判定はRust側の小さな関数へ分離する。
+- 外部プロセスはshellを介さず `Command` の引数配列で起動し、stdout / stderrはUI表示可能な文字列へ変換する。
 
 ## エラーハンドリングパターン
 

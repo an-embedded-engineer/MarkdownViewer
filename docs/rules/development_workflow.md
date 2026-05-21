@@ -19,6 +19,34 @@ cd markdown-viewer-tauri
 npm install
 ```
 
+### PlantUML
+
+PlantUML表示を使う場合はJavaと `plantuml.jar` をローカルに用意する。`plantuml.jar` はコミットしない。
+
+```bash
+java -version
+```
+
+配置方法は以下のいずれかを使う。
+
+- runtime directory に `plantuml.jar` を置く。
+- runtime directory に `plantuml.config.json` を置き、`plantUmlJarPath` にjar pathを記載する。
+
+```json
+{
+  "plantUmlJarPath": "/absolute/path/to/plantuml.jar"
+}
+```
+
+runtime directory:
+
+- Avalonia開発実行: コマンド実行時のworking directory、または実行assemblyのdirectory。
+- Tauri開発実行: `markdown-viewer-tauri/src-tauri/`、current working directory、Rust実行ファイルのdirectoryの順。
+- Tauri macOS bundle: `<app>.app/Contents/MacOS/`。
+- publish済みAvalonia: 実行ファイルのdirectory。
+
+2026-05-21時点の開発環境では `openjdk 24.0.2` と PlantUML `1.2026.3` で確認している。
+
 ## アプリケーション実行
 
 ```bash
@@ -88,6 +116,9 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - Explorer から Markdown 選択
 - Markdown プレビュー表示
 - Mermaid 描画
+- Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること
+- PlantUML 描画
+- PlantUML 描画中に読み込み中表示が出ること
 - Light / Dark 切替
 - Reload 後の再描画
 

@@ -18,6 +18,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IMarkdownRenderService _markdownRenderService;
     private readonly IHtmlTemplateService _htmlTemplateService;
     private CancellationTokenSource? _scanCancellation;
+    private string? _currentBodyHtml;
 
     public MainWindowViewModel()
         : this(new FileTreeService(), new MarkdownRenderService(), new HtmlTemplateService())
@@ -115,11 +116,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
+            IsBusy = true;
+            CurrentPath = path;
+            StatusMessage = $"Rendering {Path.GetRelativePath(RootPath, path)}...";
+
             var markdown = await File.ReadAllTextAsync(path);
-            var bodyHtml = _markdownRenderService.RenderToHtmlFragment(markdown);
+            var bodyHtml = await _markdownRenderService.RenderToHtmlFragmentAsync(markdown, CancellationToken.None);
             var documentHtml = _htmlTemplateService.BuildHtmlDocument(bodyHtml, path, Theme);
 
-            CurrentPath = path;
+            _currentBodyHtml = bodyHtml;
             StatusMessage = Path.GetRelativePath(RootPath, path);
             PreviewRequested?.Invoke(this, new PreviewRequestedEventArgs(documentHtml));
         }
@@ -127,15 +132,20 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             StatusMessage = $"Failed to open Markdown: {ex.Message}";
         }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     public void ToggleTheme()
     {
         IsDarkTheme = !IsDarkTheme;
 
-        if (CurrentPath is not null)
+        if (CurrentPath is not null && _currentBodyHtml is not null)
         {
-            _ = OpenMarkdownAsync(CurrentPath);
+            var documentHtml = _htmlTemplateService.BuildHtmlDocument(_currentBodyHtml, CurrentPath, Theme);
+            PreviewRequested?.Invoke(this, new PreviewRequestedEventArgs(documentHtml));
         }
     }
 

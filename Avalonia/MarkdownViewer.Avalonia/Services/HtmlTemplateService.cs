@@ -183,6 +183,34 @@ public sealed class HtmlTemplateService : IHtmlTemplateService
           background: color-mix(in srgb, var(--bg), var(--code-bg) 45%);
           overflow-x: auto;
         }
+
+        .plantuml-diagram {
+          margin: 20px 0;
+          padding: 16px;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          background: color-mix(in srgb, var(--bg), var(--code-bg) 35%);
+          overflow-x: auto;
+        }
+
+        .plantuml-diagram svg {
+          max-width: 100%;
+          height: auto;
+        }
+
+        .plantuml-error {
+          margin: 20px 0;
+          white-space: pre-wrap;
+          color: #b42318;
+          border-color: #f2a29b;
+          background: #fff1f0;
+        }
+
+        html.dark .plantuml-error {
+          color: #ffb3ba;
+          border-color: #704047;
+          background: #30191d;
+        }
         """;
     }
 }

@@ -225,6 +225,17 @@ button {
   font-size: 13px;
 }
 
+.loading-banner {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+
 .preview-empty {
   padding: 28px;
 }
@@ -348,6 +359,27 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-bg);
+}
+
+.markdown-body .plantuml-diagram {
+  overflow-x: auto;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+}
+
+.markdown-body .plantuml-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-body .plantuml-error {
+  white-space: pre-wrap;
+  color: var(--error-text);
+  border-color: color-mix(in srgb, var(--error-text), var(--border) 45%);
+  background: var(--error-bg);
 }
 
 @media (max-width: 760px) {

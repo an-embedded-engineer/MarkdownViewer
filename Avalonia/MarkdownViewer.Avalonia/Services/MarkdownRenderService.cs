@@ -6,40 +6,74 @@ namespace MarkdownViewer.Avalonia.Services;
 
 public interface IMarkdownRenderService
 {
-    string RenderToHtmlFragment(string markdown);
+    /// <summary>
+    /// Markdown本文をプレビュー用HTML fragmentへ変換する。
+    /// </summary>
+    Task<string> RenderToHtmlFragmentAsync(string markdown, CancellationToken cancellationToken);
 }
 
 public sealed partial class MarkdownRenderService : IMarkdownRenderService
 {
+    private readonly IPlantUmlRenderService _plantUmlRenderService;
     private readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
-    public string RenderToHtmlFragment(string markdown)
+    public MarkdownRenderService()
+        : this(new PlantUmlRenderService())
     {
-        var mermaidBlocks = new List<string>();
-        var markdownWithPlaceholders = MermaidFenceRegex().Replace(markdown, match =>
+    }
+
+    public MarkdownRenderService(IPlantUmlRenderService plantUmlRenderService)
+    {
+        _plantUmlRenderService = plantUmlRenderService;
+    }
+
+    public async Task<string> RenderToHtmlFragmentAsync(string markdown, CancellationToken cancellationToken)
+    {
+        var diagramBlocks = new List<DiagramBlock>();
+        var markdownWithPlaceholders = DiagramFenceRegex().Replace(markdown, match =>
         {
-            var placeholder = $"MERMAID_BLOCK_{mermaidBlocks.Count:D4}";
-            mermaidBlocks.Add(match.Groups["code"].Value.Trim());
+            var language = match.Groups["language"].Value.ToLowerInvariant();
+            var diagramType = language == "mermaid" ? DiagramType.Mermaid : DiagramType.PlantUml;
+            var placeholder = $"DIAGRAM_BLOCK_{diagramBlocks.Count:D4}";
+            diagramBlocks.Add(new DiagramBlock(diagramType, match.Groups["code"].Value.Trim()));
             return Environment.NewLine + placeholder + Environment.NewLine;
         });
 
         var html = Markdown.ToHtml(markdownWithPlaceholders, _pipeline);
 
-        for (var index = 0; index < mermaidBlocks.Count; index++)
+        for (var index = 0; index < diagramBlocks.Count; index++)
         {
-            var placeholder = $"MERMAID_BLOCK_{index:D4}";
-            var escapedCode = HtmlEncoder.Default.Encode(mermaidBlocks[index]);
-            var mermaidHtml = $"""<div class="mermaid">{escapedCode}</div>""";
+            var placeholder = $"DIAGRAM_BLOCK_{index:D4}";
+            var diagramHtml = await RenderDiagramAsync(diagramBlocks[index], cancellationToken);
             html = html
-                .Replace($"<p>{placeholder}</p>", mermaidHtml, StringComparison.Ordinal)
-                .Replace(placeholder, mermaidHtml, StringComparison.Ordinal);
+                .Replace($"<p>{placeholder}</p>", diagramHtml, StringComparison.Ordinal)
+                .Replace(placeholder, diagramHtml, StringComparison.Ordinal);
         }
 
         return html;
     }
 
-    [GeneratedRegex(@"(?ms)^```[ \t]*mermaid[ \t]*\r?\n(?<code>.*?)\r?\n```[ \t]*$")]
-    private static partial Regex MermaidFenceRegex();
+    private Task<string> RenderDiagramAsync(DiagramBlock diagramBlock, CancellationToken cancellationToken)
+    {
+        if (diagramBlock.Type == DiagramType.PlantUml)
+        {
+            return _plantUmlRenderService.RenderToHtmlAsync(diagramBlock.Code, cancellationToken);
+        }
+
+        var escapedCode = HtmlEncoder.Default.Encode(diagramBlock.Code);
+        return Task.FromResult($"""<div class="mermaid">{escapedCode}</div>""");
+    }
+
+    [GeneratedRegex(@"(?ms)^```[ \t]*(?<language>mermaid|plantuml|puml)[^\r\n]*\r?\n(?<code>.*?)\r?\n```[ \t]*$")]
+    private static partial Regex DiagramFenceRegex();
+
+    private enum DiagramType
+    {
+        Mermaid,
+        PlantUml
+    }
+
+    private sealed record DiagramBlock(DiagramType Type, string Code);
 }

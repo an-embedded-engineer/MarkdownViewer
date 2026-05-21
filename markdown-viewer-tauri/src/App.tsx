@@ -18,6 +18,22 @@ type FileTreeNode = {
 
 type Theme = "light" | "dark";
 
+type PlantUmlDiagramResult = {
+  ok: boolean;
+  html: string;
+  error: string | null;
+};
+
+type PlantUmlRenderResponse = {
+  diagrams: PlantUmlDiagramResult[];
+  firstError: string | null;
+};
+
+type PlantUmlRenderState = {
+  key: string;
+  diagrams: PlantUmlDiagramResult[];
+};
+
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 
@@ -30,9 +46,21 @@ function App() {
   const [theme, setTheme] = useState<Theme>("light");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  const [isMarkdownLoading, setIsMarkdownLoading] = useState(false);
+  const [plantUmlRenderState, setPlantUmlRenderState] = useState<PlantUmlRenderState>({
+    key: "",
+    diagrams: [],
+  });
   const previewRef = useRef<HTMLDivElement>(null);
+  const emptyPlantUmlDiagrams = useMemo<PlantUmlDiagramResult[]>(() => [], []);
 
   const selectedFileName = selectedFilePath ? getFileName(selectedFilePath) : "";
+  const plantUmlRenderKey = selectedFilePath ? `${selectedFilePath}:${previewRevision}` : "";
+  const plantUmlDiagrams =
+    plantUmlRenderState.key === plantUmlRenderKey ? plantUmlRenderState.diagrams : emptyPlantUmlDiagrams;
+  const isPlantUmlRendering = plantUmlDiagrams.some(
+    (diagram) => !diagram.ok && diagram.error === null,
+  );
 
   async function openFolder() {
     setErrorMessage(null);
@@ -92,6 +120,7 @@ function App() {
   }
 
   async function loadMarkdown(currentRootPath: string, filePath: string, anchor?: string) {
+    setIsMarkdownLoading(true);
     try {
       const markdown = await invoke<string>("read_text_file", {
         rootPath: currentRootPath,
@@ -104,6 +133,8 @@ function App() {
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsMarkdownLoading(false);
     }
   }
 
@@ -147,6 +178,65 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (!selectedFilePath) {
+      setPlantUmlRenderState({ key: "", diagrams: [] });
+      return;
+    }
+
+    const sources = extractPlantUmlSources(selectedMarkdown);
+    const renderKey = `${selectedFilePath}:${previewRevision}`;
+    if (sources.length === 0) {
+      setPlantUmlRenderState({ key: renderKey, diagrams: [] });
+      return;
+    }
+
+    let cancelled = false;
+    setPlantUmlRenderState({
+      key: renderKey,
+      diagrams: sources.map(() => ({
+        ok: false,
+        html: `<pre class="plantuml-error">PlantUML render pending...</pre>`,
+        error: null,
+      })),
+    });
+
+    invoke<PlantUmlRenderResponse>("render_plantuml_diagrams", { sources })
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+
+        setPlantUmlRenderState({
+          key: renderKey,
+          diagrams: response.diagrams,
+        });
+        if (response.firstError) {
+          setErrorMessage(response.firstError);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        const message = toErrorMessage(error);
+        setErrorMessage(message);
+        setPlantUmlRenderState({
+          key: renderKey,
+          diagrams: sources.map(() => ({
+            ok: false,
+            html: `<pre class="plantuml-error">PlantUML render failed: ${escapeHtml(message)}</pre>`,
+            error: message,
+          })),
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFilePath, selectedMarkdown, previewRevision]);
+
+  useEffect(() => {
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: "strict",
@@ -173,7 +263,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [previewRevision, theme]);
+  }, [previewRevision, theme, plantUmlDiagrams]);
 
   useEffect(() => {
     if (!pendingAnchor || !previewRef.current) {
@@ -215,10 +305,20 @@ function App() {
 
         <section className="preview-pane" aria-label="Markdown Preview">
           {errorMessage && <div className="error-banner">{errorMessage}</div>}
+          {isMarkdownLoading ? (
+            <div className="loading-banner" role="status">
+              Loading Markdown...
+            </div>
+          ) : isPlantUmlRendering && (
+            <div className="loading-banner" role="status">
+              Rendering PlantUML diagrams...
+            </div>
+          )}
           {selectedFilePath ? (
             <MarkdownPreview
               key={`${selectedFilePath}-${theme}-${previewRevision}`}
               markdown={selectedMarkdown}
+              plantUmlDiagrams={plantUmlDiagrams}
               selectedFilePath={selectedFilePath}
               previewRef={previewRef}
               onClick={handlePreviewClick}
@@ -335,15 +435,22 @@ function TreeNode({ node, selectedFilePath, onSelect, level }: TreeNodeProps) {
 
 type MarkdownPreviewProps = {
   markdown: string;
+  plantUmlDiagrams: PlantUmlDiagramResult[];
   selectedFilePath: string;
   previewRef: React.RefObject<HTMLDivElement | null>;
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
 };
 
-function MarkdownPreview({ markdown, selectedFilePath, previewRef, onClick }: MarkdownPreviewProps) {
+function MarkdownPreview({
+  markdown,
+  plantUmlDiagrams,
+  selectedFilePath,
+  previewRef,
+  onClick,
+}: MarkdownPreviewProps) {
   const html = useMemo(
-    () => renderMarkdown(markdown, selectedFilePath),
-    [markdown, selectedFilePath],
+    () => renderMarkdown(markdown, selectedFilePath, plantUmlDiagrams),
+    [markdown, plantUmlDiagrams, selectedFilePath],
   );
 
   return (
@@ -356,7 +463,11 @@ function MarkdownPreview({ markdown, selectedFilePath, previewRef, onClick }: Ma
   );
 }
 
-function renderMarkdown(markdown: string, selectedFilePath: string) {
+function renderMarkdown(
+  markdown: string,
+  selectedFilePath: string,
+  plantUmlDiagrams: PlantUmlDiagramResult[],
+) {
   const md = new MarkdownIt({
     html: false,
     linkify: true,
@@ -364,12 +475,18 @@ function renderMarkdown(markdown: string, selectedFilePath: string) {
   });
 
   const defaultFence = md.renderer.rules.fence?.bind(md.renderer);
+  let plantUmlIndex = 0;
   md.renderer.rules.fence = (tokens, idx, options, env, renderer) => {
     const token = tokens[idx];
     const language = token.info.trim().split(/\s+/)[0]?.toLowerCase();
 
     if (language === "mermaid") {
       return `<div class="mermaid">${escapeHtml(token.content)}</div>`;
+    }
+
+    if (language === "plantuml" || language === "puml") {
+      const result = plantUmlDiagrams[plantUmlIndex++];
+      return result?.html ?? `<pre class="plantuml-error">PlantUML render pending...</pre>`;
     }
 
     return defaultFence?.(tokens, idx, options, env, renderer) ?? "";
@@ -433,6 +550,15 @@ function findFirstMarkdown(node: FileTreeNode): FileTreeNode | null {
   }
 
   return null;
+}
+
+function extractPlantUmlSources(markdown: string) {
+  const sources: string[] = [];
+  const pattern = /^```[ \t]*(plantuml|puml)[^\r\n]*\r?\n([\s\S]*?)\r?\n```[ \t]*$/gim;
+  for (const match of markdown.matchAll(pattern)) {
+    sources.push(match[2].trim());
+  }
+  return sources;
 }
 
 function isMarkdownPath(path: string) {

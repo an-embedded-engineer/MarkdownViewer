@@ -20,3 +20,9 @@ obj/
 
 # Published output
 publish/
+
+# User-local PlantUML runtime
+/plantuml.jar
+/plantuml.config.json
+markdown-viewer-tauri/src-tauri/plantuml.jar
+markdown-viewer-tauri/src-tauri/plantuml.config.json
