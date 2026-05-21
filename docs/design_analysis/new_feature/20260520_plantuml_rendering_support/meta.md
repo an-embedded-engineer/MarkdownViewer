@@ -9,10 +9,13 @@ components:
   - "Avalonia Viewer"
   - "Tauri Viewer"
   - "PlantUML runtime setup"
-status: "implemented"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
+merged_branch: "master"
+merged_commit: "c78c2aaeae60aca5deca3d8c83b18cb5d2756b3d"
+merged_date: "2026-05-21"
 related_commits:
   - "6d0c0ec : Phase 0 Define PlantUML rendering feature"
   - "ed5a3b7 : Phase 1 Initialize PlantUML feature workflow"
@@ -30,6 +33,8 @@ related_commits:
   - "6c0ff27 : Phase 4 Refine PlantUML loading feedback"
   - "2249c63 : Phase 4 Update PlantUML loading feedback meta"
   - "1bf3e04 : Phase 4 Approve PlantUML loading feedback"
+  - "985959f : Phase 4 Complete PlantUML feature workflow artifacts"
+  - "c78c2aa : Phase 4 Merge PlantUML rendering support to master"
 ---
 
 # PlantUML Rendering Support Meta
@@ -48,4 +53,4 @@ related_commits:
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-05-20) |
 | Phase 3 Implementation and docs review | Done (approved 2026-05-21) |
-| Phase 4 Verification and completion | Done (completion artifacts prepared 2026-05-21) |
+| Phase 4 Verification and completion | Done (merged to master 2026-05-21) |
