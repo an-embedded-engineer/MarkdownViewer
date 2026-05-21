@@ -116,11 +116,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
+            IsBusy = true;
+            CurrentPath = path;
+            StatusMessage = $"Rendering {Path.GetRelativePath(RootPath, path)}...";
+
             var markdown = await File.ReadAllTextAsync(path);
             var bodyHtml = await _markdownRenderService.RenderToHtmlFragmentAsync(markdown, CancellationToken.None);
             var documentHtml = _htmlTemplateService.BuildHtmlDocument(bodyHtml, path, Theme);
 
-            CurrentPath = path;
             _currentBodyHtml = bodyHtml;
             StatusMessage = Path.GetRelativePath(RootPath, path);
             PreviewRequested?.Invoke(this, new PreviewRequestedEventArgs(documentHtml));
@@ -128,6 +131,10 @@ public partial class MainWindowViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusMessage = $"Failed to open Markdown: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 

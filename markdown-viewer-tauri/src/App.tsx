@@ -57,6 +57,9 @@ function App() {
   const plantUmlRenderKey = selectedFilePath ? `${selectedFilePath}:${previewRevision}` : "";
   const plantUmlDiagrams =
     plantUmlRenderState.key === plantUmlRenderKey ? plantUmlRenderState.diagrams : emptyPlantUmlDiagrams;
+  const isPlantUmlRendering = plantUmlDiagrams.some(
+    (diagram) => !diagram.ok && diagram.error === null,
+  );
 
   async function openFolder() {
     setErrorMessage(null);
@@ -298,6 +301,11 @@ function App() {
 
         <section className="preview-pane" aria-label="Markdown Preview">
           {errorMessage && <div className="error-banner">{errorMessage}</div>}
+          {isPlantUmlRendering && (
+            <div className="loading-banner" role="status">
+              Rendering PlantUML diagrams...
+            </div>
+          )}
           {selectedFilePath ? (
             <MarkdownPreview
               key={`${selectedFilePath}-${theme}-${previewRevision}`}

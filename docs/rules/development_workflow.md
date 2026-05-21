@@ -118,6 +118,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - Mermaid 描画
 - Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること
 - PlantUML 描画
+- PlantUML 描画中に読み込み中表示が出ること
 - Light / Dark 切替
 - Reload 後の再描画
 

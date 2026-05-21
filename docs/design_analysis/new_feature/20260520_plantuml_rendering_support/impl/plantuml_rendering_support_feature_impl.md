@@ -14,6 +14,7 @@
 - `PlantUmlRenderService` を追加し、`java -jar <plantuml.jar> -tsvg -pipe` でSVGを生成する。
 - `MarkdownRenderService` を `RenderToHtmlFragmentAsync` に一本化し、Mermaid / PlantUML fenceをplaceholder経由で差し替える。
 - `MainWindowViewModel` はMarkdown表示時に非同期rendererをawaitし、Theme切替時は直近のbody HTMLを再利用してPlantUML CLIを再実行しない。
+- PlantUML描画中は `IsBusy` と `StatusMessage` を更新し、上部バーとプレビュー領域に読み込み中表示を出す。
 - `HtmlTemplateService` に `.plantuml-diagram` / `.plantuml-error` の表示スタイルを追加した。
 
 ### Tauri
@@ -24,6 +25,7 @@
 - React側はMarkdown本文から `plantuml` / `puml` fenceを抽出し、`previewRevision` とselected file path単位でPlantUML commandを呼ぶ。
 - PlantUML結果の反映でpreview DOMが再生成された場合もMermaidを再描画し、Mermaid / PlantUML同居文書で両図が維持されるようにした。
 - Theme切替だけではPlantUML commandを再実行せず、既存結果を使って再描画する。
+- PlantUML描画結果待ちの図がある間は、プレビュー上部に描画中バナーを表示する。
 - `App.css` に `.plantuml-diagram` / `.plantuml-error` の表示スタイルを追加した。
 
 ### Runtime / Samples
@@ -75,6 +77,16 @@ Phase 3実装レビュー指摘対応後に以下を再実行した。
 - `cargo check` in `markdown-viewer-tauri/src-tauri/`: 成功。
 - `cargo fmt -- --check` in `markdown-viewer-tauri/src-tauri/`: 成功。
 - `git diff --check`: 成功。
+- `cargo fmt -- --check` in `markdown-viewer-tauri/src-tauri/`: 成功。
+- `git diff --check`: 成功。
+
+Phase 4-aユーザー確認では、publish済みTauri `.app` と publish済みAvalonia `.app` の双方でPlantUML描画を確認済み。追加フィードバックとして「PlantUML描画に時間がかかるため、ファイル選択後に読み込み中表示が必要」と判明したため、以下を追加実装して再検証した。
+
+- Avalonia: Markdown / PlantUML描画中に上部バーの進捗表示とプレビュー領域の読み込み中表示を出す。
+- Tauri: PlantUML command結果待ちの間、プレビュー上部に `Rendering PlantUML diagrams...` バナーを出す。
+- `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj --no-restore`: 成功。sandbox内ではAvalonia telemetry log書き込み権限で失敗したため、同一コマンドを権限付きで再実行した。
+- `npm run build` in `markdown-viewer-tauri/`: 成功。Mermaid由来のchunk size warningは既存課題として継続。
+- `cargo check` in `markdown-viewer-tauri/src-tauri/`: 成功。
 
 ## 既知制約
 

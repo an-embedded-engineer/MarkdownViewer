@@ -27,6 +27,8 @@ PlantUML表示はRust側の `render_plantuml_diagrams` commandで行う。React�
 
 Theme切替だけでは `render_plantuml_diagrams` を再実行しない。PlantUML CLIを起動するのは、選択ファイル、Markdown本文、Reloadに伴う `previewRevision` が変わった場合だけである。
 
+PlantUML描画結果待ちの図がある間は、React側のpending状態をもとにプレビュー上部へ読み込み中バナーを表示する。Markdown本文とMermaidは先に表示し、PlantUML結果が返った時点で該当コードブロックをSVGまたはエラー表示へ差し替える。
+
 ## ローカル画像
 
 相対画像は選択中Markdownのディレクトリから絶対パスへ解決し、`convertFileSrc` でasset URLへ変換する。

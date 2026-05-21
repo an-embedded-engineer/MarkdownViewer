@@ -20,11 +20,17 @@
                 BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="10,8">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,140,*" ColumnSpacing="8">
                 <Button Grid.Column="0" x:Name="OpenFolderButton" Content="Open Folder" Click="OpenFolderButton_OnClick"/>
                 <Button Grid.Column="1" x:Name="ThemeButton" Content="Theme" Click="ThemeButton_OnClick"/>
                 <Button Grid.Column="2" x:Name="ReloadButton" Content="Reload" Click="ReloadButton_OnClick"/>
-                <TextBlock Grid.Column="3"
+                <ProgressBar Grid.Column="3"
+                             IsVisible="{Binding IsBusy}"
+                             IsIndeterminate="True"
+                             Width="120"
+                             Height="4"
+                             VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="4"
                            Text="{Binding StatusMessage}"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
@@ -58,9 +64,32 @@
         </Border>
 
         <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
-            <NativeWebView x:Name="PreviewWebView"
-                           NavigationCompleted="PreviewWebView_OnNavigationCompleted"
-                           WebMessageReceived="PreviewWebView_OnWebMessageReceived" />
+            <Grid>
+                <NativeWebView x:Name="PreviewWebView"
+                               NavigationCompleted="PreviewWebView_OnNavigationCompleted"
+                               WebMessageReceived="PreviewWebView_OnWebMessageReceived" />
+                <Border IsVisible="{Binding IsBusy}"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch">
+                    <Border HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="18,14"
+                            MinWidth="260">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="{Binding StatusMessage}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"/>
+                            <ProgressBar IsIndeterminate="True"
+                                         Height="4"/>
+                        </StackPanel>
+                    </Border>
+                </Border>
+            </Grid>
         </Border>
     </Grid>
 

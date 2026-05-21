@@ -225,6 +225,17 @@ button {
   font-size: 13px;
 }
 
+.loading-banner {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+
 .preview-empty {
   padding: 28px;
 }
