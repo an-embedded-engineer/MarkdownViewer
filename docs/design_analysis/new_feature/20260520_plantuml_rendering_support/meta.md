@@ -24,6 +24,8 @@ related_commits:
   - "632019e : Phase 3 Address PlantUML implementation review feedback"
   - "732fbc4 : Phase 3 Approve PlantUML rendering implementation"
   - "cf18d24 : Phase 4 Add PlantUML rendering loading indicators"
+  - "e454baf : Phase 4 Update PlantUML feature meta"
+  - "6c0ff27 : Phase 4 Refine PlantUML loading feedback"
 ---
 
 # PlantUML Rendering Support Meta
