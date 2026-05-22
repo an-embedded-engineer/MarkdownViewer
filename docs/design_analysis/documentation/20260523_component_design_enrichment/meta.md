@@ -7,7 +7,7 @@ components:
   - "tauri_viewer"
 status: "draft"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "done"
 completion_status: "not_started"
 related_commits: []
 ---
