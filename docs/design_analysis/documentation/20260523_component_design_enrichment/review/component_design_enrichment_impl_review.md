@@ -33,7 +33,7 @@
 **重大度**: High
 **優先度**: 高
 **工程分類**: impl
-**ステータス**: 未対応
+**ステータス**: 対応済み（2026-05-23, `5511fbc8e2f799ad2cf8b2e13af737d0ae34087d`）
 
 **ドキュメント記載**:
 
@@ -73,7 +73,7 @@
 - `change_report.md` と `impl/component_design_enrichment_impl.md` から対象文書へは、それぞれのファイル位置からの相対パスに修正する。
 - `impl/component_design_enrichment_impl.md` の検証記録は「ファイル存在確認」だけでなく「Markdown リンク解決確認」を実施した記録へ更新する。
 
-**対応**: 未対応。リンク修正と検証記録の更新が必要。
+**対応**: `docs: fix Markdown links to be file-position-relative (codex review)` で対応済み。コンポーネント README のソースリンクは `../../../Avalonia/...` / `../../../markdown-viewer-tauri/...`、同一ディレクトリ内の設計文書リンクは `basic_design.md` 形式へ修正された。`change_report.md` と `impl/component_design_enrichment_impl.md` のリンクもファイル位置基準へ修正され、検証記録に Markdown リンク解決確認が追加された。
 
 ---
 
@@ -82,7 +82,7 @@
 **重大度**: Medium
 **優先度**: 中
 **工程分類**: impl
-**ステータス**: 未対応
+**ステータス**: 対応済み（2026-05-23, `5511fbc8e2f799ad2cf8b2e13af737d0ae34087d`）
 
 **ドキュメント記載**:
 
@@ -102,7 +102,7 @@
 - `impl/component_design_enrichment_impl.md` と `change_report.md` の記述を、`docs/architecture/overview.md` からの参照を認識した内容へ修正する。
 - 参照元が README だけを指しており、今回の拡充でリンク先変更を伴わないため追加更新不要、という判断に置き換える。
 
-**対応**: 未対応。レビュー記録の修正が必要。
+**対応**: `impl/component_design_enrichment_impl.md` と `change_report.md` に、`docs/architecture/overview.md` / `docs/rules/project_overview.md` / `docs/design_analysis/new_feature/20260520_plantuml_rendering_support/` 配下からの既存参照が追記された。参照先はいずれも README であり、今回の拡充では README の配置・ファイル名を変更していないため参照側更新不要、という判断に修正済み。
 
 ---
 
@@ -113,7 +113,7 @@
 **重大度**: Medium
 **優先度**: 中
 **工程分類**: impl
-**ステータス**: 未対応
+**ステータス**: 対応済み（2026-05-23, `5511fbc8e2f799ad2cf8b2e13af737d0ae34087d`）
 
 **不足**:
 
@@ -124,7 +124,7 @@
 - 今回のリンク修正後、文書内 Markdown リンクをファイル位置基準で解決する検証を追加する。
 - 検証対象から説明用の例示リンクを除外する条件も記録する。
 
-**対応**: 未対応。リンク修正時にあわせて検証記録を更新する。
+**対応**: `impl/component_design_enrichment_impl.md` に「ファイル存在確認（workspace root 基準）」と「Markdown リンク解決確認（ファイル位置基準）」が分離して記録された。検証対象外となる例示 inline text path / fenced code block 内 path も明記済み。
 
 ---
 
@@ -135,7 +135,7 @@
 **重大度**: Low
 **優先度**: 低
 **工程分類**: design / impl
-**ステータス**: 未対応
+**ステータス**: 対応済み（2026-05-23, `5511fbc8e2f799ad2cf8b2e13af737d0ae34087d`）
 
 **推奨対応**:
 
@@ -147,7 +147,7 @@
 - 実装ファイルとの対応表を追加する。
 - 実装挙動を説明するシーケンス図・状態図を追加する。
 
-**対応**: 未対応。運用判断の改善提案として follow-up 可。
+**対応**: `impl/component_design_enrichment_impl.md` のレビュー方針へ、索引・リンク・参照導線、実装ファイル対応表、実装挙動図を含む docs-only 変更では軽量レビューを必須にする運用改善方針が追記された。
 
 ---
 
@@ -179,13 +179,28 @@
 
 ## 6. 未解決事項 / follow-up
 
-- `docs/components` 配下の Markdown リンクは、全て本 Viewer 実装と同じ「表示中 Markdown ファイルのディレクトリ基準」に統一するか、別途「workspace root 相対を許容する表示仕様」を定義・実装するかを決める。
-- 今回は実装レビューのため、対象文書そのものの修正は行っていない。上記 High / Medium 指摘を別対応として反映する必要がある。
+- `docs/components` 配下の Markdown リンクは、本 Viewer 実装と同じ「表示中 Markdown ファイルのディレクトリ基準」に統一する方針で反映済み。
+- 追加の未解決指摘なし。
 
 ---
 
-## 7. 結論
+## 7. 指摘対応確認（2026-05-23）
+
+**確認対象コミット**: `5511fbc8e2f799ad2cf8b2e13af737d0ae34087d`
+
+**確認結果**:
+
+- 指定コミットは現在の HEAD であり、`git diff 5511fbc8e2f799ad2cf8b2e13af737d0ae34087d` は差分なし。
+- `git show 5511fbc8e2f799ad2cf8b2e13af737d0ae34087d` で、前回指摘対象だった README / change_report / impl / design のリンク方針修正を確認。
+- 対象 15 Markdown ファイルの相対リンク 44 件をファイル位置基準で解決し、未解決リンク 0 件を確認。
+- 対象 15 Markdown ファイルの fenced code block 開閉数を確認し、未閉じ fence 0 件を確認。
+
+**追加指摘**: なし。
+
+---
+
+## 8. 結論
 
 コンポーネント構成、主要クラス、PlantUML レンダリング、Tauri / Avalonia の責務説明は実装と概ね整合している。一方で、追加されたリンクの多くが Markdown ファイル位置基準では解決できず、ドキュメント拡充の主要価値である「設計文書から該当ソースへ辿る」導線が壊れている。
 
-完了判断前に、リンク修正と検証記録の更新を行うことを推奨する。
+前回指摘は `5511fbc8e2f799ad2cf8b2e13af737d0ae34087d` で対応済み。再レビュー時点で追加指摘はない。
