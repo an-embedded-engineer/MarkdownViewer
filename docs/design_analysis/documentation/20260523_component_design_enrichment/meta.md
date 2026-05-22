@@ -6,7 +6,7 @@ components:
   - "avalonia_viewer"
   - "tauri_viewer"
 status: "draft"
-design_status: "draft"
+design_status: "done"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits: []
