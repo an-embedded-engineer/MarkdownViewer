@@ -70,8 +70,16 @@ package "Models" {
     +Type : FileNodeType
     +Children : List<FileTreeNode>
   }
-  enum FileNodeType { Directory, Markdown, Image, Other }
-  enum AppTheme { Light, Dark }
+  enum FileNodeType {
+    Directory
+    Markdown
+    Image
+    Other
+  }
+  enum AppTheme {
+    Light
+    Dark
+  }
 }
 
 MainWindowViewModel --> IFileTreeService
