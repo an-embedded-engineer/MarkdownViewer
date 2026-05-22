@@ -5,11 +5,14 @@ created: "2026-05-23"
 components:
   - "avalonia_viewer"
   - "tauri_viewer"
-status: "draft"
+status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "not_started"
-related_commits: []
+completion_status: "done"
+related_commits:
+  - "1932d3f docs: scaffold component design enrichment workspace"
+  - "2e325ef docs: capture component design enrichment plan"
+  - "9b5e668 docs: enrich Avalonia / Tauri viewer component design docs"
 ---
 
 ## 概要
