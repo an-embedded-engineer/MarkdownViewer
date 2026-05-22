@@ -13,6 +13,11 @@ related_commits:
   - "1932d3f docs: scaffold component design enrichment workspace"
   - "2e325ef docs: capture component design enrichment plan"
   - "9b5e668 docs: enrich Avalonia / Tauri viewer component design docs"
+  - "0c0bd6b docs: complete component design enrichment workflow"
+  - "7f21a62 docs: fix PlantUML enum syntax in Avalonia class diagram"
+  - "efe6d0f docs: add implementation review for component design docs enrichment"
+  - "5511fbc docs: fix Markdown links to be file-position-relative (codex review)"
+  - "69871c6 docs: update implementation review status and link resolutions in component design docs"
 ---
 
 ## 概要
