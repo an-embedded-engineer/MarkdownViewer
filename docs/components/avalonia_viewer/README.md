@@ -58,17 +58,17 @@ Avalonia/
 
 | 要素 | 役割 | ソース |
 |---|---|---|
-| `Program` | エントリーポイント、`BuildAvaloniaApp` を起動 | [Avalonia/MarkdownViewer.Avalonia/Program.cs](Avalonia/MarkdownViewer.Avalonia/Program.cs) |
-| `App` | `MainWindow` + `MainWindowViewModel` の生成 | [Avalonia/MarkdownViewer.Avalonia/App.axaml.cs](Avalonia/MarkdownViewer.Avalonia/App.axaml.cs) |
-| `MainWindow` | Toolbar / Explorer / WebView レイアウト、`NativeWebView` ホスト | [Avalonia/MarkdownViewer.Avalonia/Views/MainWindow.axaml](Avalonia/MarkdownViewer.Avalonia/Views/MainWindow.axaml) |
-| `MainWindowViewModel` | root path、ファイルツリー、選択 Markdown、テーマ、busy 状態 | [Avalonia/MarkdownViewer.Avalonia/ViewModels/MainWindowViewModel.cs](Avalonia/MarkdownViewer.Avalonia/ViewModels/MainWindowViewModel.cs) |
-| `FileTreeNodeViewModel` | Explorer 表示用、選択判定、アイコン | [Avalonia/MarkdownViewer.Avalonia/ViewModels/FileTreeNodeViewModel.cs](Avalonia/MarkdownViewer.Avalonia/ViewModels/FileTreeNodeViewModel.cs) |
-| `FileTreeService` | 除外ディレクトリを考慮した再帰走査と並び替え | [Avalonia/MarkdownViewer.Avalonia/Services/FileTreeService.cs](Avalonia/MarkdownViewer.Avalonia/Services/FileTreeService.cs) |
-| `MarkdownRenderService` | Markdig 経由の Markdown→HTML、`mermaid` / `plantuml` / `puml` fence をプレースホルダで抽出して差し替え | [Avalonia/MarkdownViewer.Avalonia/Services/MarkdownRenderService.cs](Avalonia/MarkdownViewer.Avalonia/Services/MarkdownRenderService.cs) |
-| `PlantUmlRenderService` | `java -jar plantuml.jar -tsvg -pipe` を起動、stdout SVG をサニタイズ、10 秒タイムアウト | [Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRenderService.cs](Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRenderService.cs) |
-| `PlantUmlRuntimeResolver` | working dir / `AppContext.BaseDirectory` から `plantuml.config.json` → `plantuml.jar` の順に探索 | [Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRuntimeResolver.cs](Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRuntimeResolver.cs) |
-| `HtmlTemplateService` | `<base>` / CSS / Mermaid script / リンクハンドラ JS を含む完全な HTML 文書を生成 | [Avalonia/MarkdownViewer.Avalonia/Services/HtmlTemplateService.cs](Avalonia/MarkdownViewer.Avalonia/Services/HtmlTemplateService.cs) |
-| `FileTreeNode` | `Name` / `Path` / `RelativePath` / `Type` / `Children` | [Avalonia/MarkdownViewer.Avalonia/Models/FileTreeNode.cs](Avalonia/MarkdownViewer.Avalonia/Models/FileTreeNode.cs) |
+| `Program` | エントリーポイント、`BuildAvaloniaApp` を起動 | [Avalonia/MarkdownViewer.Avalonia/Program.cs](../../../Avalonia/MarkdownViewer.Avalonia/Program.cs) |
+| `App` | `MainWindow` + `MainWindowViewModel` の生成 | [Avalonia/MarkdownViewer.Avalonia/App.axaml.cs](../../../Avalonia/MarkdownViewer.Avalonia/App.axaml.cs) |
+| `MainWindow` | Toolbar / Explorer / WebView レイアウト、`NativeWebView` ホスト | [Avalonia/MarkdownViewer.Avalonia/Views/MainWindow.axaml](../../../Avalonia/MarkdownViewer.Avalonia/Views/MainWindow.axaml) |
+| `MainWindowViewModel` | root path、ファイルツリー、選択 Markdown、テーマ、busy 状態 | [Avalonia/MarkdownViewer.Avalonia/ViewModels/MainWindowViewModel.cs](../../../Avalonia/MarkdownViewer.Avalonia/ViewModels/MainWindowViewModel.cs) |
+| `FileTreeNodeViewModel` | Explorer 表示用、選択判定、アイコン | [Avalonia/MarkdownViewer.Avalonia/ViewModels/FileTreeNodeViewModel.cs](../../../Avalonia/MarkdownViewer.Avalonia/ViewModels/FileTreeNodeViewModel.cs) |
+| `FileTreeService` | 除外ディレクトリを考慮した再帰走査と並び替え | [Avalonia/MarkdownViewer.Avalonia/Services/FileTreeService.cs](../../../Avalonia/MarkdownViewer.Avalonia/Services/FileTreeService.cs) |
+| `MarkdownRenderService` | Markdig 経由の Markdown→HTML、`mermaid` / `plantuml` / `puml` fence をプレースホルダで抽出して差し替え | [Avalonia/MarkdownViewer.Avalonia/Services/MarkdownRenderService.cs](../../../Avalonia/MarkdownViewer.Avalonia/Services/MarkdownRenderService.cs) |
+| `PlantUmlRenderService` | `java -jar plantuml.jar -tsvg -pipe` を起動、stdout SVG をサニタイズ、10 秒タイムアウト | [Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRenderService.cs](../../../Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRenderService.cs) |
+| `PlantUmlRuntimeResolver` | working dir / `AppContext.BaseDirectory` から `plantuml.config.json` → `plantuml.jar` の順に探索 | [Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRuntimeResolver.cs](../../../Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRuntimeResolver.cs) |
+| `HtmlTemplateService` | `<base>` / CSS / Mermaid script / リンクハンドラ JS を含む完全な HTML 文書を生成 | [Avalonia/MarkdownViewer.Avalonia/Services/HtmlTemplateService.cs](../../../Avalonia/MarkdownViewer.Avalonia/Services/HtmlTemplateService.cs) |
+| `FileTreeNode` | `Name` / `Path` / `RelativePath` / `Type` / `Children` | [Avalonia/MarkdownViewer.Avalonia/Models/FileTreeNode.cs](../../../Avalonia/MarkdownViewer.Avalonia/Models/FileTreeNode.cs) |
 
 ## 依存関係
 
@@ -80,7 +80,7 @@ Avalonia/
 
 ## 設計文書
 
-- 基本設計: [docs/components/avalonia_viewer/basic_design.md](docs/components/avalonia_viewer/basic_design.md)
-- 詳細設計: [docs/components/avalonia_viewer/detail_design.md](docs/components/avalonia_viewer/detail_design.md)
-- インターフェース仕様: [docs/components/avalonia_viewer/interface_spec.md](docs/components/avalonia_viewer/interface_spec.md)
-- 既知課題: [docs/components/avalonia_viewer/issues.md](docs/components/avalonia_viewer/issues.md)
+- 基本設計: [basic_design.md](basic_design.md)
+- 詳細設計: [detail_design.md](detail_design.md)
+- インターフェース仕様: [interface_spec.md](interface_spec.md)
+- 既知課題: [issues.md](issues.md)

@@ -55,7 +55,7 @@ PlantUML は `inline` で fenced code block `plantuml` として埋め込む。�
 - `docs/components/<viewer>/README.md` から `basic_design.md` / `detail_design.md` / `interface_spec.md` / `issues.md` への既存リンクは維持する。
 - 同一情報を複数文書に重複させない（例: 詳細フローは detail_design.md、概観は README.md、レイヤー責務は basic_design.md）。
 - 用語は既存ドキュメント（`MainWindowViewModel` / `App.tsx` / `render_plantuml_diagrams` など）と一致させる。
-- ソースコードに直接リンクする際は、CLAUDE.md と VSCode 拡張のルールに従い `[text](relative/path)` 形式とする。
+- ソースコードに直接リンクする際は、本プロジェクトの Markdown Viewer 実装（Avalonia `HtmlTemplateService` の `<base href>`、Tauri `resolveSiblingPath`）と整合する「表示中 Markdown ファイルのディレクトリ基準」の相対リンクで記述する。VSCode 上の rendering とも齟齬しない。
 - `docs/history/README.md` への記載は、テンプレート利用者へ影響しない docs-only 変更のため不要と判断する。
 
 ## レビュー方針

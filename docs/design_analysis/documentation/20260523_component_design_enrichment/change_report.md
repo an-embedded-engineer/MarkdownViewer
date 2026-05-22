@@ -6,15 +6,15 @@
 
 ## 更新した文書一覧
 
-- [docs/components/avalonia_viewer/README.md](docs/components/avalonia_viewer/README.md)
-- [docs/components/avalonia_viewer/basic_design.md](docs/components/avalonia_viewer/basic_design.md)
-- [docs/components/avalonia_viewer/detail_design.md](docs/components/avalonia_viewer/detail_design.md)
-- [docs/components/tauri_viewer/README.md](docs/components/tauri_viewer/README.md)
-- [docs/components/tauri_viewer/basic_design.md](docs/components/tauri_viewer/basic_design.md)
-- [docs/components/tauri_viewer/detail_design.md](docs/components/tauri_viewer/detail_design.md)
-- [docs/design_analysis/documentation/20260523_component_design_enrichment/meta.md](docs/design_analysis/documentation/20260523_component_design_enrichment/meta.md)
-- [docs/design_analysis/documentation/20260523_component_design_enrichment/design/component_design_enrichment_design.md](docs/design_analysis/documentation/20260523_component_design_enrichment/design/component_design_enrichment_design.md)
-- [docs/design_analysis/documentation/20260523_component_design_enrichment/impl/component_design_enrichment_impl.md](docs/design_analysis/documentation/20260523_component_design_enrichment/impl/component_design_enrichment_impl.md)
+- [docs/components/avalonia_viewer/README.md](../../../components/avalonia_viewer/README.md)
+- [docs/components/avalonia_viewer/basic_design.md](../../../components/avalonia_viewer/basic_design.md)
+- [docs/components/avalonia_viewer/detail_design.md](../../../components/avalonia_viewer/detail_design.md)
+- [docs/components/tauri_viewer/README.md](../../../components/tauri_viewer/README.md)
+- [docs/components/tauri_viewer/basic_design.md](../../../components/tauri_viewer/basic_design.md)
+- [docs/components/tauri_viewer/detail_design.md](../../../components/tauri_viewer/detail_design.md)
+- [meta.md](meta.md)
+- [design/component_design_enrichment_design.md](design/component_design_enrichment_design.md)
+- [impl/component_design_enrichment_impl.md](impl/component_design_enrichment_impl.md)
 
 ## 追加した主な PlantUML 図
 
@@ -42,11 +42,13 @@
 
 ## 実行した確認コマンド
 
-- `ls docs/components/avalonia_viewer/ docs/components/tauri_viewer/`
-- `test -f` で各 README / detail_design で参照する Avalonia / Tauri のソースパスを全件存在確認
-- `grep -n` でドキュメント内の fence 開閉と PlantUML ブロックの整合を確認
-- `grep -rn` で他 docs から `avalonia_viewer` / `tauri_viewer` への外部参照を洗い出し、本 documentation topic の `meta.md` 以外には外部参照が無いことを確認
-- `git status --short` で `.md` のみが変更対象であることを確認
+- `ls docs/components/avalonia_viewer/ docs/components/tauri_viewer/` で対象ファイルの存在を確認。
+- `test -f` で各 README / detail_design で参照する Avalonia / Tauri のソースパスを workspace root 基準で全件存在確認。
+- `grep -n` でドキュメント内の fence 開閉と PlantUML ブロックの整合を確認。
+- `plantuml.jar -tsvg -pipe` で対象 4 文書中の全 15 個の PlantUML ブロックをレンダリングし、Syntax Error が出ないことを確認。
+- `grep -rn` で他 docs から `avalonia_viewer` / `tauri_viewer` への参照を洗い出し、README を指す既存参照（`docs/architecture/overview.md` / `docs/rules/project_overview.md` / 既存の `docs/design_analysis/new_feature/20260520_plantuml_rendering_support/`）を識別。今回の拡充は README の見出し・配置・ファイル名を変更しないため、参照側の更新は不要と判断。
+- 各 Markdown 内のリンクをファイル位置基準で resolve し、リンク先のファイルが存在することを Python スクリプトで全件確認。対象は本拡充で追加・修正した相対リンクのみ。
+- `git status --short` で `.md` のみが変更対象であることを確認。
 
 ## docs-only 判定と `diff.zip` 非作成理由
 
@@ -58,3 +60,5 @@
 - `1932d3f docs: scaffold component design enrichment workspace`
 - `2e325ef docs: capture component design enrichment plan`
 - `9b5e668 docs: enrich Avalonia / Tauri viewer component design docs`
+- `7f21a62 docs: fix PlantUML enum syntax in Avalonia class diagram`
+- レビュー指摘対応: README / change_report / impl の Markdown リンクをファイル位置基準へ修正、外部参照記録を更新（本コミット）。
