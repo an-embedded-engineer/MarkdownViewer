@@ -78,6 +78,32 @@ cargo check
 
 ## Publish
 
+Avalonia / Tauri の publish と `plantuml.jar` 配置は、原則として以下のスクリプトで行う。`plantuml.jar` はコミット対象外のため、リポジトリ直下へ置くか `--plantuml-jar` で明示する。
+
+```bash
+# Default: ./plantuml.jar を publish へコピーする
+scripts/publish_apps_with_plantuml.sh
+
+# jar の場所を明示する場合
+scripts/publish_apps_with_plantuml.sh --plantuml-jar /absolute/path/to/plantuml.jar
+
+# dmg も作る場合
+scripts/publish_apps_with_plantuml.sh --tauri-bundles app,dmg
+```
+
+先頭に `. ` を付けて source 実行しない。source 実行すると shell option や終了処理が現在のターミナルへ影響するため、スクリプト側で検出して中断する。
+
+出力先:
+
+- Avalonia: `publish/avalonia/raw/`
+- Avalonia app bundle: `publish/avalonia/MarkdownViewer.Avalonia.app`
+- Tauri app bundle: `publish/tauri/markdown-viewer-tauri.app`
+- Avalonia 用 `plantuml.jar`: `publish/avalonia/raw/plantuml.jar`
+- Avalonia app bundle 用 `plantuml.jar`: `publish/avalonia/MarkdownViewer.Avalonia.app/Contents/MacOS/plantuml.jar`
+- Tauri 用 `plantuml.jar`: `publish/tauri/markdown-viewer-tauri.app/Contents/MacOS/plantuml.jar`
+
+個別に実行する必要がある場合は以下を使う。
+
 ```bash
 # Avalonia self-contained publish
 dotnet publish Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj \
@@ -88,7 +114,7 @@ dotnet publish Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj \
 
 # Tauri app bundle
 cd markdown-viewer-tauri
-npm run tauri build
+npm run tauri -- build --bundles app --ci
 ```
 
 Finder から直接起動する `.app` は `publish/` 配下へ配置する。`publish/` は生成物として扱い、原則コミットしない。
