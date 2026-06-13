@@ -33,3 +33,13 @@ class PlantUmlRuntimeResolver
 MarkdownRenderService --> PlantUmlRenderService
 PlantUmlRenderService --> PlantUmlRuntimeResolver
 ```
+
+The following block is intentionally invalid and should end in a final PlantUML
+error state rather than a loading state.
+
+```plantuml
+@startuml
+class Foo
+Foo --
+@enduml
+```
