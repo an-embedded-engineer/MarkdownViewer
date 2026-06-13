@@ -14,7 +14,7 @@ Tauri v2 + React + TypeScript + Rust による Markdown Viewer MVP 実装。
 ## 技術スタック
 
 | 区分 | 採用技術 / バージョン | 用途 |
-|---|---|---|
+| --- | --- | --- |
 | Shell | Tauri v2 (`tauri = "2"`, feature `protocol-asset`) | デスクトップシェル / WebView ホスト |
 | Plugins | `tauri-plugin-dialog` / `tauri-plugin-opener` | フォルダ選択 / 外部 URL オープン |
 | Backend | Rust (edition 2021) | コマンド実装 / ファイル走査 / PlantUML 起動 |
@@ -28,7 +28,7 @@ Tauri v2 + React + TypeScript + Rust による Markdown Viewer MVP 実装。
 
 ## ディレクトリ構成
 
-```
+```text
 markdown-viewer-tauri/
 ├── package.json / vite.config.ts / tsconfig*.json
 ├── index.html
@@ -52,10 +52,10 @@ markdown-viewer-tauri/
 ## 主要要素
 
 | 要素 | 役割 | ソース |
-|---|---|---|
+| --- | --- | --- |
 | `main.tsx` | React DOM ルートに `App` をマウント | [markdown-viewer-tauri/src/main.tsx](../../../markdown-viewer-tauri/src/main.tsx) |
 | `App` / `Toolbar` / `FileTree` / `MarkdownPreview` | UI + 状態管理。`useState` で root / fileTree / 選択ファイル / theme / previewRevision / plantUmlRenderState を保持 | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
-| `App.css` | Light / Dark テーマ、2 ペインレイアウト、`.plantuml-diagram` / `.plantuml-error` / `.mermaid` スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
+| `App.css` | Light / Dark テーマ、2 ペインレイアウト、`.plantuml-diagram` / `.plantuml-loading` / `.plantuml-error` / `.mermaid` スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
 | `scan_directory` | Rust command。root 配下を再帰走査して `FileTreeNode` を返す。除外ディレクトリあり | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `read_text_file` | Rust command。root 配下チェックと Markdown 拡張子チェックの後 UTF-8 で読み込む | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `render_plantuml_diagrams` | Rust command。`spawn_blocking` で各 source を `java -jar plantuml.jar -tsvg -pipe` に渡し、SVG / エラー HTML を返す | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |

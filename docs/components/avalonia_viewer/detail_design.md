@@ -5,11 +5,11 @@
 `MainWindowViewModel` が以下を保持する。
 
 | プロパティ | 役割 | 補足 |
-|---|---|---|
+| --- | --- | --- |
 | `RootPath` | 選択中フォルダの絶対パス | `Path.GetFullPath` で正規化 |
 | `FileTree` | Explorer に表示する `FileTreeNodeViewModel` のコレクション | `ObservableCollection` |
 | `CurrentPath` | 表示中 Markdown の絶対パス | root 配下のみ受け付け |
-| `IsBusy` | スキャン / レンダリング中フラグ | UI の `ProgressBar` / オーバーレイに連動 |
+| `IsBusy` | スキャン / レンダリング中フラグ | UI の `ProgressBar` / オーバーレイに連動し、Toolbar / Explorer を無効化する |
 | `StatusMessage` | 上部バーに表示する状態メッセージ | エラーもここへ反映 |
 | `IsDarkTheme` | テーマ状態 | `Theme` プロパティ経由で参照 |
 | `_currentBodyHtml` | 直近の本体 HTML fragment | テーマ切替時の再構築用 |
@@ -234,6 +234,6 @@ stop
 
 `MainWindow.axaml` の 2 行 × 2 列 Grid:
 
-- 上段 (Row 0, ColumnSpan 2): Toolbar (`Open Folder` / `Theme` / `Reload` ボタン、StatusMessage、`IsBusy` 連動の indeterminate ProgressBar)。
+- 上段 (Row 0, ColumnSpan 2): Toolbar (`Open Folder` / `Theme` / `Reload` ボタン、StatusMessage、`IsBusy` 連動の indeterminate ProgressBar)。`IsBusy=true` の間はボタンと Explorer を無効化して重複操作を防止する。
 - 左下 (Row 1, Col 0): `TreeView` (Explorer)。`FileTreeNodeViewModel.Icon` でディレクトリ / Markdown / Image を区別表示。
-- 右下 (Row 1, Col 1): `NativeWebView` (`PreviewWebView`) と、`IsBusy` 時に重なる Loading オーバーレイ。
+- 右下 (Row 1, Col 1): `NativeWebView` (`PreviewWebView`) と、`IsBusy` 時に重なる semi-transparent な Loading オーバーレイ。

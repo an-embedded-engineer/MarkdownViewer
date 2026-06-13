@@ -61,8 +61,20 @@ function App() {
   const isPlantUmlRendering = plantUmlDiagrams.some(
     (diagram) => !diagram.ok && diagram.error === null,
   );
+  const isBusy = isMarkdownLoading || isPlantUmlRendering;
+  const loadingMessage = isMarkdownLoading
+    ? isPlantUmlRendering
+      ? "Loading Markdown and rendering PlantUML diagrams..."
+      : "Loading Markdown..."
+    : isPlantUmlRendering
+      ? "Rendering PlantUML diagrams..."
+      : null;
 
   async function openFolder() {
+    if (isBusy) {
+      return;
+    }
+
     setErrorMessage(null);
 
     const selected = await openDialog({
@@ -101,7 +113,7 @@ function App() {
   }
 
   async function reload() {
-    if (!rootPath) {
+    if (!rootPath || isBusy) {
       return;
     }
 
@@ -120,6 +132,10 @@ function App() {
   }
 
   async function loadMarkdown(currentRootPath: string, filePath: string, anchor?: string) {
+    if (isBusy) {
+      return;
+    }
+
     setIsMarkdownLoading(true);
     try {
       const markdown = await invoke<string>("read_text_file", {
@@ -195,7 +211,7 @@ function App() {
       key: renderKey,
       diagrams: sources.map(() => ({
         ok: false,
-        html: `<pre class="plantuml-error">PlantUML render pending...</pre>`,
+        html: `<pre class="plantuml-loading">PlantUML render pending...</pre>`,
         error: null,
       })),
     });
@@ -284,6 +300,7 @@ function App() {
         rootPath={rootPath}
         selectedFileName={selectedFileName}
         theme={theme}
+        isBusy={isBusy}
         onOpenFolder={openFolder}
         onReload={reload}
         onToggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
@@ -296,6 +313,7 @@ function App() {
             <FileTree
               node={fileTree}
               selectedFilePath={selectedFilePath}
+              disabled={isBusy}
               onSelect={(node) => rootPath && loadMarkdown(rootPath, node.path)}
             />
           ) : (
@@ -305,13 +323,9 @@ function App() {
 
         <section className="preview-pane" aria-label="Markdown Preview">
           {errorMessage && <div className="error-banner">{errorMessage}</div>}
-          {isMarkdownLoading ? (
+          {loadingMessage && (
             <div className="loading-banner" role="status">
-              Loading Markdown...
-            </div>
-          ) : isPlantUmlRendering && (
-            <div className="loading-banner" role="status">
-              Rendering PlantUML diagrams...
+              {loadingMessage}
             </div>
           )}
           {selectedFilePath ? (
@@ -336,6 +350,7 @@ type ToolbarProps = {
   rootPath: string | null;
   selectedFileName: string;
   theme: Theme;
+  isBusy: boolean;
   onOpenFolder: () => void;
   onReload: () => void;
   onToggleTheme: () => void;
@@ -345,19 +360,20 @@ function Toolbar({
   rootPath,
   selectedFileName,
   theme,
+  isBusy,
   onOpenFolder,
   onReload,
   onToggleTheme,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
-      <button type="button" onClick={onOpenFolder}>
+      <button type="button" disabled={isBusy} onClick={onOpenFolder}>
         Open Folder
       </button>
-      <button type="button" onClick={onToggleTheme}>
+      <button type="button" disabled={isBusy} onClick={onToggleTheme}>
         Theme: {theme === "light" ? "Light" : "Dark"}
       </button>
-      <button type="button" disabled={!rootPath} onClick={onReload}>
+      <button type="button" disabled={!rootPath || isBusy} onClick={onReload}>
         Reload
       </button>
       <div className="path-display" title={rootPath ?? ""}>
@@ -371,13 +387,14 @@ function Toolbar({
 type FileTreeProps = {
   node: FileTreeNode;
   selectedFilePath: string | null;
+  disabled: boolean;
   onSelect: (node: FileTreeNode) => void;
 };
 
-function FileTree({ node, selectedFilePath, onSelect }: FileTreeProps) {
+function FileTree({ node, selectedFilePath, disabled, onSelect }: FileTreeProps) {
   return (
     <div className="file-tree">
-      <TreeNode node={node} selectedFilePath={selectedFilePath} onSelect={onSelect} level={0} />
+      <TreeNode node={node} selectedFilePath={selectedFilePath} disabled={disabled} onSelect={onSelect} level={0} />
     </div>
   );
 }
@@ -386,7 +403,7 @@ type TreeNodeProps = FileTreeProps & {
   level: number;
 };
 
-function TreeNode({ node, selectedFilePath, onSelect, level }: TreeNodeProps) {
+function TreeNode({ node, selectedFilePath, disabled, onSelect, level }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(level < 1);
   const isDirectory = node.nodeType === "directory";
   const isSelected = selectedFilePath === node.path;
@@ -410,6 +427,7 @@ function TreeNode({ node, selectedFilePath, onSelect, level }: TreeNodeProps) {
               key={child.path}
               node={child}
               selectedFilePath={selectedFilePath}
+              disabled={disabled}
               onSelect={onSelect}
               level={level + 1}
             />
@@ -423,7 +441,7 @@ function TreeNode({ node, selectedFilePath, onSelect, level }: TreeNodeProps) {
       type="button"
       className={`tree-row file-row ${isSelected ? "selected" : ""}`}
       style={{ paddingLeft: 12 + level * 14 }}
-      disabled={node.nodeType !== "markdown"}
+      disabled={disabled || node.nodeType !== "markdown"}
       onClick={() => onSelect(node)}
       title={node.path}
     >
@@ -486,7 +504,7 @@ function renderMarkdown(
 
     if (language === "plantuml" || language === "puml") {
       const result = plantUmlDiagrams[plantUmlIndex++];
-      return result?.html ?? `<pre class="plantuml-error">PlantUML render pending...</pre>`;
+      return result?.html ?? `<pre class="plantuml-loading">PlantUML render pending...</pre>`;
     }
 
     return defaultFence?.(tokens, idx, options, env, renderer) ?? "";

@@ -14,7 +14,7 @@ Avalonia UI + C# + NativeWebView による Markdown Viewer MVP 実装。
 ## 技術スタック
 
 | 区分 | 採用技術 / バージョン | 用途 |
-|---|---|---|
+| --- | --- | --- |
 | Framework | .NET 10 (`net10.0`) | ランタイム / SDK |
 | Language | C# (Nullable enabled, ImplicitUsings) | アプリ実装 |
 | UI | Avalonia UI 12.0.3 | クロスプラットフォーム XAML UI |
@@ -28,7 +28,7 @@ Avalonia UI + C# + NativeWebView による Markdown Viewer MVP 実装。
 
 ## ディレクトリ構成
 
-```
+```text
 Avalonia/
 └── MarkdownViewer.Avalonia/
     ├── App.axaml / App.axaml.cs           — Application、ライフタイム、MainWindow生成
@@ -57,7 +57,7 @@ Avalonia/
 ## 主要要素
 
 | 要素 | 役割 | ソース |
-|---|---|---|
+| --- | --- | --- |
 | `Program` | エントリーポイント、`BuildAvaloniaApp` を起動 | [Avalonia/MarkdownViewer.Avalonia/Program.cs](../../../Avalonia/MarkdownViewer.Avalonia/Program.cs) |
 | `App` | `MainWindow` + `MainWindowViewModel` の生成 | [Avalonia/MarkdownViewer.Avalonia/App.axaml.cs](../../../Avalonia/MarkdownViewer.Avalonia/App.axaml.cs) |
 | `MainWindow` | Toolbar / Explorer / WebView レイアウト、`NativeWebView` ホスト | [Avalonia/MarkdownViewer.Avalonia/Views/MainWindow.axaml](../../../Avalonia/MarkdownViewer.Avalonia/Views/MainWindow.axaml) |
