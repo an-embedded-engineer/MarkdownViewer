@@ -9,9 +9,9 @@ components:
   - "Avalonia Viewer"
   - "Tauri Viewer"
   - "Component documentation"
-status: "draft"
-design_status: "draft"
-impl_status: "draft"
+status: "implemented"
+design_status: "done"
+impl_status: "done"
 completion_status: "not_started"
 related_commits: []
 ---
@@ -37,6 +37,6 @@ related_commits: []
 | --- | --- |
 | Phase 0 Requirements | Done via [docs/todo/todo.md](../../../todo/todo.md) |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | Draft |
-| Phase 3 Implementation and docs review | Draft |
+| Phase 2 Design review | Done (combined review approved 2026-06-14) |
+| Phase 3 Implementation and docs review | Done (combined review approved 2026-06-14) |
 | Phase 4 Verification and completion | Not started |
