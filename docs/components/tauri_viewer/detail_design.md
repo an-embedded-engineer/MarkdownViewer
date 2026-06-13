@@ -5,7 +5,7 @@
 `App` (`src/App.tsx`) が React の `useState` で次を保持する。
 
 | state | 役割 | 補足 |
-|---|---|---|
+| --- | --- | --- |
 | `rootPath` | 選択中フォルダ | `string \| null` |
 | `fileTree` | Explorer 用 root ノード | `FileTreeNode \| null` |
 | `selectedFilePath` | 表示中 Markdown の絶対パス | `string \| null` |
@@ -15,6 +15,7 @@
 | `errorMessage` | エラーバナー表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
 | `pendingAnchor` | 遷移先アンカー | 80ms 遅延でスクロール |
 | `isMarkdownLoading` | `read_text_file` 中フラグ | プレビュー上部 loading バナー |
+| `isBusy` | `isMarkdownLoading OR isPlantUmlRendering` | Toolbar / Explorer を一時無効化するための aggregate busy フラグ |
 | `plantUmlRenderState` | `{ key, diagrams }` | `selectedFilePath:previewRevision` をキーに最新結果を保持 |
 
 `previewRevision` は Markdown 本文が同一でも Reload 時に Mermaid / PlantUML を再描画するための更新番号である。
@@ -105,7 +106,7 @@ render_plantuml_diagram --> sanitize_svg
    - `plantuml` / `puml` → `plantUmlDiagrams[i].html` (pending / 成功 / エラー)
    - 画像の `src` は `isRelativeResource` を満たす場合に `convertFileSrc` で asset URL に置換し、`loading="lazy"` を付ける。
    - heading は `slugify(name)` を `id` に付与する。
-6. `useEffect` が `selectedFilePath` / `selectedMarkdown` / `previewRevision` の変化を検知し、`extractPlantUmlSources` で PlantUML fence を抽出 → `render_plantuml_diagrams` を invoke。pending 中は `.plantuml-error` 風プレースホルダで表示し、結果到着で差し替える。
+6. `useEffect` が `selectedFilePath` / `selectedMarkdown` / `previewRevision` の変化を検知し、`extractPlantUmlSources` で PlantUML fence を抽出 → `render_plantuml_diagrams` を invoke。pending 中は `.plantuml-loading` プレースホルダで表示し、結果到着で `.plantuml-diagram` / `.plantuml-error` へ差し替える。
 7. 別の `useEffect` が `previewRevision` / `theme` / `plantUmlDiagrams` の変化で `mermaid.run` を実行する。`securityLevel: "strict"` を指定。
 8. `pendingAnchor` がある場合は 80ms 後に `previewRef` 内のアンカーへスクロールする。
 
@@ -234,7 +235,8 @@ stop
 ### 再描画方針
 
 - Theme 切替だけでは `render_plantuml_diagrams` を再実行しない。invoke するのは `selectedFilePath` / `selectedMarkdown` / `previewRevision` のいずれかが変わった場合だけ。
-- PlantUML 結果待ちの図がある間は、React 側 (`isPlantUmlRendering`) でプレビュー上部に loading バナーを表示する。Markdown 本文と Mermaid は先に描画し、PlantUML 結果到着時にコードブロックを SVG または `.plantuml-error` に差し替える。
+- PlantUML 結果待ちの図がある間は、React 側 (`isBusy` / `isPlantUmlRendering`) でプレビュー上部に loading バナーを表示する。Markdown 読み込み中と PlantUML 描画中は併せて `Loading Markdown and rendering PlantUML diagrams...` を表示し、Toolbar / Explorer の操作を無効化して重複レンダリングを防ぐ。
+- PlantUML の pending placeholder は `.plantuml-loading` で、最終失敗時のみ `.plantuml-error` を使う。これにより pending 状態と失敗状態が視覚的に区別される。
 
 ## ローカル画像
 
@@ -280,11 +282,12 @@ stop
 ## エラーハンドリング
 
 | 失敗箇所 | 表示 |
-|---|---|
+| --- | --- |
 | Tauri command 失敗 | `errorMessage` を `error-banner` に表示 |
 | Markdown 読み込み失敗 | 同上 + 直前の選択ファイルは維持 |
 | Mermaid 描画失敗 | `errorMessage` を `Mermaid render failed: ...` で表示 |
 | PlantUML 図単位失敗 | 該当位置に `.plantuml-error`、`firstError` を `errorMessage` にも反映 |
+| PlantUML pending | 該当位置に `.plantuml-loading`、`Toolbar / Explorer` を一時無効化して重複操作を抑止 |
 | PlantUML タイムアウト (10 秒) | 図単位失敗として表示 |
 | `render_plantuml_diagrams` 全体失敗 | 全図を `.plantuml-error` に置換し `errorMessage` を更新 |
 

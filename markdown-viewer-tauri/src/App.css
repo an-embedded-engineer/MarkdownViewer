@@ -47,6 +47,8 @@ button {
   --text: #20242a;
   --accent: #2f6fed;
   --accent-soft: #e8f0ff;
+  --accent-text: #2457c5;
+  --accent-bg: #edf3ff;
   --error-bg: #fff1f1;
   --error-text: #a72626;
   --code-bg: #f0f2f5;
@@ -61,6 +63,8 @@ button {
   --text: #d8dee9;
   --accent: #74a7ff;
   --accent-soft: #1e314f;
+  --accent-text: #a8c6ff;
+  --accent-bg: #18263a;
   --error-bg: #3a1f23;
   --error-text: #ffb3ba;
   --code-bg: #20262e;
@@ -373,6 +377,13 @@ button {
 .markdown-body .plantuml-diagram svg {
   max-width: 100%;
   height: auto;
+}
+
+.markdown-body .plantuml-loading {
+  white-space: pre-wrap;
+  color: var(--accent-text);
+  border-color: color-mix(in srgb, var(--accent-text), var(--border) 35%);
+  background: var(--accent-bg);
 }
 
 .markdown-body .plantuml-error {

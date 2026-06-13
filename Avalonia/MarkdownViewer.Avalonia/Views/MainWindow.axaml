@@ -24,9 +24,9 @@
                   ColumnDefinitions="Auto,Auto,Auto,*"
                   ColumnSpacing="8"
                   RowSpacing="6">
-                <Button Grid.Column="0" x:Name="OpenFolderButton" Content="Open Folder" Click="OpenFolderButton_OnClick"/>
-                <Button Grid.Column="1" x:Name="ThemeButton" Content="Theme" Click="ThemeButton_OnClick"/>
-                <Button Grid.Column="2" x:Name="ReloadButton" Content="Reload" Click="ReloadButton_OnClick"/>
+                <Button Grid.Column="0" x:Name="OpenFolderButton" Content="Open Folder" Click="OpenFolderButton_OnClick" IsEnabled="{Binding !IsBusy}"/>
+                <Button Grid.Column="1" x:Name="ThemeButton" Content="Theme" Click="ThemeButton_OnClick" IsEnabled="{Binding !IsBusy}"/>
+                <Button Grid.Column="2" x:Name="ReloadButton" Content="Reload" Click="ReloadButton_OnClick" IsEnabled="{Binding !IsBusy}"/>
                 <TextBlock Grid.Column="3"
                            Text="{Binding StatusMessage}"
                            VerticalAlignment="Center"
@@ -48,6 +48,7 @@
             <TreeView x:Name="ExplorerTree"
                       ItemsSource="{Binding FileTree}"
                       SelectionChanged="ExplorerTree_OnSelectionChanged"
+                      IsEnabled="{Binding !IsBusy}"
                       Padding="6">
                 <TreeView.ItemTemplate>
                     <TreeDataTemplate DataType="vm:FileTreeNodeViewModel"
@@ -72,7 +73,7 @@
                                NavigationCompleted="PreviewWebView_OnNavigationCompleted"
                                WebMessageReceived="PreviewWebView_OnWebMessageReceived" />
                 <Border IsVisible="{Binding IsBusy}"
-                        Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                        Background="#00000018"
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch">
                     <Border HorizontalAlignment="Center"
