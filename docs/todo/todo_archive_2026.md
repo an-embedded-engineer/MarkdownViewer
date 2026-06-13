@@ -31,3 +31,28 @@
   - `git diff --check`
 - Follow-up:
   - `TODO-2026-002 PlantUML Loading UX Follow-up`
+
+## TODO-2026-002 PlantUML Loading UX Follow-up
+
+- Status: `done`
+- Category: `new-feature`
+- Created: `2026-05-21`
+- Completed: `2026-06-14`
+- Branch: `feature/plantuml-loading-ux-follow-up`
+- Design analysis:
+  - `docs/design_analysis/new_feature/20260613_plantuml_loading_ux_follow_up/`
+- Change report:
+  - `docs/design_analysis/new_feature/20260613_plantuml_loading_ux_follow_up/change_report.md`
+- Review records:
+  - `docs/design_analysis/new_feature/20260613_plantuml_loading_ux_follow_up/review/plantuml_loading_ux_follow_up_impl_review.md`
+- Summary:
+  - Disabled overlapping busy-state operations in Avalonia and Tauri during Markdown loading and PlantUML rendering.
+  - Split Tauri pending PlantUML rendering from final PlantUML error presentation with `.plantuml-loading`.
+  - Updated component-level permanent docs to describe the new loading UX behavior.
+  - Added a deterministic PlantUML syntax-error sample for final error-state verification.
+- Verification:
+  - User confirmed points 1 to 8 of the loading UX checklist in both Avalonia and Tauri.
+  - User confirmed the added invalid PlantUML sample renders as a syntax error in both Avalonia and Tauri and only the target diagram fails to draw.
+  - `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj`
+  - `npm run build` in `markdown-viewer-tauri/`
+  - `cargo check` in `markdown-viewer-tauri/src-tauri/`

@@ -12,8 +12,14 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "not_started"
-related_commits: []
+completion_status: "done"
+related_commits:
+  - "48694ba : Phase 1 initialize PlantUML loading UX follow-up workflow"
+  - "00703c5 : Phase 2 draft PlantUML loading UX follow-up design"
+  - "efb13db : Phase 3 implement PlantUML loading UX follow-up"
+  - "bdbaae2 : Phase 2/3 combined review document"
+  - "01cdae2 : Phase 3 approve PlantUML loading UX follow-up review"
+  - "97b24b3 : Phase 4-a add PlantUML syntax error verification sample"
 ---
 
 ## PlantUML Loading UX Follow-up Meta
@@ -35,8 +41,8 @@ related_commits: []
 
 | Phase | Status |
 | --- | --- |
-| Phase 0 Requirements | Done via [docs/todo/todo.md](../../../todo/todo.md) |
+| Phase 0 Requirements | Archived with [docs/todo/todo_archive_2026.md](../../../todo/todo_archive_2026.md) |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (combined review approved 2026-06-14) |
 | Phase 3 Implementation and docs review | Done (combined review approved 2026-06-14) |
-| Phase 4 Verification and completion | Not started |
+| Phase 4 Verification and completion | 4-a / 4-b done, ready for 4-c merge approval |
