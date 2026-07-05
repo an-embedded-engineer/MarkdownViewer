@@ -80,3 +80,31 @@ WBS は `wbs-planning-workflow` の必須チェック（背景/目的/完了条�
 2. **指摘 #2**: `WP-003` に、設計 Phase で工数超過した場合の完了条件縮小方針を追記する。
 
 指摘 #3・#4 は軽微であり、`WP-001` 実施と並行して、または次回の `wbs.md` 更新時に反映すれば承認条件としない。
+
+---
+
+## Round 2: 指摘対応確認 (対応コミット: 769ceaf)
+
+- レビュー日: 2026-07-05
+- レビュー担当: Claude Sonnet 5
+
+### 確認結果
+
+| 指摘 | 重大度 | 対応状況 | 確認内容 |
+| --- | --- | --- | --- |
+| #1 `WP-002`〜`004`, `WP-007`〜`009` の workflow 分類 | 中 | 解消 | `wbs.md` の該当 6 行の `recommended_workflow` が `spec-change` から `new-feature` に変更され、`docs/todo/todo.md` の `TODO-2026-002`〜`004`, `TODO-2026-007`〜`009` の `workflow:` フィールドも同じく `new-feature` へ同期済み。`WP-001`/`WP-006`（既存 Toolbar 再配置）は `spec-change` のまま維持されており、区別の妥当性も保たれている。 |
+| #2 `WP-003` の粒度縮小条件 | 低〜中 | 解消 | `wbs.md` `WP-003` 行の `deferred_or_follow_up` に「設計 Phase で工数超過と判断した場合は、タブ切替 / close / Reload / theme までを完了条件に縮小し、Markdown 内リンクのタブ挙動や overflow 表示は follow-up todo へ分離する」を追記済み。縮小時の最小完了ラインと分離先（follow-up todo）が明確になっている。 |
+| #3 調査レポートへの直接参照 | 低 | 解消 | `wbs.md` 冒頭に `## Source References` を新設し、調査レポート・調査レビュー・WBS レビュー自身への直接リンクを追加済み。`todo.md` の各エントリは既存の `wbs:` リンク経由でこのセクションに到達できるため、todo → wbs → report の参照経路が確立された。 |
+| #4 ADR 候補の起票タイミング | 低 | 解消 | `WP-005` の `verification_points` に「ADR 候補の起票要否確認」を追加し、`WP-010` の `docs_targets` に「必要に応じて `docs/adr/*`」、`verification_points` にも同じく「ADR 候補の起票要否確認」を追加済み。実装完了後の 2 段階（Tauri 確定時・両実装最終同期時）で確認する導線ができている。 |
+
+### 残課題（軽微・非ブロッキング）
+
+- `meta.md` の `related_commits` が `5439a1a` のままで、レビュー対応コミット（`8cd0e16`, `769ceaf` 等）が未反映。次回 `meta.md` 更新時に追記すれば十分で、承認条件とはしない。
+
+### 承認可否
+
+**承認**
+
+承認条件だった指摘 #1・#2 がすべて解消され、軽微指摘の #3・#4 も反映済みである。`wbs.md` と `docs/todo/todo.md` の間に新たな矛盾は確認されなかった。
+
+本 WBS（`meta.md`, `wbs.md`, `report.md`, および `docs/todo/todo.md` の `TODO-2026-001`〜`010`）は、`WP-001` から順に計画済みの各 workflow（`spec-change-workflow` / `new-feature-workflow` / `documentation-workflow`）への引き継ぎを承認する。
