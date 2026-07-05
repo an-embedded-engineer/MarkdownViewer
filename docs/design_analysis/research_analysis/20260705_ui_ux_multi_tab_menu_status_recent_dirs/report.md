@@ -41,7 +41,7 @@ Markdown Viewer の次期 UI/UX 改善として、複数タブ対応、並べて
 ### Avalonia 実装
 
 - `MainWindowViewModel` は `RootPath`、`CurrentPath`、`StatusMessage`、`IsBusy`、`IsDarkTheme` と `_currentBodyHtml` を持つ単一ドキュメント状態である。`OpenMarkdownAsync` は 1 パスを読み、1 つの HTML を `PreviewRequested` で View へ渡す。
-- `MainWindow.axaml` は上段 Toolbar、左 Explorer、右 1 つの `NativeWebView`、busy overlay の 2 ペイン構成である。
+- `MainWindow.axaml` は上段全幅 Toolbar (`Grid.ColumnSpan="2"`)、下段左 Explorer / 右 1 つの `NativeWebView`、busy overlay の 2 行 2 列構成である。
 - `MainWindow.axaml.cs` はフォルダ選択、テーマ切替、Reload、TreeView 選択を code-behind で ViewModel へ中継する。
 
 ### Tauri 実装
@@ -95,6 +95,10 @@ OpenDocumentTab
 Avalonia では ViewModel に `ObservableCollection<OpenDocumentTabViewModel> OpenTabs`、`OpenDocumentTabViewModel? ActiveTab`、`OpenMarkdownInTabAsync(path)`、`CloseTabAsync(tabId)`、`ActivateTab(tabId)` を追加する。`CurrentPath` は互換用に残すより、`ActiveTab?.Path` 相当に置き換える方が状態の正本が二重化しない。
 
 Tauri では `selectedFilePath` / `selectedMarkdown` を `tabs: OpenDocumentTab[]` と `activeTabId` へ置き換える。`loadMarkdown` は既存タブがあれば activate、なければ新規タブ作成または既定方針に応じて active tab を差し替える。Explorer クリックの挙動は「通常クリックは既存タブを再利用せず開く」または「既存なら activate」を設計で固定する必要がある。
+
+タブは現在開いている `rootPath` 内の Markdown ファイルに限定する。別ディレクトリのファイルを開く場合は `Open Folder` で root を変更し、既存タブを閉じるか root 変更後に再構築する扱いにする。この前提を置くことで、Tauri の `read_text_file(rootPath, path)` の root 境界チェックと Explorer の 1 ツリー構成を維持できる。
+
+Explorer クリックは「同一パスのタブが既に存在すれば activate、存在しなければ新規タブで開く」を推奨する。重複タブを防ぎつつ、ファイル選択が現在タブを破壊しないため、複数タブ UI の期待に合う。
 
 #### UI 方式
 
@@ -152,7 +156,7 @@ Help
 - About
 ```
 
-最初の実装では `About` は省略可能である。`Recent Folders` は最近開いたディレクトリ実装と同時に追加する。
+最初の実装では `About` は省略可能である。`Recent Folders` は最近開いたディレクトリ実装と同時に追加する。メニューバー / ステータスバーを複数タブより先に実装する場合、`Close Tab` / `Close Other Tabs` はその段階では省略するか disabled 表示にし、複数タブ実装時に有効化する。
 
 #### Avalonia
 
@@ -193,7 +197,7 @@ RecentDirectory
 - lastOpenedAt
 ```
 
-保持件数は 10 件程度から開始する。存在しない path は選択時にエラー表示し、一覧から削除する操作を用意する。
+`displayName` は `Path.GetFileName(path)` 相当のディレクトリ名を基本とし、同名ディレクトリの区別と詳細確認は tooltip / status bar でフルパスを表示する。保持件数は 10 件程度から開始する。存在しない path は選択時にエラー表示し、一覧から削除する操作を用意する。
 
 #### Avalonia
 
@@ -268,7 +272,7 @@ Rust command として `load_app_settings` / `save_recent_directory` / `remove_r
 
 ## リスク
 
-- 複数タブ化により `isBusy` / `IsBusy` が「アプリ全体 busy」か「タブ単位 busy」か曖昧になる。タブ単位 loading と全体操作抑止を分ける必要がある。
+- 複数タブ化により `isBusy` / `IsBusy` が「アプリ全体 busy」か「タブ単位 busy」か曖昧になる。特に Tauri の `loadMarkdown` 冒頭にある `isBusy` guard はタブ単位の `isLoading` 判定へ置き換え、グローバル `isBusy` は Open Folder など root 全体を変更する操作の抑止に限定する必要がある。
 - Tauri の Mermaid は DOM に対して `data-processed` を付けるため、複数 preview ref / split view で再描画条件を誤ると図が空白または古いままになる。
 - Avalonia の `NativeWebView` をタブごとに増やすとリソース消費が大きくなる可能性がある。
 - 最近開いたディレクトリは存在しない path、権限不足、外部ドライブ切断を扱う必要がある。
@@ -277,9 +281,9 @@ Rust command として `load_app_settings` / `save_recent_directory` / `remove_r
 
 ## 未解決事項
 
-- Explorer クリック時に常に新規タブを開くか、既存タブがあれば activate するか。
 - Markdown 内リンクは同じタブで遷移するか、新規タブで開くか。
 - タブの未保存概念は現時点では不要だが、将来編集機能を持つ可能性があるなら close confirmation をどう扱うか。
+- 多数タブ時の overflow 表示を、横スクロールにするか、ドロップダウン化するか。
 - 最近開いたディレクトリの最大件数と削除 UI。
 - Tauri で app config directory を Tauri path API で扱うか、Rust crate を追加するか。
 - Avalonia / Tauri で OS native menu まで揃えるか、アプリ内メニューバーで比較するか。
