@@ -16,7 +16,7 @@
 ## TODO-2026-002 Tauri Recent Folders 導入
 
 - status: open
-- workflow: spec-change
+- workflow: new-feature
 - wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
 - work_package_id: WP-002
 - depends_on: TODO-2026-001
@@ -29,7 +29,7 @@
 ## TODO-2026-003 Tauri Multi-tab core 導入
 
 - status: open
-- workflow: spec-change
+- workflow: new-feature
 - wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
 - work_package_id: WP-003
 - depends_on: TODO-2026-001, TODO-2026-002
@@ -42,7 +42,7 @@
 ## TODO-2026-004 Tauri Split view 導入
 
 - status: open
-- workflow: spec-change
+- workflow: new-feature
 - wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
 - work_package_id: WP-004
 - depends_on: TODO-2026-003
@@ -81,7 +81,7 @@
 ## TODO-2026-007 Avalonia Recent Folders 導入
 
 - status: open
-- workflow: spec-change
+- workflow: new-feature
 - wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
 - work_package_id: WP-007
 - depends_on: TODO-2026-006
@@ -94,7 +94,7 @@
 ## TODO-2026-008 Avalonia Multi-tab core 導入
 
 - status: open
-- workflow: spec-change
+- workflow: new-feature
 - wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
 - work_package_id: WP-008
 - depends_on: TODO-2026-006, TODO-2026-007
@@ -107,7 +107,7 @@
 ## TODO-2026-009 Avalonia Split view 導入
 
 - status: open
-- workflow: spec-change
+- workflow: new-feature
 - wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
 - work_package_id: WP-009
 - depends_on: TODO-2026-008
