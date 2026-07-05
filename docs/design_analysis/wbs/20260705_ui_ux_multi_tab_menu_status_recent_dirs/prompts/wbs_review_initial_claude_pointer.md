@@ -1,0 +1,1 @@
+docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/prompts/wbs_review_initial_claude.md を読んで、レビューを開始してください。
