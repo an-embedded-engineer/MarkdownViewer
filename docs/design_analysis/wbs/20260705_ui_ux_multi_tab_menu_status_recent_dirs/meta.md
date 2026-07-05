@@ -7,8 +7,9 @@ components:
   - Avalonia/MarkdownViewer.Avalonia
   - docs/todo
   - docs/components
-status: draft
-related_commits: []
+status: merged
+related_commits:
+  - 5439a1a : Phase 1-4 WBS 成果物と todo 追跡項目追加
 source_refs:
   - docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md
   - docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/ui_ux_multi_tab_menu_status_recent_dirs_report_review.md
