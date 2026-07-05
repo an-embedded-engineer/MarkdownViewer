@@ -6,7 +6,7 @@ components:
   - Avalonia/MarkdownViewer.Avalonia
   - markdown-viewer-tauri
   - docs/components
-status: draft
+status: in_review
 related_commits: []
 source_design_path: docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md
 ---
