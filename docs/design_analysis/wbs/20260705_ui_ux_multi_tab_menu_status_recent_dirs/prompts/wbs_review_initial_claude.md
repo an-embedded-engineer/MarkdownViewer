@@ -35,7 +35,7 @@ review target commit: 8cd0e16
 - Tauri 先行、Avalonia 後追いの判断が妥当か。
 - `docs/todo/todo.md` の TODO と `wbs.md` の WP 対応、依存順序、workflow 種別に矛盾がないか。
 - 調査レポートの承認済み方針と矛盾していないか。
-- 次に `TODO-2026-001` を通常 workflow へ引き継げるか。
+- 次に `TODO-2026-003` を通常 workflow へ引き継げるか。
 
 レビュー文書には、少なくとも以下を含めてください。
 

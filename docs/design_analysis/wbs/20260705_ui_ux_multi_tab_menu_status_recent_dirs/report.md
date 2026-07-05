@@ -66,4 +66,4 @@ Tauri 版を先行実装し、UX 評価後に Avalonia 版へ適用する 10 wor
 
 ## Todo 連携
 
-`docs/todo/todo.md` に `TODO-2026-001` から `TODO-2026-010` を追加した。各 TODO は `wbs.md` の work package ID に対応する。
+`docs/todo/todo.md` に `TODO-2026-003` から `TODO-2026-012` を追加した。各 TODO は `wbs.md` の work package ID に対応する。
