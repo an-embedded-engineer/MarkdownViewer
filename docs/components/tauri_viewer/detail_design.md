@@ -12,10 +12,10 @@
 | `selectedMarkdown` | Markdown 本文 | UTF-8 文字列 |
 | `previewRevision` | Reload / 再描画用カウンタ | 同一内容でも increment で再描画 |
 | `theme` | `"light" \| "dark"` | `<html data-theme>` に反映 |
-| `errorMessage` | エラーバナー表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
+| `errorMessage` | StatusBar の Error 表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
 | `pendingAnchor` | 遷移先アンカー | 80ms 遅延でスクロール |
-| `isMarkdownLoading` | `read_text_file` 中フラグ | プレビュー上部 loading バナー |
-| `isBusy` | `isMarkdownLoading OR isPlantUmlRendering` | Toolbar / Explorer を一時無効化するための aggregate busy フラグ |
+| `isMarkdownLoading` | `read_text_file` 中フラグ | StatusBar の State 表示 |
+| `isBusy` | `isMarkdownLoading OR isPlantUmlRendering` | MenuBar / Explorer を一時無効化するための aggregate busy フラグ |
 | `plantUmlRenderState` | `{ key, diagrams }` | `selectedFilePath:previewRevision` をキーに最新結果を保持 |
 
 `previewRevision` は Markdown 本文が同一でも Reload 時に Mermaid / PlantUML を再描画するための更新番号である。
@@ -42,10 +42,11 @@ package "Frontend (src/App.tsx)" {
     +loadMarkdown(root, file, anchor?)
     +handlePreviewClick(event)
   }
-  class Toolbar
+  class MenuBar
   class FileTree
   class TreeNode
   class MarkdownPreview
+  class StatusBar
   class renderMarkdown <<function>> {
     +md.renderer.rules.fence
     +md.renderer.rules.image
@@ -73,10 +74,11 @@ package "Rust backend (src-tauri/src/lib.rs)" {
   class sanitize_svg
 }
 
-App --> Toolbar
+App --> MenuBar
 App --> FileTree
 FileTree --> TreeNode
 App --> MarkdownPreview
+App --> StatusBar
 MarkdownPreview --> renderMarkdown
 App --> extractPlantUmlSources
 App --> resolveSiblingPath
@@ -235,7 +237,7 @@ stop
 ### 再描画方針
 
 - Theme 切替だけでは `render_plantuml_diagrams` を再実行しない。invoke するのは `selectedFilePath` / `selectedMarkdown` / `previewRevision` のいずれかが変わった場合だけ。
-- PlantUML 結果待ちの図がある間は、React 側 (`isBusy` / `isPlantUmlRendering`) でプレビュー上部に loading バナーを表示する。Markdown 読み込み中と PlantUML 描画中は併せて `Loading Markdown and rendering PlantUML diagrams...` を表示し、Toolbar / Explorer の操作を無効化して重複レンダリングを防ぐ。
+- PlantUML 結果待ちの図がある間は、React 側 (`isBusy` / `isPlantUmlRendering`) で StatusBar の State 欄に loading 状態を表示する。Markdown 読み込み中と PlantUML 描画中は併せて `Loading Markdown and rendering PlantUML diagrams...` を表示し、MenuBar / Explorer の操作を無効化して重複レンダリングを防ぐ。
 - PlantUML の pending placeholder は `.plantuml-loading` で、最終失敗時のみ `.plantuml-error` を使う。これにより pending 状態と失敗状態が視覚的に区別される。
 
 ## ローカル画像
@@ -283,13 +285,13 @@ stop
 
 | 失敗箇所 | 表示 |
 | --- | --- |
-| Tauri command 失敗 | `errorMessage` を `error-banner` に表示 |
+| Tauri command 失敗 | `errorMessage` を StatusBar の Error 欄に表示 |
 | Markdown 読み込み失敗 | 同上 + 直前の選択ファイルは維持 |
 | Mermaid 描画失敗 | `errorMessage` を `Mermaid render failed: ...` で表示 |
 | PlantUML 図単位失敗 | 該当位置に `.plantuml-error`、`firstError` を `errorMessage` にも反映 |
-| PlantUML pending | 該当位置に `.plantuml-loading`、`Toolbar / Explorer` を一時無効化して重複操作を抑止 |
+| PlantUML pending | 該当位置に `.plantuml-loading`、`MenuBar / Explorer` を一時無効化して重複操作を抑止 |
 | PlantUML タイムアウト (10 秒) | 図単位失敗として表示 |
-| `render_plantuml_diagrams` 全体失敗 | 全図を `.plantuml-error` に置換し `errorMessage` を更新 |
+| `render_plantuml_diagrams` 全体失敗 | 全図を `.plantuml-error` に置換し StatusBar の Error 欄を更新 |
 
 ## UI レイアウト
 
@@ -297,18 +299,21 @@ stop
 
 ```text
 <main.app-shell>
-  <Toolbar/>           ← Open Folder / Theme / Reload / path
+  <MenuBar/>           ← File: Open Folder / Reload、View: Theme
   <section.workspace>
     <aside.explorer-pane>
       <FileTree/>      ← 再帰 TreeNode、Markdown / Image / Directory アイコン
     </aside>
     <section.preview-pane>
-      <div.error-banner/>  (errorMessage がある場合)
-      <div.loading-banner/> (Markdown / PlantUML 読み込み中)
       <MarkdownPreview/> dangerouslySetInnerHTML
     </section>
   </section>
+  <StatusBar/>         ← Root / File / State / Error
 </main>
 ```
+
+`MenuBar` は React アプリ内の常時表示ボタン群であり、`File` / `View` はグループラベルとして扱う。ドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キー移動、フォーカストラップは導入しない。
+
+`StatusBar` は root path、active file、loading state、代表 error を下部に常時表示する。`State` と `Error` の値だけを `aria-live="polite"` にし、`Root` / `File` は live region に含めない。狭幅時の表示優先度は `Error`、`State`、`File`、`Root` の順で、`Root` を最初に短縮する。
 
 テーマは `document.documentElement.dataset.theme` に `"light" \| "dark"` を書き込み、`App.css` の `:root[data-theme=...]` で CSS 変数を切り替える。

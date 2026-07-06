@@ -296,9 +296,8 @@ function App() {
 
   return (
     <main className="app-shell">
-      <Toolbar
+      <MenuBar
         rootPath={rootPath}
-        selectedFileName={selectedFileName}
         theme={theme}
         isBusy={isBusy}
         onOpenFolder={openFolder}
@@ -322,12 +321,6 @@ function App() {
         </aside>
 
         <section className="preview-pane" aria-label="Markdown Preview">
-          {errorMessage && <div className="error-banner">{errorMessage}</div>}
-          {loadingMessage && (
-            <div className="loading-banner" role="status">
-              {loadingMessage}
-            </div>
-          )}
           {selectedFilePath ? (
             <MarkdownPreview
               key={`${selectedFilePath}-${theme}-${previewRevision}`}
@@ -342,13 +335,19 @@ function App() {
           )}
         </section>
       </section>
+
+      <StatusBar
+        rootPath={rootPath}
+        selectedFileName={selectedFileName}
+        loadingMessage={loadingMessage}
+        errorMessage={errorMessage}
+      />
     </main>
   );
 }
 
-type ToolbarProps = {
+type MenuBarProps = {
   rootPath: string | null;
-  selectedFileName: string;
   theme: Theme;
   isBusy: boolean;
   onOpenFolder: () => void;
@@ -356,31 +355,74 @@ type ToolbarProps = {
   onToggleTheme: () => void;
 };
 
-function Toolbar({
+function MenuBar({
   rootPath,
-  selectedFileName,
   theme,
   isBusy,
   onOpenFolder,
   onReload,
   onToggleTheme,
-}: ToolbarProps) {
+}: MenuBarProps) {
   return (
-    <header className="toolbar">
-      <button type="button" disabled={isBusy} onClick={onOpenFolder}>
-        Open Folder
-      </button>
-      <button type="button" disabled={isBusy} onClick={onToggleTheme}>
-        Theme: {theme === "light" ? "Light" : "Dark"}
-      </button>
-      <button type="button" disabled={!rootPath || isBusy} onClick={onReload}>
-        Reload
-      </button>
-      <div className="path-display" title={rootPath ?? ""}>
-        <span>{rootPath ?? "No folder selected"}</span>
-        {selectedFileName && <strong>{selectedFileName}</strong>}
+    <header className="menu-bar" aria-label="Application menu">
+      <div className="menu-group" aria-label="File commands">
+        <span className="menu-group-label">File</span>
+        <button type="button" disabled={isBusy} onClick={onOpenFolder}>
+          Open Folder
+        </button>
+        <button type="button" disabled={!rootPath || isBusy} onClick={onReload}>
+          Reload
+        </button>
+      </div>
+      <div className="menu-group" aria-label="View commands">
+        <span className="menu-group-label">View</span>
+        <button type="button" disabled={isBusy} onClick={onToggleTheme}>
+          Theme: {theme === "light" ? "Light" : "Dark"}
+        </button>
       </div>
     </header>
+  );
+}
+
+type StatusBarProps = {
+  rootPath: string | null;
+  selectedFileName: string;
+  loadingMessage: string | null;
+  errorMessage: string | null;
+};
+
+function StatusBar({ rootPath, selectedFileName, loadingMessage, errorMessage }: StatusBarProps) {
+  const rootText = rootPath ?? "No folder selected";
+  const fileText = selectedFileName || "No file selected";
+  const stateText = loadingMessage ?? "Ready";
+  const errorText = errorMessage ?? "None";
+
+  return (
+    <footer className="status-bar" aria-label="Application status">
+      <StatusBarItem label="Error" value={errorText} priority="error" live alert={errorMessage !== null} />
+      <StatusBarItem label="State" value={stateText} priority="state" live />
+      <StatusBarItem label="File" value={fileText} priority="file" />
+      <StatusBarItem label="Root" value={rootText} priority="root" />
+    </footer>
+  );
+}
+
+type StatusBarItemProps = {
+  label: string;
+  value: string;
+  priority: "error" | "state" | "file" | "root";
+  live?: boolean;
+  alert?: boolean;
+};
+
+function StatusBarItem({ label, value, priority, live = false, alert = false }: StatusBarItemProps) {
+  return (
+    <div className={`status-item status-${priority}${alert ? " status-alert" : ""}`} title={`${label}: ${value}`}>
+      <span className="status-label">{label}:</span>
+      <span className="status-value" aria-live={live ? "polite" : undefined}>
+        {value}
+      </span>
+    </div>
   );
 }
 

@@ -11,7 +11,7 @@ components:
   - "docs/components/tauri_viewer"
 status: "in_progress"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "draft"
 completion_status: "not_started"
 related_commits:
   - "a209fc2 : Phase 0 define TODO-2026-003 scope"
@@ -43,5 +43,5 @@ source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_
 | Phase 0 Requirements | Done (`a209fc2`) |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-07-06) |
-| Phase 3 Implementation and docs review | Not started |
+| Phase 3 Implementation and docs review | Draft |
 | Phase 4 Verification and completion | Not started |

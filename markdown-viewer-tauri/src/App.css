@@ -33,7 +33,7 @@ button {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 48px minmax(0, 1fr);
+  grid-template-rows: 44px minmax(0, 1fr) 30px;
   width: 100%;
   height: 100%;
   min-width: 680px;
@@ -41,7 +41,7 @@ button {
   color: var(--text);
   --app-bg: #f5f6f8;
   --panel-bg: #ffffff;
-  --toolbar-bg: #f9fafb;
+  --chrome-bg: #f9fafb;
   --border: #d7dce2;
   --muted: #69717d;
   --text: #20242a;
@@ -57,7 +57,7 @@ button {
 :root[data-theme="dark"] .app-shell {
   --app-bg: #101317;
   --panel-bg: #171b21;
-  --toolbar-bg: #15191f;
+  --chrome-bg: #15191f;
   --border: #303741;
   --muted: #9aa5b1;
   --text: #d8dee9;
@@ -70,17 +70,31 @@ button {
   --code-bg: #20262e;
 }
 
-.toolbar {
+.menu-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome-bg);
+}
+
+.menu-group {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--toolbar-bg);
 }
 
-.toolbar button {
+.menu-group-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.menu-bar button {
   height: 32px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -90,41 +104,58 @@ button {
   cursor: pointer;
 }
 
-.toolbar button:hover:not(:disabled) {
+.menu-bar button:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
-.toolbar button:disabled {
+.menu-bar button:disabled {
   color: var(--muted);
   cursor: default;
   opacity: 0.65;
 }
 
-.path-display {
-  display: flex;
+.status-bar {
+  display: grid;
+  grid-template-columns:
+    minmax(140px, 1.2fr)
+    minmax(128px, 0.8fr)
+    minmax(110px, 0.7fr)
+    minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  margin-left: 4px;
+  padding: 0 12px;
+  border-top: 1px solid var(--border);
   color: var(--muted);
+  background: var(--chrome-bg);
   font-size: 13px;
 }
 
-.path-display span,
-.path-display strong {
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.status-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.status-value {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.path-display span {
-  max-width: 42vw;
+.status-alert {
+  color: var(--error-text);
 }
 
-.path-display strong {
-  max-width: 20vw;
+.status-state {
   color: var(--text);
-  font-weight: 600;
 }
 
 .workspace {
@@ -216,28 +247,6 @@ button {
 .preview-pane {
   position: relative;
   overflow: auto;
-}
-
-.error-banner {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  color: var(--error-text);
-  background: var(--error-bg);
-  font-size: 13px;
-}
-
-.loading-banner {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  background: var(--accent-soft);
-  font-size: 13px;
 }
 
 .preview-empty {
@@ -407,7 +416,18 @@ button {
     padding-top: 24px;
   }
 
-  .path-display span {
-    max-width: 26vw;
+  .menu-bar {
+    overflow-x: auto;
+  }
+
+  .status-bar {
+    grid-template-columns:
+      minmax(112px, 1.1fr)
+      minmax(104px, 0.9fr)
+      minmax(72px, 0.6fr);
+  }
+
+  .status-root {
+    display: none;
   }
 }

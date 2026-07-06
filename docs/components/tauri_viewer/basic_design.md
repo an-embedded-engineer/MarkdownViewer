@@ -6,7 +6,7 @@ OS 連携とファイルシステム境界は Rust command へ寄せ、画面状
 
 ## 責務
 
-- React: Toolbar、Explorer、Preview、テーマ、エラー / loading 表示、Markdown → HTML 変換、リンク処理。
+- React: MenuBar、Explorer、Preview、StatusBar、テーマ、エラー / loading 表示、Markdown → HTML 変換、リンク処理。
 - TypeScript renderer (`renderMarkdown`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。
 - Rust: root 配下の安全なファイル走査、Markdown 本文の UTF-8 読み込み、PlantUML レンダリング (Java プロセス起動)。
 - Tauri config: dialog / opener / asset protocol の権限管理。capability で plugin 利用を許可する。
@@ -44,7 +44,7 @@ skinparam componentStyle rectangle
 
 package "Frontend (React + Vite)" as F {
   [main.tsx]
-  [App / Toolbar / FileTree / MarkdownPreview]
+  [App / MenuBar / FileTree / MarkdownPreview / StatusBar]
   [renderMarkdown\n(markdown-it custom rules)]
   [mermaid (client)]
   [App.css (theme / layout)]
@@ -74,10 +74,10 @@ package "External" as E {
   [OS default browser]
 }
 
-[main.tsx] --> [App / Toolbar / FileTree / MarkdownPreview]
-[App / Toolbar / FileTree / MarkdownPreview] --> TJS
-[App / Toolbar / FileTree / MarkdownPreview] --> [renderMarkdown\n(markdown-it custom rules)]
-[App / Toolbar / FileTree / MarkdownPreview] --> [mermaid (client)]
+[main.tsx] --> [App / MenuBar / FileTree / MarkdownPreview / StatusBar]
+[App / MenuBar / FileTree / MarkdownPreview / StatusBar] --> TJS
+[App / MenuBar / FileTree / MarkdownPreview / StatusBar] --> [renderMarkdown\n(markdown-it custom rules)]
+[App / MenuBar / FileTree / MarkdownPreview / StatusBar] --> [mermaid (client)]
 TJS --> TR
 TR --> R
 R --> E
@@ -146,7 +146,7 @@ state NoRoot : rootPath = null
 state HasRoot : rootPath set\n選択 Markdown は任意
 state MarkdownLoading : isMarkdownLoading = true
 state PlantUmlPending : pending PlantUML diagrams
-state Error : errorMessage 表示
+state Error : StatusBar の Error 欄に errorMessage 表示
 
 NoRoot --> MarkdownLoading : Open Folder / loadRoot
 HasRoot --> MarkdownLoading : Explorer 選択 / Reload
