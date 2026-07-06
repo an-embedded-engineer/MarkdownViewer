@@ -1,0 +1,1 @@
+docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/prompts/phase2_design_review_initial_claude.md を読んで、レビューを開始してください。
