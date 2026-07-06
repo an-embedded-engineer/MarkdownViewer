@@ -30,6 +30,12 @@ TODO-2026-003 Phase 3 (実装・恒久ドキュメント反映) レビュー。�
 
 **severity**: Medium
 
+### 対応内容 (2026-07-06 follow-up)
+
+`App.css` の mobile breakpoint から `.status-root { display: none; }` を削除し、`grid-template-columns` を 4 列のまま `Error` / `State` / `File` / `Root` の順で維持するよう変更した。`Root` 列は `minmax(64px, 0.5fr)` とし、狭幅時も項目を DOM / 表示上に残したまま `.status-value` の ellipsis と既存 `title` 属性で全文確認できる。
+
+`npm run build` (`markdown-viewer-tauri/`) と `cargo check` (`markdown-viewer-tauri/src-tauri/`) は再実行で成功した。Vite の chunk size warning のみで新規エラーはない。
+
 ---
 
 ## 2. ドキュメント不足
@@ -45,6 +51,10 @@ TODO-2026-003 Phase 3 (実装・恒久ドキュメント反映) レビュー。�
 **推奨対応**: `App.tsx:368,377` の `<div className="menu-group" aria-label="...">` は暗黙ロールが `generic` のままであり、支援技術によっては `aria-label` がグループ名として読み上げられない場合がある。`role="group"` (または `role="toolbar"` 相当) を付与すると、File / View のグルーピングがスクリーンリーダーでも明確になる。必須ではなく、任意の改善として扱ってよい。
 
 **severity**: Low
+
+### 対応内容 (2026-07-06 follow-up)
+
+`App.tsx` の `File commands` / `View commands` の `.menu-group` に `role="group"` を付与し、`aria-label` が支援技術上の grouping label として扱われやすい構造にした。`role="menubar"` / `role="menuitem"` は引き続き導入していない。
 
 ---
 

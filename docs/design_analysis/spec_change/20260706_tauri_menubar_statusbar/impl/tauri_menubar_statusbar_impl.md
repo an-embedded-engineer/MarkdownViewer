@@ -11,11 +11,11 @@
 | 設計項目 | 実装内容 |
 | --- | --- |
 | Toolbar を MenuBar / StatusBar へ分離 | `markdown-viewer-tauri/src/App.tsx` の `Toolbar` を削除し、`MenuBar` と `StatusBar` を追加した。 |
-| MenuBar は常時表示ボタン群 | `File` / `View` のグループラベルと通常の `button` で構成し、ドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キー移動、フォーカストラップは導入していない。 |
+| MenuBar は常時表示ボタン群 | `File` / `View` のグループラベルと通常の `button` で構成し、ドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キー移動、フォーカストラップは導入していない。各 command group は `role="group"` で支援技術向けの grouping を明示する。 |
 | 既存操作の維持 | `openFolder`、`reload`、theme toggle の handler と disabled 条件を既存 state からそのまま渡している。 |
 | StatusBar で root / active file / loading / error を表示 | `StatusBar` が `rootPath`、`selectedFileName`、`loadingMessage`、`errorMessage` を props で受け取り、`Root` / `File` / `State` / `Error` として表示する。 |
 | live region の分割 | `StatusBarItem` で `State` と `Error` の値だけ `aria-live="polite"` を付与し、`Root` / `File` は live region に含めていない。 |
-| 狭幅時の表示優先度 | CSS で `Error`、`State`、`File`、`Root` の順に配置し、mobile 幅では `Root` を非表示にして最初に短縮する。各値は `title` で全文確認できる。 |
+| 狭幅時の表示優先度 | CSS で `Error`、`State`、`File`、`Root` の順に配置し、mobile 幅でも `Root` を表示したまま最小列幅へ短縮する。各値は ellipsis と `title` で全文確認できる。 |
 | Preview 上部 banner の撤去 | 代表 error/loading の sticky banner を削除し、代表状態は StatusBar に集約した。PlantUML 図単位の `.plantuml-loading` / `.plantuml-error` は維持した。 |
 
 ## 変更ファイル
@@ -52,6 +52,8 @@
 | `npm run build` (`markdown-viewer-tauri/`) | 成功。Vite の chunk size warning のみ。 |
 | `cargo check` (`markdown-viewer-tauri/src-tauri/`) | 成功。 |
 
+Phase 3 実装レビューの follow-up 修正後にも同じ検証を再実行し、いずれも成功した。`npm run build` は Vite の chunk size warning のみ、`cargo check` は `dev` profile の check 成功。
+
 ## 手動確認予定
 
 Phase 4-a のユーザ動作確認で次を確認する。
@@ -60,6 +62,7 @@ Phase 4-a のユーザ動作確認で次を確認する。
 - Reload が MenuBar から実行でき、同一 Markdown でも Mermaid / PlantUML が再描画される。
 - Theme toggle が MenuBar から実行でき、Light / Dark が切り替わる。
 - StatusBar に root path と active file が表示される。
+- 幅 760px 未満でも Root / File / State / Error が StatusBar に残り、長い root path は ellipsis と `title` で確認できる。
 - Markdown 読み込み中または PlantUML 描画中に StatusBar が loading 状態を表示する。
 - エラー発生時に StatusBar が代表 error を表示する。
 - `sample_docs/plantuml.md` で Mermaid と PlantUML が同居して表示される。
@@ -67,5 +70,6 @@ Phase 4-a のユーザ動作確認で次を確認する。
 
 ## 未解決事項
 
-- Phase 3 時点の未解決実装指摘はなし。
+- Phase 3 実装レビューの中優先度指摘 1.1 は、狭幅時も `Root` を非表示にせず ellipsis 表示へ変更して対応済み。
+- Phase 3 実装レビューの低優先度改善 3.1 は、`menu-group` に `role="group"` を付与して対応済み。
 - ユーザ操作を伴う visual / manual 確認は Phase 4-a で実施する。

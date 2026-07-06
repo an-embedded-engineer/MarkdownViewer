@@ -365,7 +365,7 @@ function MenuBar({
 }: MenuBarProps) {
   return (
     <header className="menu-bar" aria-label="Application menu">
-      <div className="menu-group" aria-label="File commands">
+      <div className="menu-group" role="group" aria-label="File commands">
         <span className="menu-group-label">File</span>
         <button type="button" disabled={isBusy} onClick={onOpenFolder}>
           Open Folder
@@ -374,7 +374,7 @@ function MenuBar({
           Reload
         </button>
       </div>
-      <div className="menu-group" aria-label="View commands">
+      <div className="menu-group" role="group" aria-label="View commands">
         <span className="menu-group-label">View</span>
         <button type="button" disabled={isBusy} onClick={onToggleTheme}>
           Theme: {theme === "light" ? "Light" : "Dark"}
