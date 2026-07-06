@@ -1,12 +1,14 @@
 # Tauri MenuBar / StatusBar 導入 実装レビュー
 
 **レビュー日**: 2026-07-06
-**対象コミット**: `61e4cd6 feat: add Tauri menu bar and status bar`
+**再確認日**: 2026-07-06
 **対象ドキュメント**: `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/design/tauri_menubar_statusbar_design.md`
 **対象 impl 記録**: `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/impl/tauri_menubar_statusbar_impl.md`
 **対象 meta**: `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-003
-**判定**: **条件付き承認 (Conditionally Approved)**。下記 1 件 (中 1 件) を Phase 4 前に修正すれば進行可。
+**初回レビュー対象コミット**: `61e4cd6 feat: add Tauri menu bar and status bar`
+**再確認対象コミット**: `476464b fix: keep root status visible on narrow widths`
+**判定**: **承認 (Approved)**。Phase 4 進行可。
 
 ---
 
@@ -63,7 +65,7 @@ TODO-2026-003 Phase 3 (実装・恒久ドキュメント反映) レビュー。�
 | `docs/todo/todo.md` completion 条件 | 実装確認 | 結果 |
 | --- | --- | --- |
 | `Open Folder` / `Reload` / theme 操作が MenuBar から実行できる | `MenuBar` の `File` group に `Open Folder` (`disabled={isBusy}`) / `Reload` (`disabled={!rootPath \|\| isBusy}`)、`View` group に Theme toggle (`disabled={isBusy}`) を実装。旧 `Toolbar` の handler / disabled 条件と 1:1 で一致 (`App.tsx:358-385`) | ✓ 整合 |
-| root path、active file、loading、error が StatusBar に表示される | `StatusBar` が `rootPath` / `selectedFileName` / `loadingMessage` / `errorMessage` を `Root` / `File` / `State` / `Error` として表示 (`App.tsx:394-408`) | ✓ 整合 (狭幅時の `Root` 表示は 1.1 参照) |
+| root path、active file、loading、error が StatusBar に表示される | `StatusBar` が `rootPath` / `selectedFileName` / `loadingMessage` / `errorMessage` を `Root` / `File` / `State` / `Error` として表示 (`App.tsx:394-408`)。狭幅時も `Root` 列 (`minmax(64px, 0.5fr)`) が維持され、ellipsis + `title` で全文確認できる (`App.css:423-431`、1.1 follow-up 反映済み) | ✓ 整合 |
 | 既存単一ファイル表示が退行しない | `loadRoot` / `loadMarkdown` / `selectedMarkdown` / `previewRevision` / `MarkdownPreview` は Phase 2 以前と一字一句変更なし (`App.tsx:94-155`, `504-524`) | ✓ 整合 |
 | Mermaid が退行しない | `mermaid.initialize` / `mermaid.run` の effect と依存配列 (`previewRevision`, `theme`, `plantUmlDiagrams`) は変更なし (`App.tsx:255-282`) | ✓ 整合 |
 | PlantUML が退行しない | `plantUmlRenderState` の effect、`extractPlantUmlSources`、`render_plantuml_diagrams` invoke、inline `.plantuml-loading` / `.plantuml-error` は変更なし (`App.tsx:196-253`, `615-622`) | ✓ 整合 |
@@ -74,7 +76,7 @@ Phase 2 レビューで確認事項とされた 3 点も実装済み:
 
 - MenuBar は常時表示ボタン群のみで、ドロップダウン / `role="menubar"` / `role="menuitem"` / 矢印キー移動 / フォーカストラップは未導入 (`App.tsx:358-385`)。✓
 - `State` / `Error` の値のみ `aria-live="polite"`、`Root` / `File` は live region に含まれない (`App.tsx:402-405`, `418-427`)。✓
-- 狭幅時の表示優先度が `Error` → `State` → `File` → `Root` の順で構築されている (`App.tsx:401-406`, `App.css:423-428`)。ただし `Root` は「短縮」ではなく「非表示」になっている点は 1.1 で指摘。△
+- 狭幅時の表示優先度が `Error` → `State` → `File` → `Root` の順で構築されている (`App.tsx:401-406`, `App.css:423-431`)。`Root` は 1.1 follow-up 反映により「非表示」から「`minmax(64px, 0.5fr)` で ellipsis + `title` 表示」へ修正済み。✓
 
 ---
 
@@ -87,14 +89,21 @@ Phase 2 レビューで確認事項とされた 3 点も実装済み:
 
 いずれもコード変更 (`App.tsx` / `App.css`) のみで Rust / Tauri command 側の変更が含まれないことと整合する。
 
+### Follow-up 再確認 (commit `476464b`)
+
+| 検証 | 再実行結果 |
+| --- | --- |
+| `npm run build` (`markdown-viewer-tauri/`) | 成功 (`✓ built in 4.94s`)。chunk size warning のみで新規エラーなし |
+| `cargo check` (`markdown-viewer-tauri/src-tauri/`) | 成功 (`Finished dev profile ... in 0.91s`) |
+
 ---
 
 ## 6. 対応優先度
 
-| 優先度 | 項目 | 理由 |
-| --- | --- | --- |
-| 中 | 1.1 狭幅時の `Root` 完全非表示 | 受け入れ条件 (root path が StatusBar に表示される) が狭幅ウィンドウで満たされず、旧 Toolbar からの後退にもなる |
-| 低 | 3.1 `menu-group` の `role` 未指定 | 支援技術での読み上げ品質に関する改善で、必須要件には影響しない |
+| 優先度 | 項目 | 理由 | 状態 |
+| --- | --- | --- | --- |
+| 中 | 1.1 狭幅時の `Root` 完全非表示 | 受け入れ条件 (root path が StatusBar に表示される) が狭幅ウィンドウで満たされず、旧 Toolbar からの後退にもなる | 対応済み (`476464b`) |
+| 低 | 3.1 `menu-group` の `role` 未指定 | 支援技術での読み上げ品質に関する改善で、必須要件には影響しない | 対応済み (`476464b`) |
 
 ---
 
@@ -111,6 +120,20 @@ Phase 2 レビューで確認事項とされた 3 点も実装済み:
 
 実装は Phase 2 承認済み設計の大部分を忠実に反映している。MenuBar の常時表示ボタン群方針、StatusBar の `aria-live` 分割方針は正確に実装され、既存の Markdown 表示・Mermaid・PlantUML・相対画像・リンク遷移の処理経路はコード上変更されていないことをソース確認で裏付けた。恒久ドキュメント (README / basic_design / detail_design / interface_spec) も実装と一致しており、`npm run build` / `cargo check` はいずれも再実行で成功を確認した。不要な互換レイヤーや重複 state の追加も見当たらない。
 
-一方で、狭幅時に `Root` フィールドを `display: none` で完全に消す実装 (1.1) は、設計が明記した「ellipsis / title で破綻を避ける」という緩和方針と整合せず、受け入れ条件 (root path が StatusBar に表示される) を狭幅ウィンドウで満たさない。これは実装ミスとして是正可能な範囲であり、設計全体の採用案や対象範囲を覆すものではないため、**条件付き承認**とする。Phase 4 着手前に 1.1 を修正し、狭幅時も `Root` が (省略表示であっても) 確認できる状態にすること。
+初回レビューでは、狭幅時に `Root` フィールドを `display: none` で完全に消す実装 (1.1) が、設計が明記した「ellipsis / title で破綻を避ける」という緩和方針と整合せず、受け入れ条件 (root path が StatusBar に表示される) を狭幅ウィンドウで満たさない点を指摘し、**条件付き承認**とした。
 
-未対応指摘: 1 件 (中 1 件)。3.1 (低) は任意改善のため必須対応ではない。
+### 再確認結果 (2026-07-06, commit `476464b`)
+
+`markdown-viewer-tauri/src/App.tsx` / `App.css` を再確認した。
+
+- **1.1 (中) 狭幅時の `Root` 完全非表示**: `App.css` の `@media (max-width: 760px)` から `.status-root { display: none; }` が削除され、`grid-template-columns` に `minmax(64px, 0.5fr)` の `Root` 列が追加された (`App.css:423-431`)。`StatusBarItem` の `title={`${label}: ${value}`}` と `.status-value` の ellipsis は変更されておらず、狭幅時も `Root` が (省略表示であっても) DOM 上に残り `title` で全文確認できる。受け入れ条件「root path、active file、loading、error が StatusBar に表示される」は幅を問わず成立する。✓ 反映確認。
+- **3.1 (低) `menu-group` の `role` 未指定**: `App.tsx` の `File commands` / `View commands` の `.menu-group` に `role="group"` が付与された (`App.tsx:368, 377`)。`role="menubar"` / `role="menuitem"` は導入されておらず、Phase 2 で確定した「常時表示ボタン群、ドロップダウンなし」という MenuBar の操作モデルとも矛盾しない。✓ 反映確認。
+- 検証: `npm run build` / `cargo check` をこの follow-up コミット時点のソースで再実行し、いずれも成功を確認した (上記「Follow-up 再確認」参照)。新規エラーやリグレッションはない。
+
+**判定**: **承認 (Approved)**。
+
+- 中 1 件・低 1 件のレビュー指摘に対応が記録され、未解決指摘はゼロ。
+- `meta.md` の `impl_status` を `done`、Phase 3 の Phase Status を完了状態へ更新可能。
+- Phase 4 (検証・完了処理) への進行を承認する。Phase 4 では、実際にウィンドウ幅を 760px 未満まで縮小した状態で `Root` / `File` / `State` / `Error` が (ellipsis であっても) 視認・`title` 確認できることを含め、`impl/tauri_menubar_statusbar_impl.md` に記載の手動確認観点を実施すること。
+
+未解決指摘なし。本レビューでの承認をもって Phase 3 実装レビューを完了とする。
