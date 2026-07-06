@@ -1,12 +1,14 @@
 # Tauri MenuBar / StatusBar 導入 設計レビュー
 
 **レビュー日**: 2026-07-06
+**再確認日**: 2026-07-06
 **対象ドキュメント**: `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/design/tauri_menubar_statusbar_design.md`
 **対象 meta**: `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-003
 **対象 WBS**: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md` WP-001
-**レビュー対象コミット**: `7979fce docs: draft Tauri menu status design`
-**判定**: **条件付き承認 (Conditionally Approved)**。下記 2 件 (中 1 件・低 1 件) を Phase 3 着手前に設計書へ追記すれば進行可。
+**初回レビュー対象コミット**: `7979fce docs: draft Tauri menu status design`
+**再確認対象コミット**: `bec06d5 docs: address Tauri menu status design review`
+**判定**: **承認 (Approved)**。Phase 3 進行可。
 
 ---
 
@@ -112,4 +114,20 @@ WBS (`wbs.md` WP-001) の `completion_criteria` および非対象・deferred �
 
 設計は TODO-2026-003 の受け入れ条件を漏れなく反映しており、既存 `App.tsx` / `App.css` の state・handler・派生値をそのまま再利用する方針で実装粒度も十分に具体的である。OS native menu、Recent Folders、multi-tab、split view、Avalonia 変更の非対象化も WBS・todo と整合している。類似ロジックの重複や不要な互換レイヤー・fallback の追加も見当たらない。
 
-指摘は 2 件 (中 1 件、低 1 件) のみで、いずれも UI の操作モデル・アクセシビリティ方針という実装の入口で確定させておくべき詳細であり、設計全体の採用案・対象範囲・非対象を覆すものではない。**条件付き承認**とし、Phase 3 着手前に 1.1 (MenuBar の操作モデル) を設計書へ追記することを必須条件、1.2 (StatusBar の aria-live 方針) を Phase 3 detail design 内での確定で可とする。
+指摘は 2 件 (中 1 件、低 1 件) のみで、いずれも UI の操作モデル・アクセシビリティ方針という実装の入口で確定させておくべき詳細であり、設計全体の採用案・対象範囲・非対象を覆すものではない。初回レビューでは、Phase 3 着手前に 1.1 (MenuBar の操作モデル) を設計書へ追記することを必須条件、1.2 (StatusBar の aria-live 方針) を Phase 3 detail design 内での確定で可とする**条件付き承認**とした。
+
+### 再確認結果 (2026-07-06, commit `bec06d5`)
+
+設計書 (`design/tauri_menubar_statusbar_design.md`) を再確認した。
+
+- **1.1 MenuBar の操作モデル**: Before/After 図が「File group: Open Folder button / Reload button」「View group: Theme toggle button」に修正され、「UI / API / データモデルの変更点」直前に「MenuBar は React アプリ内で常時展開されたボタン群として実装する。`File` / `View` は視覚上のグループラベルであり、クリックで開くドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キーによるメニュー移動、フォーカストラップは導入しない」という一文が追記された。「UI 変更」箇条にも「`File` / `View` は grouping label であり、ドロップダウンメニューは持たない」が追加され、将来ドロップダウン化する場合は別 TODO として起票する方針が follow-up に追加されている。✓ 反映確認。
+- **1.2 StatusBar の aria-live 方針**: 「UI 変更」箇条に「支援技術向けには `State:` と `Error:` の値だけを `aria-live="polite"` な子要素に分ける。`Root:` と `File:` は live region に含めず、root / active file 変更時の不要な読み上げを避ける」が追加された。「例外・エラーハンドリング方針」にも同旨と、既存 `.loading-banner` の `role="status"` が担っていた通知を StatusBar へ移す旨が追記された。✓ 反映確認。
+- **3.1 StatusBar 省略優先順位 (改善提案)**: 「リスクと follow-up」に「表示優先度は `Error`、`State`、`File`、`Root` の順とし、`Root` を最初に短縮する」が追記された。✓ 反映確認。
+
+**判定**: **承認 (Approved)**。
+
+- すべてのレビュー指摘 (中 1 件、低 2 件) に対応が記録され、未解決指摘はゼロ。
+- `meta.md` の `design_status` を `done` に更新可能な状態。
+- Phase 3 (実装・恒久ドキュメント反映) への進行を承認する。Phase 3 着手時は、本 review 文書で確認した MenuBar の常時表示ボタン群方針、StatusBar の `aria-live` 分割方針、狭幅時の表示優先度をそのまま実装へ反映すること。
+
+未解決指摘なし。本レビューでの承認をもって Phase 2 設計レビューを完了とする。
