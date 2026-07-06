@@ -10,7 +10,7 @@ components:
   - "markdown-viewer-tauri/src/App.css"
   - "docs/components/tauri_viewer"
 status: "in_progress"
-design_status: "draft"
+design_status: "in_review"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits:
@@ -39,6 +39,6 @@ source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_
 | --- | --- |
 | Phase 0 Requirements | Done (`a209fc2`) |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | Draft |
+| Phase 2 Design review | In review |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4 Verification and completion | Not started |

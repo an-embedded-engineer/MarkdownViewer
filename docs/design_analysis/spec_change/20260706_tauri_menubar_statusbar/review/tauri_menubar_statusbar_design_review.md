@@ -28,6 +28,8 @@ TODO-2026-003 (Tauri MenuBar / StatusBar 導入) の Phase 2 設計レビュー�
 
 **severity**: Medium
 
+**対応**: 対応済み。設計書の Before / After と UI 変更点に、MenuBar は `File` / `View` のグループラベル付き常時表示ボタン群であり、ドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キー移動、フォーカストラップを導入しないことを追記した。将来ドロップダウン式 MenuBar が必要な場合は別 TODO として起票する方針も follow-up に追加した。
+
 ### 1.2 StatusBar の状態変化に対する aria-live 方針が未定義
 
 **ドキュメント記載**: StatusBar は `Root:` / `File:` / `State:` / `Error:` を表示する (design 103-107 行)。「エラー・例外ハンドリング方針」(design 172-177 行) でも表示先の記述はあるが、支援技術 (スクリーンリーダー) への通知方法には触れていない。
@@ -37,6 +39,8 @@ TODO-2026-003 (Tauri MenuBar / StatusBar 導入) の Phase 2 設計レビュー�
 **推奨対応**: Phase 3 の detail design で、StatusBar 内の `State:` / `Error:` 欄のみを `aria-live="polite"` な子要素として区切り、`Root:` / `File:` 欄は非 live にする方針を明記する。
 
 **severity**: Low
+
+**対応**: 対応済み。設計書の UI 変更点とエラーハンドリング方針に、StatusBar 全体ではなく `State:` と `Error:` の値だけを `aria-live="polite"` にし、`Root:` / `File:` は live region に含めない方針を追記した。
 
 ---
 
@@ -53,6 +57,8 @@ TODO-2026-003 (Tauri MenuBar / StatusBar 導入) の Phase 2 設計レビュー�
 **推奨対応**: 「リスクと follow-up」(design 210-214 行) で StatusBar の情報競合リスクと CSS ellipsis / title による緩和方針は既に記載されている。狭幅時に `Root:` / `File:` / `State:` / `Error:` のどれを優先的に省略するか（例: `Error:` は省略せず `Root:` を先に短縮する等）まで明記すると、Phase 3 の CSS 実装判断がぶれない。必須ではないため improvement 扱い。
 
 **severity**: Low
+
+**対応**: 対応済み。設計書のリスクと follow-up に、狭幅時の表示優先度を `Error`、`State`、`File`、`Root` の順とし、`Root` を最初に短縮する方針を追記した。
 
 ---
 

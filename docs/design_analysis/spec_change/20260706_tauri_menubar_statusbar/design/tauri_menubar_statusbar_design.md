@@ -73,8 +73,8 @@ After:
 ```text
 <main.app-shell>
   <MenuBar>
-    File: Open Folder / Reload
-    View: Theme toggle
+    File group: Open Folder button / Reload button
+    View group: Theme toggle button
   </MenuBar>
   <section.workspace>
     <aside.explorer-pane/>
@@ -90,14 +90,17 @@ After:
 
 Preview 内の inline PlantUML pending / error 表示は維持する。代表 loading / error は StatusBar に移し、preview pane 上部の sticky banner は削除する。
 
+MenuBar は React アプリ内で常時展開されたボタン群として実装する。`File` / `View` は視覚上のグループラベルであり、クリックで開くドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キーによるメニュー移動、フォーカストラップは導入しない。各 command は通常の `button` としてクリックまたはキーボード activation で即実行する。
+
 ## UI / API / データモデル / ドメインルールの変更点
 
 UI 変更:
 
 - `MenuBar` はアプリ内 header として実装する。
-- MenuBar の command は `File` と `View` のグループに分ける。
+- MenuBar の command は常時表示のボタンとして `File` と `View` のグループに分ける。
   - `File`: `Open Folder`, `Reload`
   - `View`: `Theme: Light/Dark`
+- `File` / `View` は grouping label であり、ドロップダウンメニューは持たない。
 - `Reload` は `rootPath` がない場合、または `isBusy` の場合に disabled。
 - `Open Folder` と theme toggle は既存と同じく `isBusy` 中 disabled。
 - `StatusBar` は常時下部に表示し、次を表示する。
@@ -105,6 +108,7 @@ UI 変更:
   - `File: <selectedFileName>` または `File: No file selected`
   - `State: Ready` / `Loading Markdown...` / `Rendering PlantUML diagrams...` / `Loading Markdown and rendering PlantUML diagrams...`
   - `Error: <errorMessage>` または `Error: None`
+- 支援技術向けには `State:` と `Error:` の値だけを `aria-live="polite"` な子要素に分ける。`Root:` と `File:` は live region に含めず、root / active file 変更時の不要な読み上げを避ける。
 
 API / データモデル変更:
 
@@ -174,6 +178,7 @@ App state / handlers
 - Tauri command / Mermaid / PlantUML の代表エラーは `errorMessage` に集約し、StatusBar の `Error:` 欄に表示する。
 - PlantUML 図単位の失敗は引き続き Markdown 本文内の該当箇所にも `.plantuml-error` として表示する。
 - StatusBar は代表メッセージを省略せず、横幅不足時は CSS ellipsis と `title` で全文確認できるようにする。
+- StatusBar 全体を live region にはしない。`State:` と `Error:` の値だけを `aria-live="polite"` にし、既存 `.loading-banner` の `role="status"` が担っていた loading 通知を StatusBar へ移す。
 - 既存仕様不一致を吸収するための追加 fallback は実装しない。
 
 ## 恒久ドキュメント更新予定先
@@ -211,10 +216,11 @@ Architecture docs は Tauri Viewer の詳細な UI 構成名変更に留まる�
 
 - preview pane 上部の banner を削除すると、長い文書閲覧中に error / loading の視認位置が下部へ変わる。StatusBar は常時表示し、error 文言を省略しすぎないことで補う。
 - MenuBar の見た目が OS native menu と誤認される可能性がある。設計上は React 内 MenuBar であり、platform native shortcut や OS menu integration は扱わない。
-- StatusBar の情報量が多く、狭い幅で root path と error が競合する。CSS grid / flex と ellipsis / title で破綻を避ける。
+- StatusBar の情報量が多く、狭い幅で root path と error が競合する。表示優先度は `Error`、`State`、`File`、`Root` の順とし、`Root` を最初に短縮する。CSS grid / flex と ellipsis / title で破綻を避ける。
 
 follow-up:
 
 - Recent Folders は TODO-2026-004 で MenuBar の `File` group へ追加する。
 - Multi-tab 導入時は active file 表示を active tab 表示に拡張する。
 - Split view 導入時は StatusBar の active pane / active tab 表示要否を再評価する。
+- ドロップダウン式の React 内 MenuBar が必要になった場合は、ARIA `menubar` / `menuitem` ロール、矢印キー操作、フォーカス管理を含む別 TODO として起票する。
