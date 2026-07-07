@@ -74,6 +74,7 @@ button {
 }
 
 .menu-bar {
+  grid-row: 1;
   display: flex;
   align-items: center;
   gap: 18px;
@@ -129,11 +130,13 @@ button {
 }
 
 .root-path-bar {
+  grid-row: 2;
   color: var(--muted);
   background: var(--panel-bg);
 }
 
 .error-strip {
+  grid-row: 4;
   border-top: 1px solid color-mix(in srgb, var(--error-text), var(--border) 55%);
   color: var(--error-text);
   background: var(--error-bg);
@@ -158,6 +161,7 @@ button {
 }
 
 .status-bar {
+  grid-row: 5;
   display: grid;
   grid-template-columns:
     minmax(160px, 0.8fr)
@@ -196,6 +200,7 @@ button {
 }
 
 .workspace {
+  grid-row: 3;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 0;

@@ -235,5 +235,6 @@ follow-up:
 - `RootPathBar` / `ErrorBanner` / `StatusBar` は追加 state を持たず、既存 `rootPath` / `errorMessage` / `selectedFileName` / `loadingMessage` から派生表示する。
 - `State` の値だけ `aria-live="polite"` とし、代表 error は `ErrorBanner` の `role="alert"` で通知する。
 - アプリ外枠の全体スクロールバーは出さず、Explorer / Preview それぞれの pane 内スクロールだけを使う。
+- `ErrorBanner` の条件付き描画で StatusBar の位置が変わらないよう、MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の grid row を明示する。
 
 また、Tauri v2 の local API 型定義では `@tauri-apps/api/menu` に `Menu.setAsAppMenu()` / `Menu.setAsWindowMenu()` があり、OS native menu は技術的に検討可能である。ただし TODO-2026-003 の non-scope として維持し、Recent Folders を導入する TODO-2026-004 で platform 差分と React state / handler 連携を設計する。

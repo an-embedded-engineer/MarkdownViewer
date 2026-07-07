@@ -11,6 +11,7 @@ publish 後のアプリ動作確認で次のフィードバックを受けた。
 1. React アプリ内 MenuBar が Windows / macOS の OS 標準 menu bar と異なる。
 2. StatusBar 内の `Error` / `Root` など長いテキストが見切れる。
 3. 右端に MenuBar から StatusBar までまたがる全体スクロールバーが常時表示される。
+4. エラーなし時に StatusBar の下に 1 行分の余白が表示され、エラー表示時だけ余白が消える。
 
 ## 判断
 
@@ -48,6 +49,16 @@ Explorer / Preview pane はそれぞれ独立してスクロールできるた�
 - `.app-shell` / `.workspace` に `min-height: 0` / `overflow: hidden` を指定し、grid 子要素の overflow を外側へ逃がさない。
 - `.explorer-pane` / `.preview-pane` の `overflow: auto` は維持し、スクロール責務を pane 内に限定する。
 
+### 4. StatusBar 下余白
+
+`ErrorBanner` はエラー発生時だけ描画されるため、CSS grid の自動配置に任せると、エラーなし時に `StatusBar` が error strip 用の 4 行目へ詰められ、最下段の 5 行目 `30px` が空行として残る。Phase 4-a feedback 対応として、各 chrome 要素の grid row を明示し、エラー有無に関係なく `StatusBar` を常に 5 行目へ固定した。
+
+対応内容:
+
+- `.menu-bar`、`.root-path-bar`、`.workspace`、`.error-strip`、`.status-bar` に `grid-row` を明示する。
+- エラーなし時は error strip 用の 4 行目を空の `auto` 行として 0px にし、下部に余白を残さない。
+- エラー表示時は `ErrorBanner` が 4 行目に入り、`StatusBar` は引き続き最下段に表示する。
+
 ## 検証
 
 | コマンド | 結果 |
@@ -64,4 +75,5 @@ Phase 4-a のユーザ動作確認として、publish 済みアプリまたは�
 - エラー発生時のみ StatusBar 直上に薄い赤背景の error strip が表示される。
 - StatusBar には `State` / `File` が表示される。
 - 右端にアプリ全体のスクロールバーが常時表示されず、Explorer / Preview pane それぞれのスクロールバーだけが表示される。
+- エラーなし時も StatusBar の下に 1 行分の余白が残らず、エラー有無で StatusBar の高さと位置が不自然に変わらない。
 - Open Folder / Reload / Theme / Markdown preview / Mermaid / PlantUML / 相対画像 / 相対 Markdown リンクが退行していない。
