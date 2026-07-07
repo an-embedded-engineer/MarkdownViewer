@@ -2,10 +2,29 @@
 
 ## ユーザー操作
 
-- Open Folder: フォルダ選択ダイアログを開く。
+- Open Folder: MenuBar の File group からフォルダ選択ダイアログを開く。
 - Explorer item click: Markdownファイルを読み込む。
-- Reload: rootと選択中Markdownを再読み込みする。
-- Theme switch: Light / Dark を切り替える。
+- Reload: MenuBar の File group から rootと選択中Markdownを再読み込みする。
+- Theme switch: MenuBar の View group から Light / Dark を切り替える。
+
+## Root Path Strip 表示
+
+- `Root`: 選択中 root path。未選択時は `No folder selected`。
+
+MenuBar 直下に常時表示する。長い path は ellipsis と `title` で全文確認できる。
+
+## Error Strip 表示
+
+- `Error`: 代表エラー。エラー発生時のみ表示する。
+
+StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術へ通知する。エラーがない場合は表示しない。
+
+## StatusBar 表示
+
+- `File`: 表示中 Markdown file name。未選択時は `No file selected`。
+- `State`: `Ready`、`Loading Markdown...`、`Rendering PlantUML diagrams...`、`Loading Markdown and rendering PlantUML diagrams...` のいずれか。
+
+`State` の値だけを `aria-live="polite"` とし、`File` は live region に含めない。
 
 ## Tauri Commands
 

@@ -296,15 +296,16 @@ function App() {
 
   return (
     <main className="app-shell">
-      <Toolbar
+      <MenuBar
         rootPath={rootPath}
-        selectedFileName={selectedFileName}
         theme={theme}
         isBusy={isBusy}
         onOpenFolder={openFolder}
         onReload={reload}
         onToggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
       />
+
+      <RootPathBar rootPath={rootPath} />
 
       <section className="workspace">
         <aside className="explorer-pane" aria-label="Explorer">
@@ -322,12 +323,6 @@ function App() {
         </aside>
 
         <section className="preview-pane" aria-label="Markdown Preview">
-          {errorMessage && <div className="error-banner">{errorMessage}</div>}
-          {loadingMessage && (
-            <div className="loading-banner" role="status">
-              {loadingMessage}
-            </div>
-          )}
           {selectedFilePath ? (
             <MarkdownPreview
               key={`${selectedFilePath}-${theme}-${previewRevision}`}
@@ -342,13 +337,19 @@ function App() {
           )}
         </section>
       </section>
+
+      {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
+
+      <StatusBar
+        selectedFileName={selectedFileName}
+        loadingMessage={loadingMessage}
+      />
     </main>
   );
 }
 
-type ToolbarProps = {
+type MenuBarProps = {
   rootPath: string | null;
-  selectedFileName: string;
   theme: Theme;
   isBusy: boolean;
   onOpenFolder: () => void;
@@ -356,31 +357,95 @@ type ToolbarProps = {
   onToggleTheme: () => void;
 };
 
-function Toolbar({
+function MenuBar({
   rootPath,
-  selectedFileName,
   theme,
   isBusy,
   onOpenFolder,
   onReload,
   onToggleTheme,
-}: ToolbarProps) {
+}: MenuBarProps) {
   return (
-    <header className="toolbar">
-      <button type="button" disabled={isBusy} onClick={onOpenFolder}>
-        Open Folder
-      </button>
-      <button type="button" disabled={isBusy} onClick={onToggleTheme}>
-        Theme: {theme === "light" ? "Light" : "Dark"}
-      </button>
-      <button type="button" disabled={!rootPath || isBusy} onClick={onReload}>
-        Reload
-      </button>
-      <div className="path-display" title={rootPath ?? ""}>
-        <span>{rootPath ?? "No folder selected"}</span>
-        {selectedFileName && <strong>{selectedFileName}</strong>}
+    <header className="menu-bar" aria-label="Application menu">
+      <div className="menu-group" role="group" aria-label="File commands">
+        <span className="menu-group-label">File</span>
+        <button type="button" disabled={isBusy} onClick={onOpenFolder}>
+          Open Folder
+        </button>
+        <button type="button" disabled={!rootPath || isBusy} onClick={onReload}>
+          Reload
+        </button>
+      </div>
+      <div className="menu-group" role="group" aria-label="View commands">
+        <span className="menu-group-label">View</span>
+        <button type="button" disabled={isBusy} onClick={onToggleTheme}>
+          Theme: {theme === "light" ? "Light" : "Dark"}
+        </button>
       </div>
     </header>
+  );
+}
+
+type RootPathBarProps = {
+  rootPath: string | null;
+};
+
+function RootPathBar({ rootPath }: RootPathBarProps) {
+  const rootText = rootPath ?? "No folder selected";
+
+  return (
+    <section className="root-path-bar" aria-label="Current root folder" title={rootText}>
+      <span className="chrome-label">Root:</span>
+      <span className="root-path-value">{rootText}</span>
+    </section>
+  );
+}
+
+type ErrorBannerProps = {
+  message: string;
+};
+
+function ErrorBanner({ message }: ErrorBannerProps) {
+  return (
+    <section className="error-strip" role="alert" title={message}>
+      <span className="chrome-label">Error:</span>
+      <span className="error-strip-value">{message}</span>
+    </section>
+  );
+}
+
+type StatusBarProps = {
+  selectedFileName: string;
+  loadingMessage: string | null;
+};
+
+function StatusBar({ selectedFileName, loadingMessage }: StatusBarProps) {
+  const fileText = selectedFileName || "No file selected";
+  const stateText = loadingMessage ?? "Ready";
+
+  return (
+    <footer className="status-bar" aria-label="Application status">
+      <StatusBarItem label="State" value={stateText} priority="state" live />
+      <StatusBarItem label="File" value={fileText} priority="file" />
+    </footer>
+  );
+}
+
+type StatusBarItemProps = {
+  label: string;
+  value: string;
+  priority: "state" | "file";
+  live?: boolean;
+};
+
+function StatusBarItem({ label, value, priority, live = false }: StatusBarItemProps) {
+  return (
+    <div className={`status-item status-${priority}`} title={`${label}: ${value}`}>
+      <span className="status-label">{label}:</span>
+      <span className="status-value" aria-live={live ? "polite" : undefined}>
+        {value}
+      </span>
+    </div>
   );
 }
 

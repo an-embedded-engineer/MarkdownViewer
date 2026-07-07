@@ -12,10 +12,10 @@
 | `selectedMarkdown` | Markdown 本文 | UTF-8 文字列 |
 | `previewRevision` | Reload / 再描画用カウンタ | 同一内容でも increment で再描画 |
 | `theme` | `"light" \| "dark"` | `<html data-theme>` に反映 |
-| `errorMessage` | エラーバナー表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
+| `errorMessage` | error strip の代表エラー表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
 | `pendingAnchor` | 遷移先アンカー | 80ms 遅延でスクロール |
-| `isMarkdownLoading` | `read_text_file` 中フラグ | プレビュー上部 loading バナー |
-| `isBusy` | `isMarkdownLoading OR isPlantUmlRendering` | Toolbar / Explorer を一時無効化するための aggregate busy フラグ |
+| `isMarkdownLoading` | `read_text_file` 中フラグ | StatusBar の State 表示 |
+| `isBusy` | `isMarkdownLoading OR isPlantUmlRendering` | MenuBar / Explorer を一時無効化するための aggregate busy フラグ |
 | `plantUmlRenderState` | `{ key, diagrams }` | `selectedFilePath:previewRevision` をキーに最新結果を保持 |
 
 `previewRevision` は Markdown 本文が同一でも Reload 時に Mermaid / PlantUML を再描画するための更新番号である。
@@ -42,10 +42,13 @@ package "Frontend (src/App.tsx)" {
     +loadMarkdown(root, file, anchor?)
     +handlePreviewClick(event)
   }
-  class Toolbar
+  class MenuBar
+  class RootPathBar
   class FileTree
   class TreeNode
   class MarkdownPreview
+  class ErrorBanner
+  class StatusBar
   class renderMarkdown <<function>> {
     +md.renderer.rules.fence
     +md.renderer.rules.image
@@ -73,10 +76,13 @@ package "Rust backend (src-tauri/src/lib.rs)" {
   class sanitize_svg
 }
 
-App --> Toolbar
+App --> MenuBar
+App --> RootPathBar
 App --> FileTree
 FileTree --> TreeNode
 App --> MarkdownPreview
+App --> ErrorBanner
+App --> StatusBar
 MarkdownPreview --> renderMarkdown
 App --> extractPlantUmlSources
 App --> resolveSiblingPath
@@ -235,7 +241,7 @@ stop
 ### 再描画方針
 
 - Theme 切替だけでは `render_plantuml_diagrams` を再実行しない。invoke するのは `selectedFilePath` / `selectedMarkdown` / `previewRevision` のいずれかが変わった場合だけ。
-- PlantUML 結果待ちの図がある間は、React 側 (`isBusy` / `isPlantUmlRendering`) でプレビュー上部に loading バナーを表示する。Markdown 読み込み中と PlantUML 描画中は併せて `Loading Markdown and rendering PlantUML diagrams...` を表示し、Toolbar / Explorer の操作を無効化して重複レンダリングを防ぐ。
+- PlantUML 結果待ちの図がある間は、React 側 (`isBusy` / `isPlantUmlRendering`) で StatusBar の State 欄に loading 状態を表示する。Markdown 読み込み中と PlantUML 描画中は併せて `Loading Markdown and rendering PlantUML diagrams...` を表示し、MenuBar / Explorer の操作を無効化して重複レンダリングを防ぐ。
 - PlantUML の pending placeholder は `.plantuml-loading` で、最終失敗時のみ `.plantuml-error` を使う。これにより pending 状態と失敗状態が視覚的に区別される。
 
 ## ローカル画像
@@ -283,13 +289,13 @@ stop
 
 | 失敗箇所 | 表示 |
 | --- | --- |
-| Tauri command 失敗 | `errorMessage` を `error-banner` に表示 |
+| Tauri command 失敗 | `errorMessage` を StatusBar 直上の error strip に表示 |
 | Markdown 読み込み失敗 | 同上 + 直前の選択ファイルは維持 |
-| Mermaid 描画失敗 | `errorMessage` を `Mermaid render failed: ...` で表示 |
+| Mermaid 描画失敗 | error strip に `Mermaid render failed: ...` で表示 |
 | PlantUML 図単位失敗 | 該当位置に `.plantuml-error`、`firstError` を `errorMessage` にも反映 |
-| PlantUML pending | 該当位置に `.plantuml-loading`、`Toolbar / Explorer` を一時無効化して重複操作を抑止 |
+| PlantUML pending | 該当位置に `.plantuml-loading`、`MenuBar / Explorer` を一時無効化して重複操作を抑止 |
 | PlantUML タイムアウト (10 秒) | 図単位失敗として表示 |
-| `render_plantuml_diagrams` 全体失敗 | 全図を `.plantuml-error` に置換し `errorMessage` を更新 |
+| `render_plantuml_diagrams` 全体失敗 | 全図を `.plantuml-error` に置換し error strip を更新 |
 
 ## UI レイアウト
 
@@ -297,18 +303,25 @@ stop
 
 ```text
 <main.app-shell>
-  <Toolbar/>           ← Open Folder / Theme / Reload / path
+  <MenuBar/>           ← File: Open Folder / Reload、View: Theme
+  <RootPathBar/>       ← root path。未選択時は No folder selected
   <section.workspace>
     <aside.explorer-pane>
       <FileTree/>      ← 再帰 TreeNode、Markdown / Image / Directory アイコン
     </aside>
     <section.preview-pane>
-      <div.error-banner/>  (errorMessage がある場合)
-      <div.loading-banner/> (Markdown / PlantUML 読み込み中)
       <MarkdownPreview/> dangerouslySetInnerHTML
     </section>
   </section>
+  <ErrorBanner/>       ← 代表 error。エラー発生時のみ表示
+  <StatusBar/>         ← File / State
 </main>
 ```
+
+`MenuBar` は React アプリ内の常時表示ボタン群であり、`File` / `View` はグループラベルとして扱う。ドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キー移動、フォーカストラップは導入しない。
+
+`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
+
+`html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠には縦スクロールバーを出さない。スクロールは `.explorer-pane` と `.preview-pane` の `overflow: auto` に限定し、MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。`ErrorBanner` は条件付き描画のため、chrome 要素は CSS grid の自動配置に依存せず、`grid-row` で MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の行を明示する。
 
 テーマは `document.documentElement.dataset.theme` に `"light" \| "dark"` を書き込み、`App.css` の `:root[data-theme=...]` で CSS 変数を切り替える。
