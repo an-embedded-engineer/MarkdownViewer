@@ -16,6 +16,7 @@
 | root / active file / loading / error の表示分離 | Phase 4 feedback を受け、`RootPathBar` が `rootPath`、`StatusBar` が `selectedFileName` / `loadingMessage`、`ErrorBanner` が `errorMessage` を表示する構成に変更した。 |
 | live region の分割 | `StatusBarItem` で `State` の値だけ `aria-live="polite"` を付与し、`File` は live region に含めていない。代表 error は `ErrorBanner` の `role="alert"` で通知する。 |
 | 長文表示 | root path は MenuBar 直下の `RootPathBar`、代表 error は StatusBar 直上の `ErrorBanner` に移し、各値は ellipsis と `title` で全文確認できる。 |
+| スクロール範囲 | `html` / `body` / `#root` / `.app-shell` / `.workspace` の全体 overflow を抑止し、スクロールは `.explorer-pane` / `.preview-pane` の内部に限定した。 |
 | Preview 上部 banner の撤去 | preview pane 上部の sticky banner は復活させず、代表 error は app-shell 下部の `ErrorBanner`、loading は StatusBar の `State` に表示する。PlantUML 図単位の `.plantuml-loading` / `.plantuml-error` は維持した。 |
 
 ## 変更ファイル
@@ -65,6 +66,7 @@ Phase 4-a のユーザ動作確認で次を確認する。
 - Theme toggle が MenuBar から実行でき、Light / Dark が切り替わる。
 - RootPathBar に root path、StatusBar に active file が表示される。
 - 長い root path は RootPathBar の ellipsis と `title` で確認できる。
+- 右端にアプリ全体のスクロールバーが常時表示されず、Explorer / Preview pane だけが必要に応じてスクロールする。
 - Markdown 読み込み中または PlantUML 描画中に StatusBar が loading 状態を表示する。
 - エラー発生時に StatusBar 直上の ErrorBanner が代表 error を表示する。
 - `sample_docs/plantuml.md` で Mermaid と PlantUML が同居して表示される。
@@ -75,5 +77,6 @@ Phase 4-a のユーザ動作確認で次を確認する。
 - Phase 3 実装レビューの中優先度指摘 1.1 は、狭幅時も `Root` を非表示にせず ellipsis 表示へ変更して対応済み。
 - Phase 3 実装レビューの低優先度改善 3.1 は、`menu-group` に `role="group"` を付与して対応済み。
 - Phase 4-a の publish 動作確認で、長い root path / error が StatusBar 内で見切れる点を確認したため、root path は RootPathBar、representative error は ErrorBanner へ移して対応した。
+- Phase 4-a の publish 動作確認で、右端にアプリ全体のスクロールバーが常時表示される点を確認したため、全体 overflow を抑止して Explorer / Preview pane 内スクロールに限定した。
 - OS native menu は `@tauri-apps/api/menu` の `Menu.setAsAppMenu()` / `setAsWindowMenu()` で技術的に検討可能だが、TODO-2026-003 の non-scope のため TODO-2026-004 に追記して扱う。
 - ユーザ操作を伴う visual / manual 確認は Phase 4-a で実施する。

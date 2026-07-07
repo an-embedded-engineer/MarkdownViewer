@@ -322,4 +322,6 @@ stop
 
 `RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
 
+`html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠には縦スクロールバーを出さない。スクロールは `.explorer-pane` と `.preview-pane` の `overflow: auto` に限定し、MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。
+
 テーマは `document.documentElement.dataset.theme` に `"light" \| "dark"` を書き込み、`App.css` の `:root[data-theme=...]` で CSS 変数を切り替える。
