@@ -12,7 +12,7 @@
 | `selectedMarkdown` | Markdown 本文 | UTF-8 文字列 |
 | `previewRevision` | Reload / 再描画用カウンタ | 同一内容でも increment で再描画 |
 | `theme` | `"light" \| "dark"` | `<html data-theme>` に反映 |
-| `errorMessage` | StatusBar の Error 表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
+| `errorMessage` | error strip の代表エラー表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
 | `pendingAnchor` | 遷移先アンカー | 80ms 遅延でスクロール |
 | `isMarkdownLoading` | `read_text_file` 中フラグ | StatusBar の State 表示 |
 | `isBusy` | `isMarkdownLoading OR isPlantUmlRendering` | MenuBar / Explorer を一時無効化するための aggregate busy フラグ |
@@ -43,9 +43,11 @@ package "Frontend (src/App.tsx)" {
     +handlePreviewClick(event)
   }
   class MenuBar
+  class RootPathBar
   class FileTree
   class TreeNode
   class MarkdownPreview
+  class ErrorBanner
   class StatusBar
   class renderMarkdown <<function>> {
     +md.renderer.rules.fence
@@ -75,9 +77,11 @@ package "Rust backend (src-tauri/src/lib.rs)" {
 }
 
 App --> MenuBar
+App --> RootPathBar
 App --> FileTree
 FileTree --> TreeNode
 App --> MarkdownPreview
+App --> ErrorBanner
 App --> StatusBar
 MarkdownPreview --> renderMarkdown
 App --> extractPlantUmlSources
@@ -285,13 +289,13 @@ stop
 
 | 失敗箇所 | 表示 |
 | --- | --- |
-| Tauri command 失敗 | `errorMessage` を StatusBar の Error 欄に表示 |
+| Tauri command 失敗 | `errorMessage` を StatusBar 直上の error strip に表示 |
 | Markdown 読み込み失敗 | 同上 + 直前の選択ファイルは維持 |
-| Mermaid 描画失敗 | `errorMessage` を `Mermaid render failed: ...` で表示 |
+| Mermaid 描画失敗 | error strip に `Mermaid render failed: ...` で表示 |
 | PlantUML 図単位失敗 | 該当位置に `.plantuml-error`、`firstError` を `errorMessage` にも反映 |
 | PlantUML pending | 該当位置に `.plantuml-loading`、`MenuBar / Explorer` を一時無効化して重複操作を抑止 |
 | PlantUML タイムアウト (10 秒) | 図単位失敗として表示 |
-| `render_plantuml_diagrams` 全体失敗 | 全図を `.plantuml-error` に置換し StatusBar の Error 欄を更新 |
+| `render_plantuml_diagrams` 全体失敗 | 全図を `.plantuml-error` に置換し error strip を更新 |
 
 ## UI レイアウト
 
@@ -300,6 +304,7 @@ stop
 ```text
 <main.app-shell>
   <MenuBar/>           ← File: Open Folder / Reload、View: Theme
+  <RootPathBar/>       ← root path。未選択時は No folder selected
   <section.workspace>
     <aside.explorer-pane>
       <FileTree/>      ← 再帰 TreeNode、Markdown / Image / Directory アイコン
@@ -308,12 +313,13 @@ stop
       <MarkdownPreview/> dangerouslySetInnerHTML
     </section>
   </section>
-  <StatusBar/>         ← Root / File / State / Error
+  <ErrorBanner/>       ← 代表 error。エラー発生時のみ表示
+  <StatusBar/>         ← File / State
 </main>
 ```
 
 `MenuBar` は React アプリ内の常時表示ボタン群であり、`File` / `View` はグループラベルとして扱う。ドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キー移動、フォーカストラップは導入しない。
 
-`StatusBar` は root path、active file、loading state、代表 error を下部に常時表示する。`State` と `Error` の値だけを `aria-live="polite"` にし、`Root` / `File` は live region に含めない。狭幅時の表示優先度は `Error`、`State`、`File`、`Root` の順で、`Root` を最初に短縮する。
+`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
 
 テーマは `document.documentElement.dataset.theme` に `"light" \| "dark"` を書き込み、`App.css` の `:root[data-theme=...]` で CSS 変数を切り替える。

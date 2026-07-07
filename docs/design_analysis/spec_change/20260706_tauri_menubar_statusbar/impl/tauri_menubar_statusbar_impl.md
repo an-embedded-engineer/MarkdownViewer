@@ -13,17 +13,17 @@
 | Toolbar を MenuBar / StatusBar へ分離 | `markdown-viewer-tauri/src/App.tsx` の `Toolbar` を削除し、`MenuBar` と `StatusBar` を追加した。 |
 | MenuBar は常時表示ボタン群 | `File` / `View` のグループラベルと通常の `button` で構成し、ドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キー移動、フォーカストラップは導入していない。各 command group は `role="group"` で支援技術向けの grouping を明示する。 |
 | 既存操作の維持 | `openFolder`、`reload`、theme toggle の handler と disabled 条件を既存 state からそのまま渡している。 |
-| StatusBar で root / active file / loading / error を表示 | `StatusBar` が `rootPath`、`selectedFileName`、`loadingMessage`、`errorMessage` を props で受け取り、`Root` / `File` / `State` / `Error` として表示する。 |
-| live region の分割 | `StatusBarItem` で `State` と `Error` の値だけ `aria-live="polite"` を付与し、`Root` / `File` は live region に含めていない。 |
-| 狭幅時の表示優先度 | CSS で `Error`、`State`、`File`、`Root` の順に配置し、mobile 幅でも `Root` を表示したまま最小列幅へ短縮する。各値は ellipsis と `title` で全文確認できる。 |
-| Preview 上部 banner の撤去 | 代表 error/loading の sticky banner を削除し、代表状態は StatusBar に集約した。PlantUML 図単位の `.plantuml-loading` / `.plantuml-error` は維持した。 |
+| root / active file / loading / error の表示分離 | Phase 4 feedback を受け、`RootPathBar` が `rootPath`、`StatusBar` が `selectedFileName` / `loadingMessage`、`ErrorBanner` が `errorMessage` を表示する構成に変更した。 |
+| live region の分割 | `StatusBarItem` で `State` の値だけ `aria-live="polite"` を付与し、`File` は live region に含めていない。代表 error は `ErrorBanner` の `role="alert"` で通知する。 |
+| 長文表示 | root path は MenuBar 直下の `RootPathBar`、代表 error は StatusBar 直上の `ErrorBanner` に移し、各値は ellipsis と `title` で全文確認できる。 |
+| Preview 上部 banner の撤去 | preview pane 上部の sticky banner は復活させず、代表 error は app-shell 下部の `ErrorBanner`、loading は StatusBar の `State` に表示する。PlantUML 図単位の `.plantuml-loading` / `.plantuml-error` は維持した。 |
 
 ## 変更ファイル
 
 | ファイル | 変更内容 |
 | --- | --- |
-| `markdown-viewer-tauri/src/App.tsx` | `MenuBar`、`StatusBar`、`StatusBarItem` を追加。既存 Toolbar と preview banner を削除。 |
-| `markdown-viewer-tauri/src/App.css` | `app-shell` を 3 行レイアウトへ変更。`menu-bar` / `menu-group` / `status-bar` / `status-item` スタイルを追加し、旧 toolbar/path-display/banner スタイルを削除。 |
+| `markdown-viewer-tauri/src/App.tsx` | `MenuBar`、`RootPathBar`、`ErrorBanner`、`StatusBar`、`StatusBarItem` を追加。既存 Toolbar と preview banner を削除。 |
+| `markdown-viewer-tauri/src/App.css` | `app-shell` を MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar レイアウトへ変更。`menu-bar` / `menu-group` / `root-path-bar` / `error-strip` / `status-bar` / `status-item` スタイルを追加し、旧 toolbar/path-display/banner スタイルを削除。 |
 | `docs/components/tauri_viewer/README.md` | 主要要素と責務を MenuBar / StatusBar 分離後の構成へ更新。 |
 | `docs/components/tauri_viewer/basic_design.md` | React 責務、コンポーネント図、状態モデルを MenuBar / StatusBar 構成へ更新。 |
 | `docs/components/tauri_viewer/detail_design.md` | 状態管理、モジュール図、再描画方針、エラーハンドリング、UI レイアウトを更新。 |
@@ -34,7 +34,7 @@
 - Tauri command、Rust backend、capability、保存データ形式は変更していない。
 - Markdown rendering、Mermaid rendering、PlantUML rendering、相対画像、リンク遷移の処理関数は変更していない。
 - `isBusy` による重複操作抑止は MenuBar / Explorer に引き継いだ。
-- 旧 Toolbar と preview 上部代表 banner は削除し、採用経路を MenuBar / StatusBar へ一本化した。
+- 旧 Toolbar と preview 上部代表 banner は削除し、操作は MenuBar、root path は RootPathBar、代表 error は ErrorBanner、active file / loading は StatusBar へ分離した。
 
 ## 恒久ドキュメント反映
 
@@ -54,6 +54,8 @@
 
 Phase 3 実装レビューの follow-up 修正後にも同じ検証を再実行し、いずれも成功した。`npm run build` は Vite の chunk size warning のみ、`cargo check` は `dev` profile の check 成功。
 
+Phase 4-a の publish 動作確認フィードバック対応後にも同じ検証を再実行する。
+
 ## 手動確認予定
 
 Phase 4-a のユーザ動作確認で次を確認する。
@@ -61,10 +63,10 @@ Phase 4-a のユーザ動作確認で次を確認する。
 - Open Folder が MenuBar から実行でき、Explorer と初期 Markdown が表示される。
 - Reload が MenuBar から実行でき、同一 Markdown でも Mermaid / PlantUML が再描画される。
 - Theme toggle が MenuBar から実行でき、Light / Dark が切り替わる。
-- StatusBar に root path と active file が表示される。
-- 幅 760px 未満でも Root / File / State / Error が StatusBar に残り、長い root path は ellipsis と `title` で確認できる。
+- RootPathBar に root path、StatusBar に active file が表示される。
+- 長い root path は RootPathBar の ellipsis と `title` で確認できる。
 - Markdown 読み込み中または PlantUML 描画中に StatusBar が loading 状態を表示する。
-- エラー発生時に StatusBar が代表 error を表示する。
+- エラー発生時に StatusBar 直上の ErrorBanner が代表 error を表示する。
 - `sample_docs/plantuml.md` で Mermaid と PlantUML が同居して表示される。
 - 相対画像と相対 Markdown リンク遷移が維持される。
 
@@ -72,4 +74,6 @@ Phase 4-a のユーザ動作確認で次を確認する。
 
 - Phase 3 実装レビューの中優先度指摘 1.1 は、狭幅時も `Root` を非表示にせず ellipsis 表示へ変更して対応済み。
 - Phase 3 実装レビューの低優先度改善 3.1 は、`menu-group` に `role="group"` を付与して対応済み。
+- Phase 4-a の publish 動作確認で、長い root path / error が StatusBar 内で見切れる点を確認したため、root path は RootPathBar、representative error は ErrorBanner へ移して対応した。
+- OS native menu は `@tauri-apps/api/menu` の `Menu.setAsAppMenu()` / `setAsWindowMenu()` で技術的に検討可能だが、TODO-2026-003 の non-scope のため TODO-2026-004 に追記して扱う。
 - ユーザ操作を伴う visual / manual 確認は Phase 4-a で実施する。

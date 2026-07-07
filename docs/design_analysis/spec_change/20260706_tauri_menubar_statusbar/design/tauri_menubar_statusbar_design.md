@@ -7,7 +7,7 @@
 完了条件:
 
 - `Open Folder` / `Reload` / theme 操作が MenuBar から実行できる。
-- root path、active file、loading、error が StatusBar に表示される。
+- root path、active file、loading、error が RootPathBar / StatusBar / ErrorBanner で確認できる。
 - 既存単一ファイル表示、Mermaid、PlantUML、相対画像、リンク遷移が退行しない。
 
 ## 対象範囲と非対象
@@ -15,12 +15,12 @@
 対象範囲:
 
 - `markdown-viewer-tauri/src/App.tsx`
-  - `Toolbar` を廃止し、アプリ内 `MenuBar` と `StatusBar` コンポーネントへ分割する。
-  - root path、active file、loading、error 表示用の派生値を StatusBar props として渡す。
+  - `Toolbar` を廃止し、アプリ内 `MenuBar`、`RootPathBar`、`ErrorBanner`、`StatusBar` コンポーネントへ分割する。
+  - root path、active file、loading、error 表示用の派生値を RootPathBar / ErrorBanner / StatusBar props として渡す。
   - 既存の `openFolder`、`reload`、theme toggle、`isBusy` による操作抑止は維持する。
 - `markdown-viewer-tauri/src/App.css`
-  - `app-shell` を MenuBar / workspace / StatusBar の 3 行レイアウトに変更する。
-  - MenuBar と StatusBar のスタイルを追加し、既存 `.toolbar` / `.path-display` スタイルを置換する。
+  - `app-shell` を MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar のレイアウトに変更する。
+  - MenuBar、RootPathBar、ErrorBanner、StatusBar のスタイルを追加し、既存 `.toolbar` / `.path-display` スタイルを置換する。
 - `docs/components/tauri_viewer/`
   - README、basic design、detail design、interface spec を新 UI 契約へ同期する。
 
@@ -220,7 +220,19 @@ Architecture docs は Tauri Viewer の詳細な UI 構成名変更に留まる�
 
 follow-up:
 
-- Recent Folders は TODO-2026-004 で MenuBar の `File` group へ追加する。
+- Recent Folders は TODO-2026-004 で MenuBar の `File` group または Tauri native menu (`@tauri-apps/api/menu`) へ追加する。publish 確認で OS 標準 menu への期待が出たため、TODO-2026-004 の設計で app-wide / window menu の platform 差分と React state 連携を扱う。
 - Multi-tab 導入時は active file 表示を active tab 表示に拡張する。
 - Split view 導入時は StatusBar の active pane / active tab 表示要否を再評価する。
 - ドロップダウン式の React 内 MenuBar が必要になった場合は、ARIA `menubar` / `menuitem` ロール、矢印キー操作、フォーカス管理を含む別 TODO として起票する。
+
+## Phase 4 publish 動作確認フィードバック反映
+
+2026-07-07 の publish 動作確認で、長い root path / error が StatusBar 内では見切れやすいことを確認した。完了時点仕様では、初期設計の「StatusBar に root path / active file / loading / error を集約する」方針を次のように補正する。
+
+- `RootPathBar` を MenuBar 直下に常時表示し、`Root: <rootPath>` または `Root: No folder selected` を表示する。
+- `ErrorBanner` を StatusBar 直上に追加し、代表 error がある場合だけ薄い赤背景で表示する。
+- `StatusBar` は `State` と `File` に絞る。
+- `RootPathBar` / `ErrorBanner` / `StatusBar` は追加 state を持たず、既存 `rootPath` / `errorMessage` / `selectedFileName` / `loadingMessage` から派生表示する。
+- `State` の値だけ `aria-live="polite"` とし、代表 error は `ErrorBanner` の `role="alert"` で通知する。
+
+また、Tauri v2 の local API 型定義では `@tauri-apps/api/menu` に `Menu.setAsAppMenu()` / `Menu.setAsWindowMenu()` があり、OS native menu は技術的に検討可能である。ただし TODO-2026-003 の non-scope として維持し、Recent Folders を導入する TODO-2026-004 で platform 差分と React state / handler 連携を設計する。

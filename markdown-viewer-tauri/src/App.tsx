@@ -305,6 +305,8 @@ function App() {
         onToggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
       />
 
+      <RootPathBar rootPath={rootPath} />
+
       <section className="workspace">
         <aside className="explorer-pane" aria-label="Explorer">
           <div className="pane-title">Explorer</div>
@@ -336,11 +338,11 @@ function App() {
         </section>
       </section>
 
+      {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
+
       <StatusBar
-        rootPath={rootPath}
         selectedFileName={selectedFileName}
         loadingMessage={loadingMessage}
-        errorMessage={errorMessage}
       />
     </main>
   );
@@ -384,25 +386,47 @@ function MenuBar({
   );
 }
 
-type StatusBarProps = {
+type RootPathBarProps = {
   rootPath: string | null;
-  selectedFileName: string;
-  loadingMessage: string | null;
-  errorMessage: string | null;
 };
 
-function StatusBar({ rootPath, selectedFileName, loadingMessage, errorMessage }: StatusBarProps) {
+function RootPathBar({ rootPath }: RootPathBarProps) {
   const rootText = rootPath ?? "No folder selected";
+
+  return (
+    <section className="root-path-bar" aria-label="Current root folder" title={rootText}>
+      <span className="chrome-label">Root:</span>
+      <span className="root-path-value">{rootText}</span>
+    </section>
+  );
+}
+
+type ErrorBannerProps = {
+  message: string;
+};
+
+function ErrorBanner({ message }: ErrorBannerProps) {
+  return (
+    <section className="error-strip" role="alert" title={message}>
+      <span className="chrome-label">Error:</span>
+      <span className="error-strip-value">{message}</span>
+    </section>
+  );
+}
+
+type StatusBarProps = {
+  selectedFileName: string;
+  loadingMessage: string | null;
+};
+
+function StatusBar({ selectedFileName, loadingMessage }: StatusBarProps) {
   const fileText = selectedFileName || "No file selected";
   const stateText = loadingMessage ?? "Ready";
-  const errorText = errorMessage ?? "None";
 
   return (
     <footer className="status-bar" aria-label="Application status">
-      <StatusBarItem label="Error" value={errorText} priority="error" live alert={errorMessage !== null} />
       <StatusBarItem label="State" value={stateText} priority="state" live />
       <StatusBarItem label="File" value={fileText} priority="file" />
-      <StatusBarItem label="Root" value={rootText} priority="root" />
     </footer>
   );
 }
@@ -410,14 +434,13 @@ function StatusBar({ rootPath, selectedFileName, loadingMessage, errorMessage }:
 type StatusBarItemProps = {
   label: string;
   value: string;
-  priority: "error" | "state" | "file" | "root";
+  priority: "state" | "file";
   live?: boolean;
-  alert?: boolean;
 };
 
-function StatusBarItem({ label, value, priority, live = false, alert = false }: StatusBarItemProps) {
+function StatusBarItem({ label, value, priority, live = false }: StatusBarItemProps) {
   return (
-    <div className={`status-item status-${priority}${alert ? " status-alert" : ""}`} title={`${label}: ${value}`}>
+    <div className={`status-item status-${priority}`} title={`${label}: ${value}`}>
       <span className="status-label">{label}:</span>
       <span className="status-value" aria-live={live ? "polite" : undefined}>
         {value}

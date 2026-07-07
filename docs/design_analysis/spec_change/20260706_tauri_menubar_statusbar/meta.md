@@ -13,6 +13,7 @@ status: "in_progress"
 design_status: "done"
 impl_status: "done"
 completion_status: "not_started"
+verification_status: "in_progress"
 related_commits:
   - "a209fc2 : Phase 0 define TODO-2026-003 scope"
   - "7979fce : Phase 2 draft Tauri menu status design"
@@ -30,7 +31,7 @@ source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_
 ## Scope
 
 - Tauri 版の既存 Toolbar 操作を React アプリ内 MenuBar へ移す。
-- root path、active file、loading、error の表示先を StatusBar として定義する。
+- root path、active file、loading、error の表示先を RootPathBar / StatusBar / ErrorBanner として定義する。
 - 既存の単一 root / 単一 active Markdown 表示モデルは維持する。
 
 ## Non-Scope
@@ -47,4 +48,4 @@ source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-07-06) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-06) |
-| Phase 4 Verification and completion | Not started |
+| Phase 4 Verification and completion | In progress (user feedback addressed 2026-07-07) |

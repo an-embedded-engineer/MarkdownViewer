@@ -11,7 +11,7 @@
 - purpose: 既存 Toolbar に集約されている主要操作と状態表示を、React アプリ内の MenuBar / StatusBar へ分離し、後続の Recent Folders / multi-tab / split view 導入時に操作領域と状態表示領域が衝突しない UI 契約へ変更する。
 - scope:
   - Tauri 版の既存 Toolbar 操作をアプリ内 MenuBar へ移す。
-  - root path、active file、loading、error の表示先を StatusBar として定義する。
+  - root path は MenuBar 直下の root path strip、active file と loading は StatusBar、代表 error はエラー発生時のみ StatusBar 直上の error strip に表示する。
   - 既存の単一 root / 単一 active Markdown 表示モデルは維持する。
 - non_scope:
   - OS native menu は導入しない。
@@ -26,7 +26,7 @@
   - `docs/components/tauri_viewer/interface_spec.md`
 - completion:
   - `Open Folder` / `Reload` / theme 操作が MenuBar から実行できる。
-  - root path、active file、loading、error が StatusBar に表示される。
+  - root path、active file、loading、error がそれぞれ root path strip、StatusBar、error strip に表示される。
   - 既存単一ファイル表示、Mermaid、PlantUML、相対画像、リンク遷移が退行しない。
 
 ## TODO-2026-004 Tauri Recent Folders 導入
@@ -37,7 +37,12 @@
 - work_package_id: WP-002
 - depends_on: TODO-2026-003
 - summary: Tauri 版に最近開いたディレクトリを追加し、MenuBar の `Recent Folders` から再オープンできるようにする。
+- scope:
+  - Tauri v2 の native menu API (`@tauri-apps/api/menu`) を使い、OS 標準の menu bar / app menu に `File` / `Recent Folders` を表示できるか設計する。
+  - macOS では app-wide menu、Windows / Linux では window menu として扱う platform 差分を整理する。
+  - native menu の action から既存 React state / handler へ接続する event / command bridge と disabled 状態同期を設計する。
 - completion:
+  - Tauri の制約上可能な platform では OS 標準 menu として `Open Folder` / `Reload` / `Recent Folders` が表示・実行できる。
   - root open 成功時に最近開いたディレクトリが保存される。
   - 最大件数、重複更新、存在しない path のエラー、削除 UI が機能する。
   - 再起動後も一覧が復元される。
