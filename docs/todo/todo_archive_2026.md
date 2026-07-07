@@ -56,3 +56,36 @@
   - `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj`
   - `npm run build` in `markdown-viewer-tauri/`
   - `cargo check` in `markdown-viewer-tauri/src-tauri/`
+
+## TODO-2026-003 Tauri MenuBar / StatusBar 導入
+
+- Status: `done`
+- Category: `spec-change`
+- Created: `2026-07-06`
+- Completed: `2026-07-07`
+- Branch: `spec-change/tauri-menubar-statusbar`
+- WBS:
+  - `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
+- Work package: `WP-001`
+- Design analysis:
+  - `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/`
+- Change report:
+  - `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/change_report.md`
+- Review records:
+  - `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/review/tauri_menubar_statusbar_design_review.md`
+  - `docs/design_analysis/spec_change/20260706_tauri_menubar_statusbar/review/tauri_menubar_statusbar_impl_review.md`
+- Summary:
+  - Split the Tauri Toolbar into a React app-level MenuBar, RootPathBar, ErrorBanner, and StatusBar.
+  - Moved `Open Folder` / `Reload` / theme controls to MenuBar while preserving existing handlers and busy-state disabled behavior.
+  - Displayed root path under MenuBar, active file and loading state in StatusBar, and representative error above StatusBar only when present.
+  - Constrained app-level overflow so only Explorer and Preview panes scroll.
+  - Fixed conditional ErrorBanner layout so StatusBar position and bottom spacing stay stable with or without errors.
+- Verification:
+  - User confirmed root path and Error display were expected in the published Tauri app.
+  - User confirmed the app-level scrollbar was removed and pane-level scrollbars remained.
+  - User confirmed StatusBar bottom spacing stayed stable after the grid-row fix.
+  - `npm run build` in `markdown-viewer-tauri/`
+  - `cargo check` in `markdown-viewer-tauri/src-tauri/`
+  - `git diff --check`
+- Follow-up:
+  - OS native menu integration is deferred to `TODO-2026-004 Tauri Recent Folders 導入`.

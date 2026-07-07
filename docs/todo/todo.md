@@ -1,34 +1,5 @@
 # TODO
 
-## TODO-2026-003 Tauri MenuBar / StatusBar 導入
-
-- status: open
-- workflow: spec-change
-- wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
-- work_package_id: WP-001
-- depends_on: none
-- summary: Tauri 版で Toolbar をアプリ内 MenuBar と StatusBar へ分離し、後続タブ UI の土台を作る。
-- purpose: 既存 Toolbar に集約されている主要操作と状態表示を、React アプリ内の MenuBar / StatusBar へ分離し、後続の Recent Folders / multi-tab / split view 導入時に操作領域と状態表示領域が衝突しない UI 契約へ変更する。
-- scope:
-  - Tauri 版の既存 Toolbar 操作をアプリ内 MenuBar へ移す。
-  - root path は MenuBar 直下の root path strip、active file と loading は StatusBar、代表 error はエラー発生時のみ StatusBar 直上の error strip に表示する。
-  - 既存の単一 root / 単一 active Markdown 表示モデルは維持する。
-- non_scope:
-  - OS native menu は導入しない。
-  - Recent Folders、multi-tab、split view は後続 TODO で扱う。
-  - Avalonia 版の UI 変更は TODO-2026-008 以降で扱う。
-- affected_components:
-  - `markdown-viewer-tauri/src/App.tsx`
-  - `markdown-viewer-tauri/src/App.css`
-  - `docs/components/tauri_viewer/README.md`
-  - `docs/components/tauri_viewer/basic_design.md`
-  - `docs/components/tauri_viewer/detail_design.md`
-  - `docs/components/tauri_viewer/interface_spec.md`
-- completion:
-  - `Open Folder` / `Reload` / theme 操作が MenuBar から実行できる。
-  - root path、active file、loading、error がそれぞれ root path strip、StatusBar、error strip に表示される。
-  - 既存単一ファイル表示、Mermaid、PlantUML、相対画像、リンク遷移が退行しない。
-
 ## TODO-2026-004 Tauri Recent Folders 導入
 
 - status: open
