@@ -1,12 +1,14 @@
 # Tauri Recent Folders 導入 設計レビュー
 
 **レビュー日**: 2026-07-08
+**再確認日**: 2026-07-08
 **対象ドキュメント**: `docs/design_analysis/new_feature/20260708_tauri_recent_folders/design/tauri_recent_folders_feature_design.md`
 **対象 meta**: `docs/design_analysis/new_feature/20260708_tauri_recent_folders/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-004
 **対象 WBS**: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md` WP-002
-**対象コミット**: `8b4ab06 Phase 2 draft Tauri recent folders design`
-**判定**: **条件付き承認 (Conditionally Approved)**。1.1 (command 一覧の自己矛盾) を設計書へ反映後、Phase 3 着手可。
+**初回レビュー対象コミット**: `8b4ab06 Phase 2 draft Tauri recent folders design`
+**再確認対象コミット**: `25d3082 Phase 2 address Tauri recent folders design review`
+**判定**: **承認 (Approved)**。Phase 3 進行可。
 
 ---
 
@@ -152,4 +154,22 @@ WBS (`wbs.md` WP-002) の `completion_criteria` および `deferred_or_follow_up
 
 一方で、追加 command 一覧が設計書内 (「影響範囲」と「Command 境界」) で自己矛盾しており (1.1, High)、app config JSON への同時書き込みに対する排他制御が未設計 (1.2, Medium)、`RecentFolderEntry.name` の表示上の正本が未確定 (1.3, Medium) という 3 点は、いずれも受け入れ条件「重複更新、削除…が機能する」に直結しうる。これらは設計方針自体の変更ではなく記載の統一・追記で解消できる規模のため、**条件付き承認**とする。Phase 3 着手前に 1.1 (command 一覧統一) を設計書へ反映し、1.2 / 1.3 は Phase 3 detail design 内で確定させた上で実装へ進めること。2.1 / 3.1 は Phase 3 の docs 反映時に併せて解消すればよい。
 
-未解決指摘: 高 1 件、中 2 件、低 2 件。
+初回レビューでは、Phase 3 着手前に 1.1 (command 一覧統一) を設計書へ反映することを必須条件、1.2 (排他制御) / 1.3 (`name` 表示の正本) を Phase 3 detail design 内での確定で可、2.1 (恒久ドキュメント訂正方針) / 3.1 (no-markdown root の recent 記録) を Phase 3 docs 反映時の解消で可とする**条件付き承認**とした。
+
+### 再確認結果 (2026-07-08, commit `25d3082`)
+
+設計書 (`design/tauri_recent_folders_feature_design.md`) と `meta.md` を再確認した。
+
+- **1.1 command 一覧の自己矛盾**: 「影響範囲 > Backend」の command 一覧が `load_recent_folders` / `record_recent_folder` / `remove_recent_folder` に統一され (109 行)、`save_recent_folders` の記載は削除された。`validate_recent_folder` も「専用の command は追加せず、既存 `scan_directory` の検証を利用する」(111, 250 行) と明記され、「Command 境界」節の不採用理由と整合した。✓ 反映確認。
+- **1.2 app config JSON の排他制御未設計**: 「永続化」節に「排他制御」小節が新設され (228-236 行)、`tauri::State<AppConfigStore>` + `std::sync::Mutex<()>` で `load_recent_folders` / `record_recent_folder` / `remove_recent_folder` の read-modify-write を直列化する方針、lock 範囲を config file アクセスに限定し `scan_directory` / Markdown 読み込み / PlantUML rendering は対象外とする方針が明記された。✓ 反映確認。
+- **1.3 `name` 表示の正本未確定**: 「entry 表示は `RecentFolderEntry.name` を主表示…」(156 行) に修正され、データモデル節に `name` は `record_recent_folder` 実行時に Rust 側で確定するスナップショットであり、frontend は `getFileName` で再導出しないこと、record 後に folder がリネームされた場合は古い `name` が残る既知挙動であることが追記された (198 行)。「失敗時動作とデフォルト挙動」にも同旨のリネーム後挙動が追記され (277 行)、「既存類似ロジックとの抽象化・共通化方針」も `entry.name` を正本とし `getFileName` は fallback 限定と整合するよう修正された (294 行)。✓ 反映確認。
+- **2.1 恒久ドキュメントの訂正方針未記載**: 「恒久ドキュメント更新予定先」の `detail_design.md` 項目に、TODO-2026-003 時点の「ドロップダウン…導入しない」という記述を追記ではなく置換する方針が明記され、Phase 3 docs 更新時に README / basic_design / detail_design / interface_spec を横断的に確認する一文も追加された (313-317 行)。✓ 反映確認。
+- **3.1 no-markdown root の recent 記録有無**: 「既存機能との統合」に、`loadRoot` が initial markdown の有無や成否に関わらず `record_recent_folder` を呼ぶことが明記され (264 行)、「initial markdown の読み込みに失敗した場合の扱い」にも「Markdown file が 1 つもない root でも、`scan_directory` が成功した directory であれば recent entry は保存対象にする」という一文が追記された (270 行)。✓ 反映確認。
+
+**判定**: **承認 (Approved)**。
+
+- すべてのレビュー指摘 (高 1 件、中 2 件、低 2 件) に対応が記録され、未解決指摘はゼロ。
+- `meta.md` の `design_status` を `done` に更新可能な状態 (現状 `in_review`)。
+- Phase 3 (実装・恒久ドキュメント反映) への進行を承認する。Phase 3 着手時は、本 review で確認した統一済み command 一覧、`AppConfigStore` の Mutex による排他制御、`entry.name` を正本とする表示方針、`detail_design.md` の旧ドロップダウン否定文の置換、no-markdown root でも recent 記録する方針をそのまま実装・docs 反映へ反映すること。
+
+未解決指摘なし。本レビューでの承認をもって Phase 2 設計レビューを完了とする。
