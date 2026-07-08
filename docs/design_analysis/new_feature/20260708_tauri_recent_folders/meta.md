@@ -11,11 +11,11 @@ components:
   - "markdown-viewer-tauri/src-tauri/src/lib.rs"
   - "markdown-viewer-tauri/src-tauri/capabilities"
   - "docs/components/tauri_viewer"
-status: "implemented"
+status: "completed"
 design_status: "done"
 impl_status: "done"
-completion_status: "not_started"
-verification_status: "not_started"
+completion_status: "done"
+verification_status: "done"
 related_commits:
   - "0967086 : Phase 0 define TODO-2026-004 scope"
   - "ecab28a : Phase 1 initialize Tauri recent folders workflow"
@@ -32,7 +32,9 @@ related_commits:
   - "632f0a2 : Phase 3 address implementation review"
   - "f0dedc6 : Phase 3 add implementation review follow-up prompt"
   - "e414677 : Phase 3 approve implementation review"
-source_todo_path: "docs/todo/todo.md#todo-2026-004-tauri-recent-folders-導入"
+  - "653d075 : Phase 3 complete Tauri recent folders implementation"
+  - "9871f27 : Phase 4-b complete Tauri recent folders artifacts"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-004-tauri-recent-folders-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
 depends_on:
@@ -69,4 +71,4 @@ depends_on:
 | Phase 1 Branch and meta | Done (`ecab28a`) |
 | Phase 2 Design review | Done (approved 2026-07-08) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-08, `e414677`) |
-| Phase 4 Verification and completion | Not started |
+| Phase 4 Verification and completion | Done (awaiting merge approval, 2026-07-09) |
