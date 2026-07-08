@@ -106,9 +106,9 @@ Backend:
 - `markdown-viewer-tauri/src-tauri/src/lib.rs`
   - app config JSON schema と command を追加する。
   - `load_recent_folders() -> Result<Vec<RecentFolderEntry>, String>`
-  - `save_recent_folders(entries: Vec<RecentFolderEntry>) -> Result<(), String>`
+  - `record_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, String>`
   - `remove_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, String>`
-  - 必要に応じて `validate_recent_folder(path: String) -> Result<String, String>` または `scan_directory` の既存検証を利用する。
+  - 専用の `validate_recent_folder` command は追加せず、root open 時の path validation は既存 `scan_directory` の検証を利用する。
 - `markdown-viewer-tauri/src-tauri/capabilities/default.json`
   - 追加 command の利用権限を必要に応じて追加する。
 
@@ -153,7 +153,7 @@ View
 - `Reload` は現行通り `rootPath` がない場合も disabled にする。
 - Recent Folders の削除 button は busy 中でも実行可能にするかを避け、busy 中は disabled に統一する。
 - 削除 button click は entry open へ伝播しない。
-- entry 表示は folder basename を主表示、absolute path を補助表示または `title` にする。basename が取れない場合は path 全体を使う。
+- entry 表示は `RecentFolderEntry.name` を主表示、absolute path を補助表示または `title` にする。`name` が空の場合だけ path 全体を使う。
 
 アクセシビリティ:
 
@@ -195,6 +195,8 @@ struct AppConfig {
 
 `lastOpenedAt` は ISO 8601 風の UTC 文字列ではなく、追加依存を避けるため `SystemTime::now().duration_since(UNIX_EPOCH)` の秒数を decimal string にする案を採る。表示には使わず、将来の並び・デバッグ用 metadata とする。ユーザーに見せる日付フォーマットは今回の対象外。
 
+`name` は `record_recent_folder` 実行時に Rust 側で canonical path の `file_name()` から作る表示名スナップショットを正本にする。Frontend は Recent Folders entry の主表示に `entry.name` を使い、`getFileName(entry.path)` で再導出しない。これにより Windows / Unix path separator 差分を Rust 側に閉じ、frontend の表示ロジックを単純に保つ。record 後に OS 側で folder がリネームされた場合、recent list には record 時点の古い `name` が残る。path は absolute path として補助表示され、entry 実行時に存在しない path として明示 error になる。
+
 最大件数:
 
 - `MAX_RECENT_FOLDERS = 10`
@@ -226,6 +228,13 @@ struct AppConfig {
 - app config 全体を JSON pretty format で保存する。
 - 書き込み失敗は ErrorBanner に表示する。ただし root open 自体は成功済みなので、Explorer / preview は維持する。
 
+排他制御:
+
+- app config JSON の読み込み、更新、書き込みは `tauri::State<AppConfigStore>` 経由で直列化する。
+- `AppConfigStore` は `std::sync::Mutex<()>` を持ち、`load_recent_folders`、`record_recent_folder`、`remove_recent_folder` は JSON file へアクセスする前に同じ lock を取得する。
+- lock 範囲は config file の read-modify-write に限定し、`scan_directory` や Markdown 読み込み、PlantUML rendering は lock 対象にしない。
+- これにより、`record_recent_folder` と `remove_recent_folder` が近接して実行されても後着の read-modify-write が先着の更新を消す race を避ける。
+
 ### Command 境界
 
 追加 command:
@@ -238,7 +247,7 @@ remove_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, String>
 
 `save_recent_folders(entries)` は frontend が list 正本を持つ設計になりやすく、path canonicalization と最大件数の責務が分散するため採用しない。Recent Folders list の正本更新は Rust command に寄せ、React は戻り値を `recentFolders` state に反映する。
 
-`record_recent_folder` は `scan_directory` 成功後に呼ぶ。これにより、存在しない path や directory ではない path は root open 成功扱いにならず、recent list にも入らない。
+専用の `validate_recent_folder` command は追加しない。`record_recent_folder` は `scan_directory` 成功後に呼ぶ。これにより、存在しない path や directory ではない path は root open 成功扱いにならず、recent list にも入らない。
 
 Recent entry 実行時は `loadRoot(path, { recordRecent: true })` を呼ぶ。path が存在しない場合、既存 `scan_directory` が `Selected path is not a directory.` または canonicalize error を返し、React は ErrorBanner に表示する。recent list からの自動削除はしない。ユーザは削除 button で明示削除する。
 
@@ -252,11 +261,12 @@ recent item click -> loadRoot(entry.path, { recordRecent: true })
 reload -> scan_directory(rootPath) -> loadMarkdown(...)
 ```
 
-`loadRoot` は `scan_directory` 成功後に `rootPath` / `fileTree` / initial markdown を更新し、その後 `record_recent_folder` を呼んで recent list を更新する。`record_recent_folder` が失敗しても、root open 成功状態は維持し、ErrorBanner に保存失敗を表示する。
+`loadRoot` は `scan_directory` 成功後に `rootPath` / `fileTree` を更新し、initial markdown の有無や成否に関わらず `record_recent_folder` を呼んで recent list を更新する。その後、initial markdown がある場合は `loadMarkdown` で preview を更新する。`record_recent_folder` が失敗しても、root open 成功状態は維持し、ErrorBanner に保存失敗を表示する。
 
 initial markdown の読み込みに失敗した場合の扱い:
 
 - `scan_directory` 成功後に initial markdown の `read_text_file` が失敗した場合でも root は開けているため、recent entry は保存対象にする。
+- Markdown file が 1 つもない root でも、`scan_directory` が成功した directory であれば recent entry は保存対象にする。
 - ただし `loadMarkdown` が `isBusy` を見るため、`loadRoot` 内から呼ぶ場合に自分自身の busy state と衝突しないよう、今回も現行と同じく `isMarkdownLoading` は Markdown 読み込み単位でだけ使う。
 
 ### 失敗時動作とデフォルト挙動
@@ -264,6 +274,7 @@ initial markdown の読み込みに失敗した場合の扱い:
 - 初回起動で config がない: Recent Folders は empty state を表示する。
 - config 読み込み失敗: `errorMessage` に表示し、Recent Folders は空配列のままにする。
 - recent path が存在しない: `loadRoot` が失敗し、root / fileTree / selected markdown は現在状態を維持する。
+- record 後に folder がリネームされた: recent entry の `name` は record 時点の表示名のまま残り、entry 実行時は旧 path が存在しない error として扱う。
 - recent 保存失敗: root open は維持し、ErrorBanner に保存失敗を表示する。recent list は古い状態のままにする。
 - recent 削除失敗: ErrorBanner に表示し、recent list は古い状態のままにする。
 - busy 中の menu item: disabled とし、handler でも early return する。
@@ -280,7 +291,7 @@ initial markdown の読み込みに失敗した場合の扱い:
 - `scan_directory` の path canonicalization と directory validation は既存の `normalize_path` を再利用する。
 - Rust 側の JSON parse は既存 PlantUML config の `serde_json::from_str` と同じエラーメッセージ方針に合わせる。
 - UI は既存 `MenuBar` component を置き換える。別の `NativeMenuBridge` や parallel menu state は作らない。
-- path display は既存 `getFileName` を recent entry basename にも再利用する。
+- path display は RootPathBar や ErrorBanner と同様に ellipsis と `title` を使う。Recent Folders の主表示は Rust が返す `entry.name` を使い、既存 `getFileName` は fallback 表示や通常 file name 表示に限定する。
 - command の list 更新は `record_recent_folder` / `remove_recent_folder` に集約し、frontend に duplicate promotion や truncate ロジックを重複実装しない。
 
 ## 拡張ポイントと将来の派生機能への耐性
@@ -299,9 +310,11 @@ Phase 3 で以下を更新する。
 - `docs/components/tauri_viewer/basic_design.md`
   - React / Rust 責務、データモデル、依存方向、コンポーネント図を更新。
 - `docs/components/tauri_viewer/detail_design.md`
-  - MenuBar dropdown、Recent Folders state、app config JSON、失敗時動作を追記。
+  - TODO-2026-003 時点の「ドロップダウン、`role="menubar"` / `role="menuitem"` は導入しない」という記述を、今回の dropdown 方式の記述で置き換える。追記だけにせず、古い否定文を残さない。
+  - MenuBar dropdown、Recent Folders state、app config JSON、失敗時動作を反映する。
 - `docs/components/tauri_viewer/interface_spec.md`
   - `File` menu 操作、recent entry / delete UI、追加 Tauri command を追記。
+- Phase 3 の docs 更新時は `README.md`、`basic_design.md`、`detail_design.md`、`interface_spec.md` を `MenuBar`、`dropdown`、`role="menu"`、`導入しない` で横断確認し、古い MenuBar 制約が残っていないことを確認する。
 
 Phase 4 で必要に応じて以下を更新する。
 
