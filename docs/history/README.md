@@ -16,4 +16,5 @@
 - PlantUML表示対応: `docs/history/plantuml_rendering_support_2026-05-21.md`
 - PlantUML loading UX follow-up: `docs/history/plantuml_loading_ux_follow_up_2026-06-14.md`
 - Tauri MenuBar / StatusBar 導入: `docs/history/tauri_menubar_statusbar_2026-07-07.md`
+- Tauri Recent Folders 導入: `docs/history/tauri_recent_folders_2026-07-09.md`
 - 大きな仕様変更、採用判断、publish方式の変更が発生した場合に履歴文書を追加する。
