@@ -11,7 +11,7 @@ components:
   - "markdown-viewer-tauri/src-tauri/src/lib.rs"
   - "markdown-viewer-tauri/src-tauri/capabilities"
   - "docs/components/tauri_viewer"
-status: "completed"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -34,6 +34,7 @@ related_commits:
   - "e414677 : Phase 3 approve implementation review"
   - "653d075 : Phase 3 complete Tauri recent folders implementation"
   - "9871f27 : Phase 4-b complete Tauri recent folders artifacts"
+  - "f3a7eef : Phase 4-c merge Tauri recent folders into main"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-004-tauri-recent-folders-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
@@ -71,4 +72,4 @@ depends_on:
 | Phase 1 Branch and meta | Done (`ecab28a`) |
 | Phase 2 Design review | Done (approved 2026-07-08) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-08, `e414677`) |
-| Phase 4 Verification and completion | Done (awaiting merge approval, 2026-07-09) |
+| Phase 4 Verification and completion | Done (merged to main 2026-07-09, `f3a7eef`) |
