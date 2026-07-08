@@ -115,8 +115,9 @@ function App() {
 
       const initialFile = findReadme(tree) ?? findFirstMarkdown(tree);
       const recentError = options.recordRecent ? await recordRecentFolder(path) : null;
+      let markdownError: string | null = null;
       if (initialFile) {
-        await loadMarkdown(path, initialFile.path);
+        markdownError = await loadMarkdown(path, initialFile.path);
       } else {
         setSelectedFilePath(null);
         setSelectedMarkdown("");
@@ -124,7 +125,7 @@ function App() {
         setErrorMessage(null);
       }
 
-      if (recentError) {
+      if (recentError && !markdownError) {
         setErrorMessage(recentError);
       }
     } catch (error) {
@@ -192,7 +193,7 @@ function App() {
 
   async function loadMarkdown(currentRootPath: string, filePath: string, anchor?: string) {
     if (isBusy) {
-      return;
+      return null;
     }
 
     setIsMarkdownLoading(true);
@@ -206,8 +207,11 @@ function App() {
       setPreviewRevision((revision) => revision + 1);
       setPendingAnchor(anchor ?? null);
       setErrorMessage(null);
+      return null;
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      const message = toErrorMessage(error);
+      setErrorMessage(message);
+      return message;
     } finally {
       setIsMarkdownLoading(false);
     }
@@ -500,12 +504,11 @@ function MenuBar({
   onRemoveRecentFolder,
 }: MenuBarProps) {
   return (
-    <header ref={menuBarRef} className="menu-bar" role="menubar" aria-label="Application menu">
+    <header ref={menuBarRef} className="menu-bar" aria-label="Application menu">
       <div className="menu-group">
         <button
           type="button"
           className="menu-trigger"
-          role="menuitem"
           aria-haspopup="menu"
           aria-expanded={activeMenu === "file"}
           onClick={() => onMenuToggle("file")}
@@ -525,11 +528,13 @@ function MenuBar({
             >
               Open Folder...
             </button>
-            <div className="menu-section-label">Recent Folders</div>
+            <div className="menu-section-label" role="none">
+              Recent Folders
+            </div>
             {recentFolders.length > 0 ? (
-              <div className="recent-folder-list">
+              <div className="recent-folder-list" role="none">
                 {recentFolders.map((entry) => (
-                  <div className="recent-folder-row" key={entry.path}>
+                  <div className="recent-folder-row" role="none" key={entry.path}>
                     <button
                       type="button"
                       className="recent-folder-open"
@@ -544,6 +549,7 @@ function MenuBar({
                     <button
                       type="button"
                       className="recent-folder-remove"
+                      role="menuitem"
                       aria-label={`Remove ${entry.path} from recent folders`}
                       title="Remove from Recent Folders"
                       disabled={isBusy}
@@ -558,7 +564,9 @@ function MenuBar({
                 ))}
               </div>
             ) : (
-              <div className="menu-empty-state">No recent folders</div>
+              <div className="menu-empty-state" role="menuitem" aria-disabled="true">
+                No recent folders
+              </div>
             )}
             <button
               type="button"
@@ -578,7 +586,6 @@ function MenuBar({
         <button
           type="button"
           className="menu-trigger"
-          role="menuitem"
           aria-haspopup="menu"
           aria-expanded={activeMenu === "view"}
           onClick={() => onMenuToggle("view")}

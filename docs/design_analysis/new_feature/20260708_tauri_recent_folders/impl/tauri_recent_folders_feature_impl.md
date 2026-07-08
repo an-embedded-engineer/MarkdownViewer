@@ -23,7 +23,8 @@ Phase 2 の承認済み設計に従い、OS native menu ではなく React app-l
   - Recent Folders entry click で missing path の error を表示し、entry は自動削除しない。
   - Recent Folders delete button で `remove_recent_folder` を呼び、明示削除する。
   - `isBusy` に `isRecentFoldersBusy` を含め、Recent Folders 更新中の重複操作を抑止。
-  - `MenuBar` を dropdown UI に変更し、`role="menubar"` / `role="menu"` / `role="menuitem"`、outside click close、Escape close を追加。
+  - `MenuBar` を dropdown UI に変更し、top-level trigger は native button + `aria-haspopup="menu"` / `aria-expanded`、dropdown は `role="menu"` / `role="menuitem"`、layout wrapper は `role="none"` とした。outside click close、Escape close を追加。
+  - `loadRoot` 内で initial Markdown 読み込みと recent 保存が同時に失敗した場合、Markdown 読み込み失敗を recent 保存失敗で上書きしないようにした。
 
 - `markdown-viewer-tauri/src/App.css`
   - `.menu-trigger`、`.menu-dropdown`、`.file-menu-dropdown`、Recent Folders list / row / delete button / empty state のスタイルを追加。
@@ -54,7 +55,7 @@ Phase 2 の承認済み設計に従い、OS native menu ではなく React app-l
 ## 設計差分
 
 - Phase 2 設計からの意図的な仕様変更はない。
-- `MenuBar` は実装上 `role="menubar"` を付与した。Phase 2 の旧 docs 置換方針と整合し、矢印キー移動とフォーカストラップは引き続き非対象。
+- `MenuBar` は review 指摘を受け、`role="menubar"` を付与しない方針へ戻した。矢印キー移動とフォーカストラップは引き続き非対象であり、top-level trigger は native button として扱う。
 - `lastOpenedAt` は設計通り Unix seconds の decimal string とし、UI 表示には使わない。
 
 ## 検証結果
@@ -64,6 +65,18 @@ Phase 2 の承認済み設計に従い、OS native menu ではなく React app-l
 | `npm run build` (`markdown-viewer-tauri/`) | Pass | Vite の既存 chunk size warning のみ |
 | `cargo check` (`markdown-viewer-tauri/src-tauri/`) | Pass | `dev` profile |
 | `git diff --check` | Pass | whitespace error なし |
+
+## 実装レビュー対応
+
+### 1.1 MenuBar ARIA role 過剰付与
+
+`App.tsx` から `header.menu-bar` の `role="menubar"` と `File` / `View` trigger の `role="menuitem"` を削除した。trigger は native button のまま `aria-haspopup="menu"` / `aria-expanded` を持つ構成に戻した。
+
+`role="menu"` 配下の `.recent-folder-list` / `.recent-folder-row` などの layout wrapper には `role="none"` を付与し、recent entry open button と delete button はどちらも menu action として `role="menuitem"` に揃えた。empty state は disabled menu item として `role="menuitem"` / `aria-disabled="true"` を付与した。
+
+### 3.1 `loadRoot` の二重障害時エラー上書き
+
+`loadMarkdown` が失敗 message を戻り値として返すようにし、`loadRoot` は Markdown 読み込み失敗がある場合に `recentError` で error strip を上書きしないようにした。これにより、initial Markdown 読み込み失敗と recent 保存失敗が同時に起きた場合は、preview が空になる直接原因の Markdown エラーを優先表示する。
 
 ## 手動確認観点
 
