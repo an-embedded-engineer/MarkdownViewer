@@ -13,7 +13,7 @@ components:
   - "docs/components/tauri_viewer"
 status: "in_progress"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "draft"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -61,5 +61,5 @@ depends_on:
 | Phase 0 Requirements | Done (`0967086`) |
 | Phase 1 Branch and meta | Done (`ecab28a`) |
 | Phase 2 Design review | Done (approved 2026-07-08) |
-| Phase 3 Implementation and docs review | Not started |
+| Phase 3 Implementation and docs review | Draft implemented |
 | Phase 4 Verification and completion | Not started |

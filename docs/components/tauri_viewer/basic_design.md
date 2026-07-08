@@ -6,9 +6,9 @@ OS 連携とファイルシステム境界は Rust command へ寄せ、画面状
 
 ## 責務
 
-- React: MenuBar、root path strip、Explorer、Preview、error strip、StatusBar、テーマ、エラー / loading 表示、Markdown → HTML 変換、リンク処理。
+- React: MenuBar dropdown、Recent Folders、root path strip、Explorer、Preview、error strip、StatusBar、テーマ、エラー / loading 表示、Markdown → HTML 変換、リンク処理。
 - TypeScript renderer (`renderMarkdown`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。
-- Rust: root 配下の安全なファイル走査、Markdown 本文の UTF-8 読み込み、PlantUML レンダリング (Java プロセス起動)。
+- Rust: root 配下の安全なファイル走査、Markdown 本文の UTF-8 読み込み、PlantUML レンダリング (Java プロセス起動)、Recent Folders の app config JSON 永続化。
 - Tauri config: dialog / opener / asset protocol の権限管理。capability で plugin 利用を許可する。
 
 ## データモデル
@@ -24,6 +24,14 @@ OS 連携とファイルシステム境界は Rust command へ寄せ、画面状
 | `children` | `FileTreeNode[]` | directory のみ非空、Directory→Markdown→Image の順で整列 |
 
 PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRenderResponse` / `PlantUmlDiagramResult`)。
+
+`RecentFolderEntry` は Rust とフロントエンドで camelCase で対応し、保存時点の canonical path を正本とする。
+
+| field | 型 | 補足 |
+|---|---|---|
+| `path` | string | canonicalized absolute directory path |
+| `name` | string | `record_recent_folder` 実行時に Rust 側で確定した folder name snapshot |
+| `lastOpenedAt` | string | Unix seconds を文字列化した最終 open 時刻 |
 
 ## 依存方向
 
@@ -66,6 +74,9 @@ package "Rust backend (lib.rs)" as R {
   [scan_directory]
   [read_text_file]
   [render_plantuml_diagrams\n(spawn_blocking)]
+  [load_recent_folders]
+  [record_recent_folder]
+  [remove_recent_folder]
 }
 
 package "External" as E {
@@ -145,6 +156,7 @@ skinparam shadowing false
 state NoRoot : rootPath = null
 state HasRoot : rootPath set\n選択 Markdown は任意
 state MarkdownLoading : isMarkdownLoading = true
+state RecentFoldersUpdating : isRecentFoldersBusy = true
 state PlantUmlPending : pending PlantUML diagrams
 state Error : error strip に errorMessage 表示
 
@@ -152,6 +164,9 @@ NoRoot --> MarkdownLoading : Open Folder / loadRoot
 HasRoot --> MarkdownLoading : Explorer 選択 / Reload
 MarkdownLoading --> HasRoot : read_text_file 成功
 MarkdownLoading --> Error : Tauri command 失敗
+HasRoot --> RecentFoldersUpdating : record / remove recent folder
+RecentFoldersUpdating --> HasRoot : app config JSON 更新完了
+RecentFoldersUpdating --> Error : recent folder command 失敗
 HasRoot --> PlantUmlPending : PlantUML fence 検出
 PlantUmlPending --> HasRoot : render_plantuml_diagrams 完了
 PlantUmlPending --> Error : render 失敗 / firstError
@@ -164,3 +179,4 @@ Error --> HasRoot : 次の操作で復帰
 - `assetProtocol.enable = true` + `scope = ["**"]` で `convertFileSrc` を介した相対画像参照を許可する。
 - `csp = null` (MVP)。本番化時は要見直し。
 - capability `default` は window `main` に対し `core:default` / `dialog:default` / `opener:default` のみを許可する。
+- Recent Folders は Tauri の app config directory 配下 `settings.json` に保存する。browser `localStorage` は使用しない。

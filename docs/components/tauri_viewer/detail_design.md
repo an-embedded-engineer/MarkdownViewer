@@ -15,7 +15,10 @@
 | `errorMessage` | error strip の代表エラー表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
 | `pendingAnchor` | 遷移先アンカー | 80ms 遅延でスクロール |
 | `isMarkdownLoading` | `read_text_file` 中フラグ | StatusBar の State 表示 |
-| `isBusy` | `isMarkdownLoading OR isPlantUmlRendering` | MenuBar / Explorer を一時無効化するための aggregate busy フラグ |
+| `isRecentFoldersBusy` | Recent Folders command 実行中フラグ | app config JSON 読み書き中の重複操作を抑止 |
+| `recentFolders` | 最近開いた root folder 一覧 | `RecentFolderEntry[]`。app config JSON から復元 |
+| `activeMenu` | 開いている MenuBar dropdown | `"file"` / `"view"` / `null` |
+| `isBusy` | `isMarkdownLoading OR isPlantUmlRendering OR isRecentFoldersBusy` | MenuBar / Explorer を一時無効化するための aggregate busy フラグ |
 | `plantUmlRenderState` | `{ key, diagrams }` | `selectedFilePath:previewRevision` をキーに最新結果を保持 |
 
 `previewRevision` は Markdown 本文が同一でも Reload 時に Mermaid / PlantUML を再描画するための更新番号である。
@@ -35,9 +38,14 @@ package "Frontend (src/App.tsx)" {
     +selectedMarkdown
     +previewRevision
     +theme
+    +recentFolders
+    +activeMenu
     +plantUmlRenderState
     +openFolder()
     +loadRoot(path)
+    +recordRecentFolder(path)
+    +openRecentFolder(path)
+    +removeRecentFolder(path)
     +reload()
     +loadMarkdown(root, file, anchor?)
     +handlePreviewClick(event)
@@ -69,6 +77,10 @@ package "Rust backend (src-tauri/src/lib.rs)" {
   class "scan_directory" as Scan <<command>>
   class "read_text_file" as Read <<command>>
   class "render_plantuml_diagrams" as Render <<command>>
+  class "load_recent_folders" as LoadRecent <<command>>
+  class "record_recent_folder" as RecordRecent <<command>>
+  class "remove_recent_folder" as RemoveRecent <<command>>
+  class AppConfigStore
   class build_tree
   class render_plantuml_diagram
   class render_plantuml_svg
@@ -93,7 +105,13 @@ App --> openUrl
 invoke ..> Scan : "scan_directory"
 invoke ..> Read : "read_text_file"
 invoke ..> Render : "render_plantuml_diagrams"
+invoke ..> LoadRecent : "load_recent_folders"
+invoke ..> RecordRecent : "record_recent_folder"
+invoke ..> RemoveRecent : "remove_recent_folder"
 Scan --> build_tree
+LoadRecent --> AppConfigStore
+RecordRecent --> AppConfigStore
+RemoveRecent --> AppConfigStore
 Render --> render_plantuml_diagram
 render_plantuml_diagram --> render_plantuml_svg
 render_plantuml_svg --> resolve_plantuml_runtime
@@ -105,16 +123,17 @@ render_plantuml_diagram --> sanitize_svg
 
 1. `@tauri-apps/plugin-dialog` の `open({ directory: true })` でフォルダを選択する。
 2. `scan_directory` command で Explorer 用ツリーを取得する。
-3. `findReadme` → `findFirstMarkdown` の順で初期表示ファイルを決める。
-4. Explorer の Markdown 選択時に `read_text_file` command で本文を取得する。
-5. `renderMarkdown` (`markdown-it`) で HTML 化する。fence rule で:
+3. `record_recent_folder` command で選択 root を Recent Folders へ保存する。Markdown file が 1 つもない root でも、`scan_directory` が成功した directory であれば保存対象にする。
+4. `findReadme` → `findFirstMarkdown` の順で初期表示ファイルを決める。
+5. Explorer の Markdown 選択時に `read_text_file` command で本文を取得する。
+6. `renderMarkdown` (`markdown-it`) で HTML 化する。fence rule で:
    - `mermaid` → `<div class="mermaid">`
    - `plantuml` / `puml` → `plantUmlDiagrams[i].html` (pending / 成功 / エラー)
    - 画像の `src` は `isRelativeResource` を満たす場合に `convertFileSrc` で asset URL に置換し、`loading="lazy"` を付ける。
    - heading は `slugify(name)` を `id` に付与する。
-6. `useEffect` が `selectedFilePath` / `selectedMarkdown` / `previewRevision` の変化を検知し、`extractPlantUmlSources` で PlantUML fence を抽出 → `render_plantuml_diagrams` を invoke。pending 中は `.plantuml-loading` プレースホルダで表示し、結果到着で `.plantuml-diagram` / `.plantuml-error` へ差し替える。
-7. 別の `useEffect` が `previewRevision` / `theme` / `plantUmlDiagrams` の変化で `mermaid.run` を実行する。`securityLevel: "strict"` を指定。
-8. `pendingAnchor` がある場合は 80ms 後に `previewRef` 内のアンカーへスクロールする。
+7. `useEffect` が `selectedFilePath` / `selectedMarkdown` / `previewRevision` の変化を検知し、`extractPlantUmlSources` で PlantUML fence を抽出 → `render_plantuml_diagrams` を invoke。pending 中は `.plantuml-loading` プレースホルダで表示し、結果到着で `.plantuml-diagram` / `.plantuml-error` へ差し替える。
+8. 別の `useEffect` が `previewRevision` / `theme` / `plantUmlDiagrams` の変化で `mermaid.run` を実行する。`securityLevel: "strict"` を指定。
+9. `pendingAnchor` がある場合は 80ms 後に `previewRef` 内のアンカーへスクロールする。
 
 ```plantuml
 @startuml
@@ -136,6 +155,8 @@ App -> Inv : invoke("scan_directory", { rootPath })
 Inv -> Scan : command
 Scan --> Inv : FileTreeNode
 Inv --> App : FileTreeNode
+App -> Inv : invoke("record_recent_folder", { path })
+Inv --> App : RecentFolderEntry[]
 App -> App : findReadme / findFirstMarkdown
 App -> Inv : invoke("read_text_file", { rootPath, path })
 Inv -> Read : command
@@ -285,12 +306,54 @@ stop
 
 - `read_text_file` は root 配下チェック (`file_path.starts_with(&root)`) + Markdown 拡張子チェックの後、UTF-8 で読み込む。
 
+## Recent Folders
+
+Recent Folders は React の MenuBar dropdown から操作し、永続化と path 検証は Rust command に集約する。OS native menu は使わず、window top の `File` / `View` menu name をクリックして dropdown item を展開する React UI とする。
+
+### データと永続化
+
+`RecentFolderEntry` は次のフィールドを持つ。
+
+| field | 役割 |
+| --- | --- |
+| `path` | `record_recent_folder` で canonicalize した絶対 directory path |
+| `name` | Rust 側で保存時に確定した basename snapshot。frontend は通常 `getFileName(entry.path)` で再導出しない |
+| `lastOpenedAt` | Unix seconds 文字列 |
+
+Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し、`load_recent_folders` / `record_recent_folder` / `remove_recent_folder` の app config JSON 読み書きを同一 lock で直列化する。lock 範囲は settings read/write に限定し、`scan_directory`、Markdown 読み込み、PlantUML rendering は対象外とする。
+
+設定ファイルは Tauri app config directory 配下の `settings.json` で、構造は次の通り。
+
+```json
+{
+  "recentFolders": [
+    {
+      "path": "/absolute/path/to/project",
+      "name": "project",
+      "lastOpenedAt": "1783440000"
+    }
+  ]
+}
+```
+
+`record_recent_folder` は directory であることを確認してから同一 `path` の既存 entry を削除し、新しい entry を先頭へ挿入する。最大件数は 10 件で、超過分は末尾から切り捨てる。保存後に folder が OS 側でリネームされた場合、既存 entry の `name` は保存時点の snapshot のまま残る。
+
+### UI と操作
+
+- App 起動時に `load_recent_folders` を呼び、復元できた entry を File dropdown に表示する。
+- `File` dropdown には `Open Folder...`、`Recent Folders` list、`Reload` を表示する。
+- Recent entry は `entry.name` を主表示、`entry.path` を補助表示にする。`entry.name` が空の場合のみ path 全体を fallback 表示する。
+- Recent entry click は `scan_directory` → `record_recent_folder` → initial Markdown 読み込みの順で既存 `loadRoot` に統合する。
+- `x` delete button は `remove_recent_folder` を呼び、entry を明示削除する。
+- 保存済み path が存在しない場合、recent entry click は `scan_directory` / `record_recent_folder` の失敗を error strip に表示し、entry を自動削除しない。
+
 ## エラーハンドリング
 
 | 失敗箇所 | 表示 |
 | --- | --- |
 | Tauri command 失敗 | `errorMessage` を StatusBar 直上の error strip に表示 |
 | Markdown 読み込み失敗 | 同上 + 直前の選択ファイルは維持 |
+| Recent Folders 読み書き失敗 | error strip に表示。missing path は自動削除しない |
 | Mermaid 描画失敗 | error strip に `Mermaid render failed: ...` で表示 |
 | PlantUML 図単位失敗 | 該当位置に `.plantuml-error`、`firstError` を `errorMessage` にも反映 |
 | PlantUML pending | 該当位置に `.plantuml-loading`、`MenuBar / Explorer` を一時無効化して重複操作を抑止 |
@@ -303,7 +366,7 @@ stop
 
 ```text
 <main.app-shell>
-  <MenuBar/>           ← File: Open Folder / Reload、View: Theme
+  <MenuBar/>           ← File: Open Folder / Recent Folders / Reload、View: Theme
   <RootPathBar/>       ← root path。未選択時は No folder selected
   <section.workspace>
     <aside.explorer-pane>
@@ -318,7 +381,7 @@ stop
 </main>
 ```
 
-`MenuBar` は React アプリ内の常時表示ボタン群であり、`File` / `View` はグループラベルとして扱う。ドロップダウン、`role="menubar"` / `role="menuitem"`、矢印キー移動、フォーカストラップは導入しない。
+`MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は `role="menubar"` 内の menu trigger であり、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload` を持ち、`View` dropdown は theme 切替を持つ。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
 
 `RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
 

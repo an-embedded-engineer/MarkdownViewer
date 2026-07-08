@@ -2,10 +2,22 @@
 
 ## ユーザー操作
 
-- Open Folder: MenuBar の File group からフォルダ選択ダイアログを開く。
+- Open Folder: MenuBar の File dropdown からフォルダ選択ダイアログを開く。
+- Recent Folders: MenuBar の File dropdown から最近開いた root folder を開く。
+- Remove Recent Folder: Recent Folders entry の delete button から該当 entry を削除する。
 - Explorer item click: Markdownファイルを読み込む。
-- Reload: MenuBar の File group から rootと選択中Markdownを再読み込みする。
-- Theme switch: MenuBar の View group から Light / Dark を切り替える。
+- Reload: MenuBar の File dropdown から rootと選択中Markdownを再読み込みする。
+- Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
+
+## MenuBar 表示
+
+MenuBar は window top に `File` / `View` を表示する React UI で、menu name click により dropdown item を展開する。
+
+- `File`: `Open Folder...`、`Recent Folders`、`Reload`
+- `Recent Folders`: 最大 10 件。主表示は保存時点の folder name、補助表示は absolute path。
+- `View`: `Theme: Light` または `Theme: Dark`
+
+Recent Folders entry click で保存済み path が存在しない場合は error strip に表示し、entry は自動削除しない。削除は delete button による明示操作だけで行う。
 
 ## Root Path Strip 表示
 
@@ -22,7 +34,7 @@ StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術�
 ## StatusBar 表示
 
 - `File`: 表示中 Markdown file name。未選択時は `No file selected`。
-- `State`: `Ready`、`Loading Markdown...`、`Rendering PlantUML diagrams...`、`Loading Markdown and rendering PlantUML diagrams...` のいずれか。
+- `State`: `Ready`、`Loading Markdown...`、`Rendering PlantUML diagrams...`、`Loading Markdown and rendering PlantUML diagrams...`、`Updating recent folders...` のいずれか。
 
 `State` の値だけを `aria-live="polite"` とし、`File` は live region に含めない。
 
@@ -61,6 +73,18 @@ PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTML�
 - `html: string`
 - `error: string | null`
 
+### `load_recent_folders() -> Result<Vec<RecentFolderEntry>, String>`
+
+app config JSON から Recent Folders を読み込み、保存順の配列で返す。設定ファイルが存在しない場合は空配列を返す。
+
+### `record_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, String>`
+
+`path` を canonicalize し、directory であることを確認した上で Recent Folders の先頭へ保存する。同一 canonical path の既存 entry は削除してから先頭へ移動する。最大件数は 10 件。
+
+### `remove_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, String>`
+
+指定 `path` と一致する entry を Recent Folders から削除し、更新後の配列を返す。`path` の存在確認は行わない。
+
 ## Frontend Types
 
 `FileTreeNode`:
@@ -72,3 +96,11 @@ PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTML�
 - `children: FileTreeNode[]`
 
 PlantUML frontend typesはTauri commandの `PlantUmlRenderResponse` / `PlantUmlDiagramResult` とcamelCaseで対応する。
+
+`RecentFolderEntry`:
+
+- `path: string`
+- `name: string`
+- `lastOpenedAt: string`
+
+`name` は Rust 側で保存時に確定した値を表示上の正本とする。frontend は `name` が空の場合だけ `path` 全体を fallback 表示する。
