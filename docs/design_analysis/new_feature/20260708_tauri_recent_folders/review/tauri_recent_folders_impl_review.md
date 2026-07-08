@@ -1,12 +1,14 @@
 # Tauri Recent Folders 導入 実装レビュー
 
 **レビュー日**: 2026-07-08
+**再確認日**: 2026-07-08
 **対象ドキュメント**: `docs/design_analysis/new_feature/20260708_tauri_recent_folders/design/tauri_recent_folders_feature_design.md`
 **対象 impl 記録**: `docs/design_analysis/new_feature/20260708_tauri_recent_folders/impl/tauri_recent_folders_feature_impl.md`
 **対象 meta**: `docs/design_analysis/new_feature/20260708_tauri_recent_folders/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-004
-**対象コミット**: `3a33830 Phase 3 implement Tauri recent folders`
-**判定**: **条件付き承認 (Conditionally Approved)**。1.1 (MenuBar の ARIA role 過剰付与) を対応後、Phase 4 進行可。
+**初回レビュー対象コミット**: `3a33830 Phase 3 implement Tauri recent folders`
+**再確認対象コミット**: `632f0a2 Phase 3 address Tauri recent folders implementation review`
+**判定**: **承認 (Approved)**。Phase 4 進行可。
 
 ---
 
@@ -119,4 +121,21 @@ Phase 2 design review で確認された 5 点も実装済みであることを�
 
 一方で、MenuBar の `header` に `role="menubar"`、`File` / `View` trigger に `role="menuitem"` を付与する変更 (1.1) は、Phase 2 承認済み設計のアクセシビリティ節が明記した範囲を超えており、矢印キー移動が非対象のままこれらの role を導入すると、TODO-2026-003 で一度明示的に回避した ARIA menubar パターンの期待値ミスマッチを再導入する。これは受け入れ条件そのものを破壊するものではないが、Phase 2 で確定した設計方針からの逸脱であり、Phase 4 着手前に是正することを条件に**条件付き承認**とする。3.1 (二重障害時のエラー上書き) は改善提案として記録し、対応有無は実装判断に委ねる。
 
-未解決指摘: 中 1 件、低 1 件。
+初回レビューでは、Phase 4 着手前に 1.1 (MenuBar の ARIA role 過剰付与) の対応を必須条件、3.1 (`loadRoot` の二重障害時エラー上書き) を改善提案 (対応有無は実装判断) とする**条件付き承認**とした。
+
+### 再確認結果 (2026-07-08, commit `632f0a2`)
+
+`markdown-viewer-tauri/src/App.tsx`、`docs/components/tauri_viewer/detail_design.md`、`impl/tauri_recent_folders_feature_impl.md` を再確認した。
+
+- **1.1 MenuBar の ARIA role 過剰付与**: `header.menu-bar` から `role="menubar"` が削除され、`File` / `View` trigger からも `role="menuitem"` が削除された。両 trigger は native button のまま `aria-haspopup="menu"` / `aria-expanded` を維持している (`App.tsx:506-521, 585-592`)。`role="menu"` 配下の `.menu-section-label` / `.recent-folder-list` / `.recent-folder-row` は `role="none"` を付与した layout wrapper に整理され、`recent-folder-open` / `recent-folder-remove` の両 button は `role="menuitem"` に揃い、`No recent folders` の empty state も `role="menuitem" aria-disabled="true"` の disabled menu item として扱われている (`App.tsx:530-573`)。`role="menu"` の直接の子がすべて `menuitem` (または `none` の非対話要素) になり、ARIA menu パターンの構造要件を満たす。`detail_design.md:384` も「`File` / `View` は native button の menu trigger であり…`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない」と明記され、実装と一致した。✓ 反映確認。
+- **3.1 `loadRoot` の二重障害時エラー上書き**: `loadMarkdown` が成功時 `null`、失敗時は `errorMessage` に設定したメッセージ文字列を戻り値として返すようになり (`App.tsx:193-217`)、`loadRoot` は `markdownError` を保持した上で `if (recentError && !markdownError) { setErrorMessage(recentError); }` として、Markdown 読み込み失敗がある場合は `recentError` で上書きしないようになった (`App.tsx:108-133`)。initial Markdown 読み込み失敗と recent 保存失敗が同時に発生した場合も、preview が空になる直接原因の Markdown エラーが優先表示される。✓ 反映確認。
+- 恒久ドキュメント・impl 記録: `detail_design.md` の MenuBar 記述と `impl/tauri_recent_folders_feature_impl.md` の「実装差分」「設計差分」「実装レビュー対応」節がいずれも今回の role 構成・エラー優先順位の変更と一致していることを確認した。
+- 検証: `cargo check` (`markdown-viewer-tauri/src-tauri/`) と `npm run build` (`markdown-viewer-tauri/`, `tsc && vite build`) をこの follow-up コミット時点のソースで再実行し、いずれも成功を確認した (chunk size warning のみ、新規エラーなし)。`git diff --check` も `0408028..632f0a2` で再実行し whitespace error なしを確認した。
+
+**判定**: **承認 (Approved)**。
+
+- 中 1 件・低 1 件のレビュー指摘に対応が記録され、未解決指摘はゼロ。
+- `meta.md` の `impl_status` を `done`、Phase 3 の Phase Status を完了状態へ更新可能。
+- Phase 4 (検証・完了処理) への進行を承認する。Phase 4 では `impl/tauri_recent_folders_feature_impl.md` 記載の手動確認観点に加え、Recent Folders の追加・重複更新・最大件数・削除・存在しない path・再起動後復元を実機で確認すること。
+
+未解決指摘なし。本レビューでの承認をもって Phase 3 実装レビューを完了とする。
