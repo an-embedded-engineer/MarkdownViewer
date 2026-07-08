@@ -3,8 +3,10 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tauri::{Manager, State};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +44,25 @@ struct PlantUmlRuntimeOptions {
     _config_path: Option<PathBuf>,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RecentFolderEntry {
+    path: String,
+    name: String,
+    last_opened_at: String,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppConfig {
+    recent_folders: Vec<RecentFolderEntry>,
+}
+
+#[derive(Default)]
+struct AppConfigStore {
+    lock: Mutex<()>,
+}
+
 #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase")]
 enum FileNodeType {
@@ -63,6 +84,8 @@ const SKIPPED_DIRS: &[&str] = &[
 const PLANTUML_CONFIG_FILE_NAME: &str = "plantuml.config.json";
 const PLANTUML_JAR_FILE_NAME: &str = "plantuml.jar";
 const PLANTUML_RENDER_TIMEOUT: Duration = Duration::from_secs(10);
+const APP_CONFIG_FILE_NAME: &str = "settings.json";
+const MAX_RECENT_FOLDERS: usize = 10;
 
 #[tauri::command]
 fn scan_directory(root_path: String) -> Result<FileTreeNode, String> {
@@ -97,6 +120,67 @@ async fn render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRender
         .map_err(|error| format!("PlantUML render task failed: {error}"))?
 }
 
+#[tauri::command]
+fn load_recent_folders(
+    app: tauri::AppHandle,
+    store: State<'_, AppConfigStore>,
+) -> Result<Vec<RecentFolderEntry>, String> {
+    let _guard = store
+        .lock
+        .lock()
+        .map_err(|_| "Failed to lock app config store.".to_string())?;
+    Ok(read_app_config(&app)?.recent_folders)
+}
+
+#[tauri::command]
+fn record_recent_folder(
+    app: tauri::AppHandle,
+    store: State<'_, AppConfigStore>,
+    path: String,
+) -> Result<Vec<RecentFolderEntry>, String> {
+    let canonical_path = normalize_path(PathBuf::from(path))?;
+    if !canonical_path.is_dir() {
+        return Err("Selected path is not a directory.".into());
+    }
+
+    let _guard = store
+        .lock
+        .lock()
+        .map_err(|_| "Failed to lock app config store.".to_string())?;
+    let mut config = read_app_config(&app)?;
+    let canonical_path_text = path_to_string(&canonical_path);
+    config
+        .recent_folders
+        .retain(|entry| entry.path != canonical_path_text);
+    config.recent_folders.insert(
+        0,
+        RecentFolderEntry {
+            path: canonical_path_text,
+            name: recent_folder_name(&canonical_path),
+            last_opened_at: current_unix_seconds(),
+        },
+    );
+    config.recent_folders.truncate(MAX_RECENT_FOLDERS);
+    write_app_config(&app, &config)?;
+    Ok(config.recent_folders)
+}
+
+#[tauri::command]
+fn remove_recent_folder(
+    app: tauri::AppHandle,
+    store: State<'_, AppConfigStore>,
+    path: String,
+) -> Result<Vec<RecentFolderEntry>, String> {
+    let _guard = store
+        .lock
+        .lock()
+        .map_err(|_| "Failed to lock app config store.".to_string())?;
+    let mut config = read_app_config(&app)?;
+    config.recent_folders.retain(|entry| entry.path != path);
+    write_app_config(&app, &config)?;
+    Ok(config.recent_folders)
+}
+
 fn render_plantuml_diagrams_blocking(
     sources: Vec<String>,
 ) -> Result<PlantUmlRenderResponse, String> {
@@ -115,6 +199,52 @@ fn render_plantuml_diagrams_blocking(
         diagrams,
         first_error,
     })
+}
+
+fn read_app_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
+    let config_path = app_config_path(app)?;
+    if !config_path.is_file() {
+        return Ok(AppConfig::default());
+    }
+
+    let content = fs::read_to_string(&config_path)
+        .map_err(|error| format!("Failed to read app config: {error}"))?;
+    serde_json::from_str(&content).map_err(|error| format!("Failed to parse app config: {error}"))
+}
+
+fn write_app_config(app: &tauri::AppHandle, config: &AppConfig) -> Result<(), String> {
+    let config_path = app_config_path(app)?;
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Failed to create app config directory: {error}"))?;
+    }
+
+    let content = serde_json::to_string_pretty(config)
+        .map_err(|error| format!("Failed to serialize app config: {error}"))?;
+    fs::write(&config_path, content)
+        .map_err(|error| format!("Failed to write app config: {error}"))
+}
+
+fn app_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|directory| directory.join(APP_CONFIG_FILE_NAME))
+        .map_err(|error| format!("Failed to resolve app config directory: {error}"))
+}
+
+fn recent_folder_name(path: &Path) -> String {
+    path.file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_owned)
+        .unwrap_or_else(|| path.display().to_string())
+}
+
+fn current_unix_seconds() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs().to_string())
+        .unwrap_or_else(|_| "0".to_string())
 }
 
 fn build_tree(path: &Path, root: &Path) -> Result<FileTreeNode, String> {
@@ -558,10 +688,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(AppConfigStore::default())
         .invoke_handler(tauri::generate_handler![
             scan_directory,
             read_text_file,
-            render_plantuml_diagrams
+            render_plantuml_diagrams,
+            load_recent_folders,
+            record_recent_folder,
+            remove_recent_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

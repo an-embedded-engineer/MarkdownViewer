@@ -89,3 +89,36 @@
   - `git diff --check`
 - Follow-up:
   - OS native menu integration is deferred to `TODO-2026-004 Tauri Recent Folders 導入`.
+
+## TODO-2026-004 Tauri Recent Folders 導入
+
+- Status: `done`
+- Category: `new-feature`
+- Created: `2026-07-08`
+- Completed: `2026-07-09`
+- Branch: `new-feature/tauri-recent-folders`
+- WBS:
+  - `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
+- Work package: `WP-002`
+- Design analysis:
+  - `docs/design_analysis/new_feature/20260708_tauri_recent_folders/`
+- Change report:
+  - `docs/design_analysis/new_feature/20260708_tauri_recent_folders/change_report.md`
+- Review records:
+  - `docs/design_analysis/new_feature/20260708_tauri_recent_folders/review/tauri_recent_folders_design_review.md`
+  - `docs/design_analysis/new_feature/20260708_tauri_recent_folders/review/tauri_recent_folders_impl_review.md`
+- Summary:
+  - Added `File` / `Recent Folders` to the Tauri React app-level MenuBar dropdown.
+  - Persisted successful root opens to app config JSON through Rust commands.
+  - Supported duplicate promotion, maximum 10 entries, explicit entry deletion, missing path errors, and restart restoration.
+  - Kept existing `Open Folder` / `Reload` / `Theme` behavior working from MenuBar.
+- Verification:
+  - User confirmed opening a directory adds it to `RECENT FOLDERS`.
+  - User confirmed the entry `x` button deletes history.
+  - User confirmed clicking a recent entry opens the target directory.
+  - User confirmed existing `Open Folder` / `Reload` / `Theme` still work.
+  - `npm run build` in `markdown-viewer-tauri/`
+  - `cargo check` in `markdown-viewer-tauri/src-tauri/`
+  - `git diff --check`
+  - `diff.zip` generated from `0967086..653d075`.
+  - Completion artifacts are ready for Phase 4-c merge approval.

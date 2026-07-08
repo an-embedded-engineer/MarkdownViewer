@@ -85,17 +85,10 @@ button {
 }
 
 .menu-group {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
-}
-
-.menu-group-label {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
 }
 
 .menu-bar button {
@@ -116,6 +109,111 @@ button {
   color: var(--muted);
   cursor: default;
   opacity: 0.65;
+}
+
+.menu-trigger {
+  min-width: 64px;
+}
+
+.menu-trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  gap: 4px;
+  width: 220px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  box-shadow: 0 10px 28px rgb(20 26 34 / 18%);
+}
+
+.file-menu-dropdown {
+  width: min(520px, calc(100vw - 24px));
+}
+
+.menu-dropdown button {
+  justify-content: flex-start;
+  width: 100%;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.menu-dropdown button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.menu-section-label {
+  padding: 8px 8px 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.menu-empty-state {
+  padding: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.recent-folder-list {
+  display: grid;
+  gap: 2px;
+  max-height: min(320px, 48vh);
+  overflow: auto;
+}
+
+.recent-folder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.recent-folder-open {
+  display: grid;
+  height: auto;
+  min-height: 42px;
+  padding: 5px 8px;
+}
+
+.recent-folder-name,
+.recent-folder-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-folder-name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.recent-folder-path {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.recent-folder-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: auto;
+  min-height: 42px;
+  padding: 0;
+  color: var(--muted);
 }
 
 .root-path-bar,

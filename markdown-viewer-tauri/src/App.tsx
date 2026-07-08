@@ -34,6 +34,14 @@ type PlantUmlRenderState = {
   diagrams: PlantUmlDiagramResult[];
 };
 
+type RecentFolderEntry = {
+  path: string;
+  name: string;
+  lastOpenedAt: string;
+};
+
+type ActiveMenu = "file" | "view" | null;
+
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 
@@ -47,11 +55,15 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
   const [isMarkdownLoading, setIsMarkdownLoading] = useState(false);
+  const [isRecentFoldersBusy, setIsRecentFoldersBusy] = useState(false);
+  const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([]);
+  const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const [plantUmlRenderState, setPlantUmlRenderState] = useState<PlantUmlRenderState>({
     key: "",
     diagrams: [],
   });
   const previewRef = useRef<HTMLDivElement>(null);
+  const menuBarRef = useRef<HTMLElement>(null);
   const emptyPlantUmlDiagrams = useMemo<PlantUmlDiagramResult[]>(() => [], []);
 
   const selectedFileName = selectedFilePath ? getFileName(selectedFilePath) : "";
@@ -61,13 +73,15 @@ function App() {
   const isPlantUmlRendering = plantUmlDiagrams.some(
     (diagram) => !diagram.ok && diagram.error === null,
   );
-  const isBusy = isMarkdownLoading || isPlantUmlRendering;
+  const isBusy = isMarkdownLoading || isPlantUmlRendering || isRecentFoldersBusy;
   const loadingMessage = isMarkdownLoading
     ? isPlantUmlRendering
       ? "Loading Markdown and rendering PlantUML diagrams..."
       : "Loading Markdown..."
     : isPlantUmlRendering
       ? "Rendering PlantUML diagrams..."
+      : isRecentFoldersBusy
+        ? "Updating recent folders..."
       : null;
 
   async function openFolder() {
@@ -88,10 +102,10 @@ function App() {
       return;
     }
 
-    await loadRoot(selected);
+    await loadRoot(selected, { recordRecent: true });
   }
 
-  async function loadRoot(path: string) {
+  async function loadRoot(path: string, options: { recordRecent?: boolean } = {}) {
     try {
       const tree = await invoke<FileTreeNode>("scan_directory", {
         rootPath: path,
@@ -100,15 +114,61 @@ function App() {
       setFileTree(tree);
 
       const initialFile = findReadme(tree) ?? findFirstMarkdown(tree);
+      const recentError = options.recordRecent ? await recordRecentFolder(path) : null;
+      let markdownError: string | null = null;
       if (initialFile) {
-        await loadMarkdown(path, initialFile.path);
+        markdownError = await loadMarkdown(path, initialFile.path);
       } else {
         setSelectedFilePath(null);
         setSelectedMarkdown("");
         setPreviewRevision((revision) => revision + 1);
+        setErrorMessage(null);
+      }
+
+      if (recentError && !markdownError) {
+        setErrorMessage(recentError);
       }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  async function recordRecentFolder(path: string) {
+    setIsRecentFoldersBusy(true);
+    try {
+      const entries = await invoke<RecentFolderEntry[]>("record_recent_folder", { path });
+      setRecentFolders(entries);
+      return null;
+    } catch (error) {
+      return toErrorMessage(error);
+    } finally {
+      setIsRecentFoldersBusy(false);
+    }
+  }
+
+  async function openRecentFolder(path: string) {
+    if (isBusy) {
+      return;
+    }
+
+    setActiveMenu(null);
+    await loadRoot(path, { recordRecent: true });
+  }
+
+  async function removeRecentFolder(path: string) {
+    if (isBusy) {
+      return;
+    }
+
+    setIsRecentFoldersBusy(true);
+    try {
+      const entries = await invoke<RecentFolderEntry[]>("remove_recent_folder", { path });
+      setRecentFolders(entries);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsRecentFoldersBusy(false);
     }
   }
 
@@ -133,7 +193,7 @@ function App() {
 
   async function loadMarkdown(currentRootPath: string, filePath: string, anchor?: string) {
     if (isBusy) {
-      return;
+      return null;
     }
 
     setIsMarkdownLoading(true);
@@ -147,8 +207,11 @@ function App() {
       setPreviewRevision((revision) => revision + 1);
       setPendingAnchor(anchor ?? null);
       setErrorMessage(null);
+      return null;
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      const message = toErrorMessage(error);
+      setErrorMessage(message);
+      return message;
     } finally {
       setIsMarkdownLoading(false);
     }
@@ -192,6 +255,57 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsRecentFoldersBusy(true);
+
+    invoke<RecentFolderEntry[]>("load_recent_folders")
+      .then((entries) => {
+        if (!cancelled) {
+          setRecentFolders(entries);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setErrorMessage(toErrorMessage(error));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRecentFoldersBusy(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeMenu) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!menuBarRef.current?.contains(event.target as Node)) {
+        setActiveMenu(null);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setActiveMenu(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeMenu]);
 
   useEffect(() => {
     if (!selectedFilePath) {
@@ -297,12 +411,22 @@ function App() {
   return (
     <main className="app-shell">
       <MenuBar
+        menuBarRef={menuBarRef}
         rootPath={rootPath}
         theme={theme}
         isBusy={isBusy}
+        activeMenu={activeMenu}
+        recentFolders={recentFolders}
         onOpenFolder={openFolder}
         onReload={reload}
-        onToggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
+        onToggleTheme={() => {
+          setActiveMenu(null);
+          setTheme((value) => (value === "light" ? "dark" : "light"));
+        }}
+        onMenuToggle={(menu) => setActiveMenu((value) => (value === menu ? null : menu))}
+        onCloseMenu={() => setActiveMenu(null)}
+        onOpenRecentFolder={openRecentFolder}
+        onRemoveRecentFolder={removeRecentFolder}
       />
 
       <RootPathBar rootPath={rootPath} />
@@ -349,38 +473,132 @@ function App() {
 }
 
 type MenuBarProps = {
+  menuBarRef: React.RefObject<HTMLElement | null>;
   rootPath: string | null;
   theme: Theme;
   isBusy: boolean;
+  activeMenu: ActiveMenu;
+  recentFolders: RecentFolderEntry[];
   onOpenFolder: () => void;
   onReload: () => void;
   onToggleTheme: () => void;
+  onMenuToggle: (menu: Exclude<ActiveMenu, null>) => void;
+  onCloseMenu: () => void;
+  onOpenRecentFolder: (path: string) => void;
+  onRemoveRecentFolder: (path: string) => void;
 };
 
 function MenuBar({
+  menuBarRef,
   rootPath,
   theme,
   isBusy,
+  activeMenu,
+  recentFolders,
   onOpenFolder,
   onReload,
   onToggleTheme,
+  onMenuToggle,
+  onCloseMenu,
+  onOpenRecentFolder,
+  onRemoveRecentFolder,
 }: MenuBarProps) {
   return (
-    <header className="menu-bar" aria-label="Application menu">
-      <div className="menu-group" role="group" aria-label="File commands">
-        <span className="menu-group-label">File</span>
-        <button type="button" disabled={isBusy} onClick={onOpenFolder}>
-          Open Folder
+    <header ref={menuBarRef} className="menu-bar" aria-label="Application menu">
+      <div className="menu-group">
+        <button
+          type="button"
+          className="menu-trigger"
+          aria-haspopup="menu"
+          aria-expanded={activeMenu === "file"}
+          onClick={() => onMenuToggle("file")}
+        >
+          File
         </button>
-        <button type="button" disabled={!rootPath || isBusy} onClick={onReload}>
-          Reload
-        </button>
+        {activeMenu === "file" ? (
+          <div className="menu-dropdown file-menu-dropdown" role="menu" aria-label="File">
+            <button
+              type="button"
+              role="menuitem"
+              disabled={isBusy}
+              onClick={() => {
+                onCloseMenu();
+                onOpenFolder();
+              }}
+            >
+              Open Folder...
+            </button>
+            <div className="menu-section-label" role="none">
+              Recent Folders
+            </div>
+            {recentFolders.length > 0 ? (
+              <div className="recent-folder-list" role="none">
+                {recentFolders.map((entry) => (
+                  <div className="recent-folder-row" role="none" key={entry.path}>
+                    <button
+                      type="button"
+                      className="recent-folder-open"
+                      role="menuitem"
+                      title={entry.path}
+                      disabled={isBusy}
+                      onClick={() => onOpenRecentFolder(entry.path)}
+                    >
+                      <span className="recent-folder-name">{entry.name || entry.path}</span>
+                      <span className="recent-folder-path">{entry.path}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="recent-folder-remove"
+                      role="menuitem"
+                      aria-label={`Remove ${entry.path} from recent folders`}
+                      title="Remove from Recent Folders"
+                      disabled={isBusy}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemoveRecentFolder(entry.path);
+                      }}
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="menu-empty-state" role="menuitem" aria-disabled="true">
+                No recent folders
+              </div>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!rootPath || isBusy}
+              onClick={() => {
+                onCloseMenu();
+                onReload();
+              }}
+            >
+              Reload
+            </button>
+          </div>
+        ) : null}
       </div>
-      <div className="menu-group" role="group" aria-label="View commands">
-        <span className="menu-group-label">View</span>
-        <button type="button" disabled={isBusy} onClick={onToggleTheme}>
-          Theme: {theme === "light" ? "Light" : "Dark"}
+      <div className="menu-group">
+        <button
+          type="button"
+          className="menu-trigger"
+          aria-haspopup="menu"
+          aria-expanded={activeMenu === "view"}
+          onClick={() => onMenuToggle("view")}
+        >
+          View
         </button>
+        {activeMenu === "view" ? (
+          <div className="menu-dropdown" role="menu" aria-label="View">
+            <button type="button" role="menuitem" disabled={isBusy} onClick={onToggleTheme}>
+              Theme: {theme === "light" ? "Light" : "Dark"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </header>
   );
