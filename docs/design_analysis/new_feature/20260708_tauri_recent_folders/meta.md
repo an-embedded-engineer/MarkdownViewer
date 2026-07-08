@@ -12,7 +12,7 @@ components:
   - "markdown-viewer-tauri/src-tauri/capabilities"
   - "docs/components/tauri_viewer"
 status: "in_progress"
-design_status: "not_started"
+design_status: "draft"
 impl_status: "not_started"
 completion_status: "not_started"
 verification_status: "not_started"
@@ -52,7 +52,7 @@ depends_on:
 | Phase | Status |
 | --- | --- |
 | Phase 0 Requirements | Done (`0967086`) |
-| Phase 1 Branch and meta | In progress |
-| Phase 2 Design review | Not started |
+| Phase 1 Branch and meta | Done (`ecab28a`) |
+| Phase 2 Design review | Draft |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4 Verification and completion | Not started |
