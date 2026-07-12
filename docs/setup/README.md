@@ -43,10 +43,10 @@ PlantUML 表示には Java と `plantuml.jar` が必要です。`plantuml.jar` �
 java -version
 ```
 
-開発時は次のいずれかを使用します。
+開発時は実装ごとに次のいずれかを使用します。
 
-- リポジトリルートに `plantuml.jar` を置く。
-- Avalonia のコマンド実行 directory、または Tauri の `markdown-viewer-tauri/src-tauri/` に置く。
+- Avalonia: リポジトリルートから `dotnet run` する場合はリポジトリルート、または実行 assembly の directory に `plantuml.jar` を置く。
+- Tauri: `markdown-viewer-tauri/src-tauri/`、Tauri process の current working directory、または Rust 実行ファイルの directory に `plantuml.jar` を置く。
 - runtime directory の `plantuml.config.json` から絶対 path を指定する。
 
 ```json

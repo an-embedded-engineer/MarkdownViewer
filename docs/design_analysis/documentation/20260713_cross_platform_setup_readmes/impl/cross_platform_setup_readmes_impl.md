@@ -23,6 +23,7 @@
 - ルート README から OS 別 setup と各実装 README へリンクした。
 - 各実装 README から OS 別 setup、実行、publish/bundle、共通開発ルールへリンクした。
 - `docs/rules/project_overview.md` にルート README、setup 索引、各実装 README を追加した。
+- PlantUML の開発時配置先は、Avalonia の current working directory / assembly directory と、Tauri の `src-tauri/` / current working directory / executable directory を混同しないよう実装別に記載した。
 - architecture、component、ADR の仕様は変更していない。
 - publish 方式自体は変更していないため、新規 history 文書は作成しない。
 - TODO archive は Phase 4 で更新する。

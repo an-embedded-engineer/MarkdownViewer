@@ -63,7 +63,7 @@ npm run tauri dev
 
 ## PlantUML（任意）
 
-`java -version` で Java を確認し、開発時はリポジトリルートまたは各実装の runtime directory に `plantuml.jar` を配置します。jar はコミットしません。設定ファイルを使う場合を含む詳細は [共通 PlantUML 手順](README.md#plantuml任意)を参照してください。次節の統合 publish スクリプトを使うと、jar を両方の `.app` へ配置できます。
+`java -version` で Java を確認します。Avalonia はリポジトリルートから `dotnet run` する場合はリポジトリルート、Tauri は `markdown-viewer-tauri/src-tauri/`、Tauri process の current working directory、または Rust 実行ファイルの directory に `plantuml.jar` を配置します。jar はコミットしません。設定ファイルを使う場合を含む詳細は [共通 PlantUML 手順](README.md#plantuml任意)を参照してください。次節の統合 publish スクリプトを使うと、jar を両方の `.app` へ配置できます。
 
 ## 5. publish / bundle
 
