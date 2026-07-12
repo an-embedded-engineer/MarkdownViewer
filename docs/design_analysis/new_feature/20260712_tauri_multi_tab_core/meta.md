@@ -12,7 +12,7 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "not_started"
+completion_status: "done"
 verification_status: "done"
 related_commits:
   - "19e2226 : Phase 0 define TODO-2026-005 scope"
@@ -25,7 +25,8 @@ related_commits:
   - "9a92ec3 : Phase 3 implementation review (conditional approval)"
   - "c4a6a09 : Phase 3 address Tauri multi-tab implementation review"
   - "71a2861 : Phase 3 approve Tauri multi-tab implementation (Round 2)"
-source_todo_path: "docs/todo/todo.md#todo-2026-005-tauri-multi-tab-core-導入"
+  - "785dff8 : Phase 4-a complete Tauri multi-tab user verification"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-005-tauri-multi-tab-core-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
 depends_on:
@@ -54,7 +55,7 @@ depends_on:
 | Phase | Status |
 | --- | --- |
 | Phase 0 Requirements | Done (`19e2226`) |
-| Phase 1 Branch and meta | In progress |
+| Phase 1 Branch and meta | Done (`6f70fdb`) |
 | Phase 2 Design review | Done (approved 2026-07-12, `27e7cf1`) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-12, `71a2861`) |
-| Phase 4 Verification and completion | Phase 4-a user verification done (2026-07-12) |
+| Phase 4 Verification and completion | Phase 4-b done; awaiting Phase 4-c merge approval |
