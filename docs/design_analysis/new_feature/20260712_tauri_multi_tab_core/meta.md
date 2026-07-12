@@ -9,7 +9,7 @@ components:
   - "markdown-viewer-tauri/src/App.tsx"
   - "markdown-viewer-tauri/src/App.css"
   - "docs/components/tauri_viewer"
-status: "implemented"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -26,6 +26,8 @@ related_commits:
   - "c4a6a09 : Phase 3 address Tauri multi-tab implementation review"
   - "71a2861 : Phase 3 approve Tauri multi-tab implementation (Round 2)"
   - "785dff8 : Phase 4-a complete Tauri multi-tab user verification"
+  - "2b253ca : Phase 4-b complete Tauri multi-tab artifacts"
+  - "57412d9 : Phase 4-c merge Tauri multi-tab core into main"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-005-tauri-multi-tab-core-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
@@ -58,4 +60,4 @@ depends_on:
 | Phase 1 Branch and meta | Done (`6f70fdb`) |
 | Phase 2 Design review | Done (approved 2026-07-12, `27e7cf1`) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-12, `71a2861`) |
-| Phase 4 Verification and completion | Phase 4-b done; awaiting Phase 4-c merge approval |
+| Phase 4 Verification and completion | Done (merged to main 2026-07-12, `57412d9`) |
