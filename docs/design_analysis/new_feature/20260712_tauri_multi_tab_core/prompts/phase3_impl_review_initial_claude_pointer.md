@@ -1,0 +1,1 @@
+`docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/prompts/phase3_impl_review_initial_claude.md` を読んで、Phase 3実装レビューを開始してください。

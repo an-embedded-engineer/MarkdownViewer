@@ -31,5 +31,6 @@ cargo check
 ## Notes
 
 - The app skips `.git`, `node_modules`, `bin`, `obj`, `target`, `.venv`, and `__pycache__` while scanning folders.
-- PlantUML, full-text search, tabs, file watching, and packaging are outside this MVP.
+- Full-text search, split view, tab persistence/reorder, file watching, and packaging are outside this MVP.
+- Markdown files open in a horizontally scrollable TabStrip. Selecting an already-open file activates its tab; Reload refreshes only the active tab.
 - Local images use the Tauri asset protocol. The current MVP allows a broad asset scope so arbitrary selected folders can display relative images.

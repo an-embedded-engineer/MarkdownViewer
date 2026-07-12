@@ -6,7 +6,7 @@ OS 連携とファイルシステム境界は Rust command へ寄せ、画面状
 
 ## 責務
 
-- React: MenuBar dropdown、Recent Folders、root path strip、Explorer、Preview、error strip、StatusBar、テーマ、エラー / loading 表示、Markdown → HTML 変換、リンク処理。
+- React: MenuBar dropdown、Recent Folders、root path strip、Explorer、TabStrip、Preview、error strip、StatusBar、テーマ、tab単位のエラー / loading、Markdown → HTML 変換、リンク処理。
 - TypeScript renderer (`renderMarkdown`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。
 - Rust: root 配下の安全なファイル走査、Markdown 本文の UTF-8 読み込み、PlantUML レンダリング (Java プロセス起動)、Recent Folders の app config JSON 永続化。
 - Tauri config: dialog / opener / asset protocol の権限管理。capability で plugin 利用を許可する。
@@ -33,6 +33,19 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 | `name` | string | `record_recent_folder` 実行時に Rust 側で確定した folder name snapshot |
 | `lastOpenedAt` | string | Unix seconds を文字列化した最終 open 時刻 |
 
+`OpenDocumentTab` はfrontend内だけの型付きstateで、同一root内のMarkdownを保持する。
+
+| field | 型 | 補足 |
+|---|---|---|
+| `id` | string | App内で単調増加する不透明ID |
+| `path` | string | tab collection内で一意な絶対path |
+| `displayName` | string | TabStrip / StatusBar表示名 |
+| `markdown` | string | UTF-8本文。Reload失敗時は直前値を維持 |
+| `revision` | number | 初回読込 / Reloadごとに増加するasync guard |
+| `loadState` | `loading \| rendering \| ready \| error` | tab単位状態 |
+| `errorMessage` | `string \| null` | tab単位代表error |
+| `plantUmlDiagrams` | `PlantUmlDiagramResult[]` | tab単位のpending / SVG / error cache |
+
 ## 依存方向
 
 ```text
@@ -52,7 +65,7 @@ skinparam componentStyle rectangle
 
 package "Frontend (React + Vite)" as F {
   [main.tsx]
-  [App / MenuBar / RootPathBar / FileTree / MarkdownPreview / ErrorBanner / StatusBar]
+  [App / MenuBar / RootPathBar / FileTree / TabStrip / MarkdownPreview / ErrorBanner / StatusBar]
   [renderMarkdown\n(markdown-it custom rules)]
   [mermaid (client)]
   [App.css (theme / layout)]
@@ -85,10 +98,10 @@ package "External" as E {
   [OS default browser]
 }
 
-[main.tsx] --> [App / MenuBar / RootPathBar / FileTree / MarkdownPreview / ErrorBanner / StatusBar]
-[App / MenuBar / RootPathBar / FileTree / MarkdownPreview / ErrorBanner / StatusBar] --> TJS
-[App / MenuBar / RootPathBar / FileTree / MarkdownPreview / ErrorBanner / StatusBar] --> [renderMarkdown\n(markdown-it custom rules)]
-[App / MenuBar / RootPathBar / FileTree / MarkdownPreview / ErrorBanner / StatusBar] --> [mermaid (client)]
+[main.tsx] --> [App / MenuBar / RootPathBar / FileTree / TabStrip / MarkdownPreview / ErrorBanner / StatusBar]
+[App / MenuBar / RootPathBar / FileTree / TabStrip / MarkdownPreview / ErrorBanner / StatusBar] --> TJS
+[App / MenuBar / RootPathBar / FileTree / TabStrip / MarkdownPreview / ErrorBanner / StatusBar] --> [renderMarkdown\n(markdown-it custom rules)]
+[App / MenuBar / RootPathBar / FileTree / TabStrip / MarkdownPreview / ErrorBanner / StatusBar] --> [mermaid (client)]
 TJS --> TR
 TR --> R
 R --> E
@@ -154,16 +167,16 @@ skinparam shadowing false
 [*] --> NoRoot : App 起動
 
 state NoRoot : rootPath = null
-state HasRoot : rootPath set\n選択 Markdown は任意
-state MarkdownLoading : isMarkdownLoading = true
+state HasRoot : rootPath set\ntabs は0件以上
+state TabLoading : active tab loadState = loading
 state RecentFoldersUpdating : isRecentFoldersBusy = true
-state PlantUmlPending : pending PlantUML diagrams
+state PlantUmlPending : active tab loadState = rendering
 state Error : error strip に errorMessage 表示
 
-NoRoot --> MarkdownLoading : Open Folder / loadRoot
-HasRoot --> MarkdownLoading : Explorer 選択 / Reload
-MarkdownLoading --> HasRoot : read_text_file 成功
-MarkdownLoading --> Error : Tauri command 失敗
+NoRoot --> HasRoot : Open Folder / loadRoot scan成功
+HasRoot --> TabLoading : Explorer 選択 / Reload
+TabLoading --> HasRoot : read_text_file 成功
+TabLoading --> Error : Tauri command 失敗
 HasRoot --> RecentFoldersUpdating : record / remove recent folder
 RecentFoldersUpdating --> HasRoot : app config JSON 更新完了
 RecentFoldersUpdating --> Error : recent folder command 失敗

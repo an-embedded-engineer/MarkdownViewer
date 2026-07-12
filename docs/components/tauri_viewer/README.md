@@ -8,7 +8,8 @@ Tauri v2 + React + TypeScript + Rust による Markdown Viewer MVP 実装。
 
 - Tauri dialog plugin でフォルダを選択する。
 - Rust command でファイルツリー構築、Markdown 読み込み、Recent Folders 設定永続化を行う。
-- React で MenuBar dropdown、Recent Folders、root path strip、Explorer、Markdown preview、error strip、StatusBar を表示する。
+- React で MenuBar dropdown、Recent Folders、root path strip、Explorer、TabStrip、Markdown preview、error strip、StatusBar を表示する。
+- 同一 root 内の Markdown を複数タブで保持し、active tabだけを単一preview paneへ描画する。
 - `markdown-it`、`mermaid`、Rust 側 PlantUML command で Markdown / Mermaid / PlantUML を描画する。
 
 ## 技術スタック
@@ -35,8 +36,8 @@ markdown-viewer-tauri/
 ├── public/                       — favicon / アイコンなど静的 asset
 ├── src/                          — React + TypeScript フロントエンド
 │   ├── main.tsx                  — React エントリーポイント
-│   ├── App.tsx                   — UI + 状態管理 + Markdown 描画
-│   ├── App.css                   — Light / Dark テーマ + MenuBar dropdown / root path strip / 2 ペイン / error strip / StatusBar レイアウト
+│   ├── App.tsx                   — UI + tab状態管理 + Markdown 描画
+│   ├── App.css                   — Light / Dark テーマ + MenuBar / TabStrip / 2 ペイン / StatusBar レイアウト
 │   └── vite-env.d.ts             — Vite 型定義
 └── src-tauri/                    — Rust バックエンド (Tauri 本体)
     ├── Cargo.toml                — クレート / プラグイン
@@ -54,8 +55,8 @@ markdown-viewer-tauri/
 | 要素 | 役割 | ソース |
 | --- | --- | --- |
 | `main.tsx` | React DOM ルートに `App` をマウント | [markdown-viewer-tauri/src/main.tsx](../../../markdown-viewer-tauri/src/main.tsx) |
-| `App` / `MenuBar` / `RootPathBar` / `FileTree` / `MarkdownPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`useState` で root / fileTree / 選択ファイル / theme / previewRevision / plantUmlRenderState / recentFolders を保持し、操作は MenuBar dropdown、root 表示は root path strip、代表 error は error strip、active file / loading は StatusBar へ分離 | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
-| `App.css` | Light / Dark テーマ、MenuBar dropdown / Recent Folders list / root path strip / 2 ペイン / error strip / StatusBar レイアウト、`.plantuml-diagram` / `.plantuml-loading` / `.plantuml-error` / `.mermaid` スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
+| `App` / `MenuBar` / `RootPathBar` / `FileTree` / `TabStrip` / `MarkdownPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`tabs` / `activeTabId` を文書状態の正本とし、Markdown / PlantUML結果とloading/errorをtab単位で保持する。root操作とRecent Foldersだけをglobal busyとして扱う | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
+| `App.css` | Light / Dark テーマ、MenuBar、TabStripのactive/loading/error/横overflow、2ペイン、error strip、StatusBar、Markdown図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
 | `scan_directory` | Rust command。root 配下を再帰走査して `FileTreeNode` を返す。除外ディレクトリあり | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `read_text_file` | Rust command。root 配下チェックと Markdown 拡張子チェックの後 UTF-8 で読み込む | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `render_plantuml_diagrams` | Rust command。`spawn_blocking` で各 source を `java -jar plantuml.jar -tsvg -pipe` に渡し、SVG / エラー HTML を返す | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |

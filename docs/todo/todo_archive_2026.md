@@ -122,3 +122,39 @@
   - `git diff --check`
   - `diff.zip` generated from `0967086..653d075`.
   - Completion artifacts are ready for Phase 4-c merge approval.
+
+## TODO-2026-005 Tauri Multi-tab core 導入
+
+- Status: `done`
+- Category: `new-feature`
+- Created: `2026-07-12`
+- Completed: `2026-07-12`
+- Branch: `new-feature/tauri-multi-tab-core`
+- WBS:
+  - `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
+- Work package: `WP-003`
+- Design analysis:
+  - `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/`
+- Change report:
+  - `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/change_report.md`
+- Review records:
+  - `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/review/tauri_multi_tab_core_design_review.md`
+  - `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/review/tauri_multi_tab_core_impl_review.md`
+- Summary:
+  - Replaced the Tauri single-document state with typed open tabs and an active tab identifier.
+  - Added a horizontally scrollable TabStrip with activate, close, loading/error state, and keyboard navigation.
+  - Cached Markdown and PlantUML results per tab and guarded asynchronous responses by tab ID and revision.
+  - Integrated Explorer selection, active-tab Reload, root changes, theme, and relative Markdown links with tab state.
+  - Preserved a single preview pane as the foundation for the follow-up split-view work package.
+- Verification:
+  - User confirmed multi-tab open, switching without reload, active/non-active/last tab close, and active-tab Reload.
+  - User confirmed root changes clear old tabs and open the new root default Markdown.
+  - User confirmed TabStrip overflow, ArrowLeft / ArrowRight / Home / End, and close-after-focus behavior.
+  - User confirmed PlantUML error indication and no cross-tab preview/error bleed during concurrent rendering.
+  - User confirmed relative Markdown links reuse or create tabs as appropriate and scroll to anchors.
+  - User confirmed no regression in existing viewer features.
+  - `npm run build` in `markdown-viewer-tauri/`.
+  - `cargo check` in `markdown-viewer-tauri/src-tauri/`.
+  - `git diff --check`.
+  - `diff.zip` generated from `19e2226..785dff8`.
+  - Completion artifacts are ready for Phase 4-c merge approval.

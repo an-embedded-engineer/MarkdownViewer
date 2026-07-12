@@ -5,8 +5,10 @@
 - Open Folder: MenuBar の File dropdown からフォルダ選択ダイアログを開く。
 - Recent Folders: MenuBar の File dropdown から最近開いた root folder を開く。
 - Remove Recent Folder: Recent Folders entry の delete button から該当 entry を削除する。
-- Explorer item click: Markdownファイルを読み込む。
-- Reload: MenuBar の File dropdown から rootと選択中Markdownを再読み込みする。
+- Explorer item click: 未openのMarkdownは新規tabを開き、同一pathがopen済みならactivateする。
+- Tab activate: TabStripから表示するMarkdownを切り替える。ArrowLeft / ArrowRight / Home / Endでもfocusとselectionを移動できる。
+- Tab close: 非active tabではselectionを維持する。active tabでは右隣、なければ左隣へ移り、最後のtab close後は未選択表示になる。
+- Reload: MenuBar の File dropdown から root treeとactive tabだけを再読み込みする。
 - Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
 
 ## MenuBar 表示
@@ -25,6 +27,14 @@ Recent Folders entry click で保存済み path が存在しない場合は erro
 
 MenuBar 直下に常時表示する。長い path は ellipsis と `title` で全文確認できる。
 
+## TabStrip 表示
+
+- 同一root内でopenしたMarkdownをopen順に表示する。同一pathのtabは重複作成しない。
+- active / Loading / Rendering / Errorを表示し、長いfile nameはellipsis、absolute pathは`title`で確認できる。
+- 多数tabは横scrollで到達可能にする。`role="tablist"` / `role="tab"` とroving tabindexを使う。
+- activate buttonとactive tabのclose buttonだけをTabキーのfocus順に含める。非active tabをcloseする場合は、先に矢印キーでactivateしてからclose buttonへ移動する。
+- tab永続化、reorder、pin、split viewは対象外。
+
 ## Error Strip 表示
 
 - `Error`: 代表エラー。エラー発生時のみ表示する。
@@ -34,7 +44,7 @@ StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術�
 ## StatusBar 表示
 
 - `File`: 表示中 Markdown file name。未選択時は `No file selected`。
-- `State`: `Ready`、`Loading Markdown...`、`Rendering PlantUML diagrams...`、`Loading Markdown and rendering PlantUML diagrams...`、`Updating recent folders...` のいずれか。
+- `State`: `Loading folder...`、`Updating recent folders...`、`Loading Markdown...`、`Rendering PlantUML diagrams...`、`Ready` のいずれか。左から順に優先する。
 
 `State` の値だけを `aria-live="polite"` とし、`File` は live region に含めない。
 
@@ -104,3 +114,16 @@ PlantUML frontend typesはTauri commandの `PlantUmlRenderResponse` / `PlantUmlD
 - `lastOpenedAt: string`
 
 `name` は Rust 側で保存時に確定した値を表示上の正本とする。frontend は `name` が空の場合だけ `path` 全体を fallback 表示する。
+
+`OpenDocumentTab`:
+
+- `id: string`
+- `path: string`
+- `displayName: string`
+- `markdown: string`
+- `revision: number`
+- `loadState: "loading" | "rendering" | "ready" | "error"`
+- `errorMessage: string | null`
+- `plantUmlDiagrams: PlantUmlDiagramResult[]`
+
+Markdown / PlantUML responseは`tabId + revision`が現在値と一致する場合だけ適用する。close済み、Reload前、旧rootのresponseは無視する。

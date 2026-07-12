@@ -29,9 +29,22 @@ type PlantUmlRenderResponse = {
   firstError: string | null;
 };
 
-type PlantUmlRenderState = {
-  key: string;
-  diagrams: PlantUmlDiagramResult[];
+type TabLoadState = "loading" | "rendering" | "ready" | "error";
+
+type OpenDocumentTab = {
+  id: string;
+  path: string;
+  displayName: string;
+  markdown: string;
+  revision: number;
+  loadState: TabLoadState;
+  errorMessage: string | null;
+  plantUmlDiagrams: PlantUmlDiagramResult[];
+};
+
+type PendingNavigation = {
+  tabId: string;
+  anchor: string;
 };
 
 type RecentFolderEntry = {
@@ -48,48 +61,55 @@ const externalUrlPattern = /^(https?:)?\/\//i;
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [fileTree, setFileTree] = useState<FileTreeNode | null>(null);
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
-  const [selectedMarkdown, setSelectedMarkdown] = useState("");
-  const [previewRevision, setPreviewRevision] = useState(0);
+  const [tabs, setTabs] = useState<OpenDocumentTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
-  const [isMarkdownLoading, setIsMarkdownLoading] = useState(false);
+  const [rootOperationError, setRootOperationError] = useState<string | null>(null);
+  const [isRootLoading, setIsRootLoading] = useState(false);
   const [isRecentFoldersBusy, setIsRecentFoldersBusy] = useState(false);
   const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([]);
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
-  const [plantUmlRenderState, setPlantUmlRenderState] = useState<PlantUmlRenderState>({
-    key: "",
-    diagrams: [],
-  });
   const previewRef = useRef<HTMLDivElement>(null);
   const menuBarRef = useRef<HTMLElement>(null);
-  const emptyPlantUmlDiagrams = useMemo<PlantUmlDiagramResult[]>(() => [], []);
+  const tabsRef = useRef<OpenDocumentTab[]>([]);
+  const nextTabIdRef = useRef(1);
 
-  const selectedFileName = selectedFilePath ? getFileName(selectedFilePath) : "";
-  const plantUmlRenderKey = selectedFilePath ? `${selectedFilePath}:${previewRevision}` : "";
-  const plantUmlDiagrams =
-    plantUmlRenderState.key === plantUmlRenderKey ? plantUmlRenderState.diagrams : emptyPlantUmlDiagrams;
-  const isPlantUmlRendering = plantUmlDiagrams.some(
-    (diagram) => !diagram.ok && diagram.error === null,
-  );
-  const isBusy = isMarkdownLoading || isPlantUmlRendering || isRecentFoldersBusy;
-  const loadingMessage = isMarkdownLoading
-    ? isPlantUmlRendering
-      ? "Loading Markdown and rendering PlantUML diagrams..."
-      : "Loading Markdown..."
-    : isPlantUmlRendering
-      ? "Rendering PlantUML diagrams..."
-      : isRecentFoldersBusy
-        ? "Updating recent folders..."
-      : null;
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
+  const isGlobalBusy = isRootLoading || isRecentFoldersBusy;
+  const errorMessage = rootOperationError ?? activeTab?.errorMessage ?? null;
+  const loadingMessage = isRootLoading
+    ? "Loading folder..."
+    : isRecentFoldersBusy
+      ? "Updating recent folders..."
+      : activeTab?.loadState === "loading"
+        ? "Loading Markdown..."
+        : activeTab?.loadState === "rendering"
+          ? "Rendering PlantUML diagrams..."
+          : null;
+
+  function updateTabs(updater: (current: OpenDocumentTab[]) => OpenDocumentTab[]) {
+    const next = updater(tabsRef.current);
+    tabsRef.current = next;
+    setTabs(next);
+  }
+
+  function updateTabIfCurrent(
+    tabId: string,
+    revision: number,
+    updater: (tab: OpenDocumentTab) => OpenDocumentTab,
+  ) {
+    updateTabs((current) =>
+      current.map((tab) => (tab.id === tabId && tab.revision === revision ? updater(tab) : tab)),
+    );
+  }
 
   async function openFolder() {
-    if (isBusy) {
+    if (isGlobalBusy) {
       return;
     }
 
-    setErrorMessage(null);
+    setRootOperationError(null);
 
     const selected = await openDialog({
       directory: true,
@@ -106,30 +126,34 @@ function App() {
   }
 
   async function loadRoot(path: string, options: { recordRecent?: boolean } = {}) {
+    setIsRootLoading(true);
+    setRootOperationError(null);
     try {
       const tree = await invoke<FileTreeNode>("scan_directory", {
         rootPath: path,
       });
       setRootPath(path);
       setFileTree(tree);
+      setIsRootLoading(false);
+      updateTabs(() => []);
+      setActiveTabId(null);
+      setPendingNavigation(null);
 
       const initialFile = findReadme(tree) ?? findFirstMarkdown(tree);
-      const recentError = options.recordRecent ? await recordRecentFolder(path) : null;
-      let markdownError: string | null = null;
       if (initialFile) {
-        markdownError = await loadMarkdown(path, initialFile.path);
-      } else {
-        setSelectedFilePath(null);
-        setSelectedMarkdown("");
-        setPreviewRevision((revision) => revision + 1);
-        setErrorMessage(null);
+        openOrActivateTab(path, initialFile.path);
       }
 
-      if (recentError && !markdownError) {
-        setErrorMessage(recentError);
+      if (options.recordRecent) {
+        const recentError = await recordRecentFolder(path);
+        if (recentError) {
+          setRootOperationError(recentError);
+        }
       }
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      setRootOperationError(toErrorMessage(error));
+    } finally {
+      setIsRootLoading(false);
     }
   }
 
@@ -147,7 +171,7 @@ function App() {
   }
 
   async function openRecentFolder(path: string) {
-    if (isBusy) {
+    if (isGlobalBusy) {
       return;
     }
 
@@ -156,7 +180,7 @@ function App() {
   }
 
   async function removeRecentFolder(path: string) {
-    if (isBusy) {
+    if (isGlobalBusy) {
       return;
     }
 
@@ -164,57 +188,147 @@ function App() {
     try {
       const entries = await invoke<RecentFolderEntry[]>("remove_recent_folder", { path });
       setRecentFolders(entries);
-      setErrorMessage(null);
+      setRootOperationError(null);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      setRootOperationError(toErrorMessage(error));
     } finally {
       setIsRecentFoldersBusy(false);
     }
   }
 
   async function reload() {
-    if (!rootPath || isBusy) {
+    if (!rootPath || isGlobalBusy) {
       return;
     }
 
+    setIsRootLoading(true);
+    setRootOperationError(null);
     try {
       const tree = await invoke<FileTreeNode>("scan_directory", {
         rootPath,
       });
       setFileTree(tree);
+      setIsRootLoading(false);
 
-      if (selectedFilePath) {
-        await loadMarkdown(rootPath, selectedFilePath);
+      if (activeTab) {
+        const revision = activeTab.revision + 1;
+        updateTabIfCurrent(activeTab.id, activeTab.revision, (tab) => ({
+          ...tab,
+          revision,
+          loadState: "loading",
+          errorMessage: null,
+        }));
+        void loadTab(activeTab.id, rootPath, activeTab.path, revision);
       }
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      setRootOperationError(toErrorMessage(error));
+    } finally {
+      setIsRootLoading(false);
     }
   }
 
-  async function loadMarkdown(currentRootPath: string, filePath: string, anchor?: string) {
-    if (isBusy) {
-      return null;
+  function openOrActivateTab(currentRootPath: string, filePath: string, anchor?: string) {
+    const existing = tabsRef.current.find((tab) => tab.path === filePath);
+    if (existing) {
+      setActiveTabId(existing.id);
+      setPendingNavigation(anchor ? { tabId: existing.id, anchor } : null);
+      return;
     }
 
-    setIsMarkdownLoading(true);
+    const tabId = `tab-${nextTabIdRef.current++}`;
+    const tab: OpenDocumentTab = {
+      id: tabId,
+      path: filePath,
+      displayName: getFileName(filePath),
+      markdown: "",
+      revision: 1,
+      loadState: "loading",
+      errorMessage: null,
+      plantUmlDiagrams: [],
+    };
+    updateTabs((current) => [...current, tab]);
+    setActiveTabId(tabId);
+    setPendingNavigation(anchor ? { tabId, anchor } : null);
+    void loadTab(tabId, currentRootPath, filePath, tab.revision);
+  }
+
+  async function loadTab(tabId: string, currentRootPath: string, filePath: string, revision: number) {
     try {
       const markdown = await invoke<string>("read_text_file", {
         rootPath: currentRootPath,
         path: filePath,
       });
-      setSelectedFilePath(filePath);
-      setSelectedMarkdown(markdown);
-      setPreviewRevision((revision) => revision + 1);
-      setPendingAnchor(anchor ?? null);
-      setErrorMessage(null);
-      return null;
+      const sources = extractPlantUmlSources(markdown);
+      const pendingDiagrams = sources.map(() => ({
+        ok: false,
+        html: `<pre class="plantuml-loading">PlantUML render pending...</pre>`,
+        error: null,
+      }));
+      updateTabIfCurrent(tabId, revision, (tab) => ({
+        ...tab,
+        markdown,
+        loadState: sources.length > 0 ? "rendering" : "ready",
+        errorMessage: null,
+        plantUmlDiagrams: pendingDiagrams,
+      }));
+
+      if (sources.length === 0) {
+        return;
+      }
+
+      try {
+        const response = await invoke<PlantUmlRenderResponse>("render_plantuml_diagrams", { sources });
+        updateTabIfCurrent(tabId, revision, (tab) => ({
+          ...tab,
+          loadState: response.firstError ? "error" : "ready",
+          errorMessage: response.firstError,
+          plantUmlDiagrams: response.diagrams,
+        }));
+      } catch (error) {
+        const message = toErrorMessage(error);
+        updateTabIfCurrent(tabId, revision, (tab) => ({
+          ...tab,
+          loadState: "error",
+          errorMessage: message,
+          plantUmlDiagrams: sources.map(() => ({
+            ok: false,
+            html: `<pre class="plantuml-error">PlantUML render failed: ${escapeHtml(message)}</pre>`,
+            error: message,
+          })),
+        }));
+      }
     } catch (error) {
       const message = toErrorMessage(error);
-      setErrorMessage(message);
-      return message;
-    } finally {
-      setIsMarkdownLoading(false);
+      updateTabIfCurrent(tabId, revision, (tab) => ({
+        ...tab,
+        loadState: "error",
+        errorMessage: message,
+      }));
     }
+  }
+
+  function activateTab(tabId: string) {
+    setActiveTabId(tabId);
+  }
+
+  function closeTab(tabId: string): string | null {
+    const current = tabsRef.current;
+    const closeIndex = current.findIndex((tab) => tab.id === tabId);
+    if (closeIndex < 0) {
+      return activeTabId;
+    }
+
+    const next = current.filter((tab) => tab.id !== tabId);
+    updateTabs(() => next);
+    setPendingNavigation((navigation) => (navigation?.tabId === tabId ? null : navigation));
+
+    if (activeTabId === tabId) {
+      const adjacent = next[closeIndex] ?? next[closeIndex - 1] ?? null;
+      setActiveTabId(adjacent?.id ?? null);
+      return adjacent?.id ?? null;
+    }
+
+    return activeTabId;
   }
 
   async function handlePreviewClick(event: React.MouseEvent<HTMLDivElement>) {
@@ -238,7 +352,7 @@ function App() {
       return;
     }
 
-    if (!rootPath || !selectedFilePath) {
+    if (!rootPath || !activeTab) {
       return;
     }
 
@@ -248,8 +362,8 @@ function App() {
     }
 
     event.preventDefault();
-    const nextPath = resolveSiblingPath(selectedFilePath, safeDecode(rawPath));
-    await loadMarkdown(rootPath, nextPath, rawAnchor ? safeDecode(rawAnchor) : undefined);
+    const nextPath = resolveSiblingPath(activeTab.path, safeDecode(rawPath));
+    openOrActivateTab(rootPath, nextPath, rawAnchor ? safeDecode(rawAnchor) : undefined);
   }
 
   useEffect(() => {
@@ -268,7 +382,7 @@ function App() {
       })
       .catch((error) => {
         if (!cancelled) {
-          setErrorMessage(toErrorMessage(error));
+          setRootOperationError(toErrorMessage(error));
         }
       })
       .finally(() => {
@@ -308,65 +422,6 @@ function App() {
   }, [activeMenu]);
 
   useEffect(() => {
-    if (!selectedFilePath) {
-      setPlantUmlRenderState({ key: "", diagrams: [] });
-      return;
-    }
-
-    const sources = extractPlantUmlSources(selectedMarkdown);
-    const renderKey = `${selectedFilePath}:${previewRevision}`;
-    if (sources.length === 0) {
-      setPlantUmlRenderState({ key: renderKey, diagrams: [] });
-      return;
-    }
-
-    let cancelled = false;
-    setPlantUmlRenderState({
-      key: renderKey,
-      diagrams: sources.map(() => ({
-        ok: false,
-        html: `<pre class="plantuml-loading">PlantUML render pending...</pre>`,
-        error: null,
-      })),
-    });
-
-    invoke<PlantUmlRenderResponse>("render_plantuml_diagrams", { sources })
-      .then((response) => {
-        if (cancelled) {
-          return;
-        }
-
-        setPlantUmlRenderState({
-          key: renderKey,
-          diagrams: response.diagrams,
-        });
-        if (response.firstError) {
-          setErrorMessage(response.firstError);
-        }
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-
-        const message = toErrorMessage(error);
-        setErrorMessage(message);
-        setPlantUmlRenderState({
-          key: renderKey,
-          diagrams: sources.map(() => ({
-            ok: false,
-            html: `<pre class="plantuml-error">PlantUML render failed: ${escapeHtml(message)}</pre>`,
-            error: message,
-          })),
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedFilePath, selectedMarkdown, previewRevision]);
-
-  useEffect(() => {
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: "strict",
@@ -374,7 +429,7 @@ function App() {
     });
 
     const container = previewRef.current;
-    if (!container) {
+    if (!container || !activeTab) {
       return;
     }
 
@@ -384,29 +439,47 @@ function App() {
     }
 
     let cancelled = false;
+    const tabId = activeTab.id;
+    const revision = activeTab.revision;
     mermaid.run({ nodes }).catch((error) => {
       if (!cancelled) {
-        setErrorMessage(`Mermaid render failed: ${toErrorMessage(error)}`);
+        updateTabIfCurrent(tabId, revision, (tab) => ({
+          ...tab,
+          loadState: "error",
+          errorMessage: `Mermaid render failed: ${toErrorMessage(error)}`,
+        }));
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [previewRevision, theme, plantUmlDiagrams]);
+  }, [activeTab?.id, activeTab?.revision, activeTab?.plantUmlDiagrams, theme]);
 
   useEffect(() => {
-    if (!pendingAnchor || !previewRef.current) {
+    if (
+      !pendingNavigation ||
+      !activeTab ||
+      activeTab.loadState === "loading" ||
+      pendingNavigation.tabId !== activeTab.id ||
+      !previewRef.current
+    ) {
       return;
     }
 
+    const tabId = activeTab.id;
+    const revision = activeTab.revision;
     const timer = window.setTimeout(() => {
-      scrollToAnchor(pendingAnchor, previewRef.current);
-      setPendingAnchor(null);
+      scrollToAnchor(pendingNavigation.anchor, previewRef.current);
+      setPendingNavigation((current) =>
+        current?.tabId === tabId && tabsRef.current.some((tab) => tab.id === tabId && tab.revision === revision)
+          ? null
+          : current,
+      );
     }, 80);
 
     return () => window.clearTimeout(timer);
-  }, [pendingAnchor, previewRevision]);
+  }, [pendingNavigation, activeTab?.id, activeTab?.revision, activeTab?.loadState]);
 
   return (
     <main className="app-shell">
@@ -414,7 +487,7 @@ function App() {
         menuBarRef={menuBarRef}
         rootPath={rootPath}
         theme={theme}
-        isBusy={isBusy}
+        isBusy={isGlobalBusy}
         activeMenu={activeMenu}
         recentFolders={recentFolders}
         onOpenFolder={openFolder}
@@ -437,35 +510,48 @@ function App() {
           {fileTree ? (
             <FileTree
               node={fileTree}
-              selectedFilePath={selectedFilePath}
-              disabled={isBusy}
-              onSelect={(node) => rootPath && loadMarkdown(rootPath, node.path)}
+              selectedFilePath={activeTab?.path ?? null}
+              disabled={isGlobalBusy}
+              onSelect={(node) => rootPath && openOrActivateTab(rootPath, node.path)}
             />
           ) : (
             <div className="empty-state">Open a folder to browse Markdown files.</div>
           )}
         </aside>
 
-        <section className="preview-pane" aria-label="Markdown Preview">
-          {selectedFilePath ? (
-            <MarkdownPreview
-              key={`${selectedFilePath}-${theme}-${previewRevision}`}
-              markdown={selectedMarkdown}
-              plantUmlDiagrams={plantUmlDiagrams}
-              selectedFilePath={selectedFilePath}
-              previewRef={previewRef}
-              onClick={handlePreviewClick}
-            />
-          ) : (
-            <div className="preview-empty">No Markdown file selected.</div>
-          )}
+        <section className="preview-workspace" aria-label="Markdown Preview">
+          <TabStrip
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onActivate={activateTab}
+            onClose={closeTab}
+          />
+          <div
+            className="preview-pane"
+            id="markdown-preview"
+            role="tabpanel"
+            aria-labelledby={activeTab ? `tab-${activeTab.id}` : undefined}
+          >
+            {activeTab ? (
+              <MarkdownPreview
+                key={`${activeTab.id}-${theme}-${activeTab.revision}`}
+                markdown={activeTab.markdown}
+                plantUmlDiagrams={activeTab.plantUmlDiagrams}
+                selectedFilePath={activeTab.path}
+                previewRef={previewRef}
+                onClick={handlePreviewClick}
+              />
+            ) : (
+              <div className="preview-empty">No Markdown file selected.</div>
+            )}
+          </div>
         </section>
       </section>
 
       {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
 
       <StatusBar
-        selectedFileName={selectedFileName}
+        selectedFileName={activeTab?.displayName ?? ""}
         loadingMessage={loadingMessage}
       />
     </main>
@@ -663,6 +749,122 @@ function StatusBarItem({ label, value, priority, live = false }: StatusBarItemPr
       <span className="status-value" aria-live={live ? "polite" : undefined}>
         {value}
       </span>
+    </div>
+  );
+}
+
+type TabStripProps = {
+  tabs: OpenDocumentTab[];
+  activeTabId: string | null;
+  onActivate: (tabId: string) => void;
+  onClose: (tabId: string) => string | null;
+};
+
+function TabStrip({ tabs, activeTabId, onActivate, onClose }: TabStripProps) {
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  useEffect(() => {
+    if (!activeTabId) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      tabRefs.current.get(activeTabId)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTabId, tabs.length]);
+
+  function focusTab(tabId: string) {
+    window.requestAnimationFrame(() => {
+      const button = tabRefs.current.get(tabId);
+      button?.focus();
+      button?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+
+  function activateAndFocus(tabId: string) {
+    onActivate(tabId);
+    focusTab(tabId);
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (tabs.length === 0) {
+      return;
+    }
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + tabs.length) % tabs.length;
+    } else if (event.key === "ArrowRight") {
+      nextIndex = (index + 1) % tabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = tabs.length - 1;
+    }
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      activateAndFocus(tabs[nextIndex].id);
+    }
+  }
+
+  function close(tabId: string) {
+    const nextFocusId = onClose(tabId);
+    if (nextFocusId) {
+      focusTab(nextFocusId);
+    }
+  }
+
+  return (
+    <div className="tab-strip" role="tablist" aria-label="Open Markdown files">
+      {tabs.map((tab, index) => {
+        const isActive = tab.id === activeTabId;
+        const stateLabel =
+          tab.loadState === "loading"
+            ? "Loading"
+            : tab.loadState === "rendering"
+              ? "Rendering"
+              : tab.loadState === "error"
+                ? "Error"
+                : null;
+        return (
+          <div className={`tab-item ${isActive ? "active" : ""} tab-${tab.loadState}`} key={tab.id}>
+            <button
+              ref={(element) => {
+                if (element) {
+                  tabRefs.current.set(tab.id, element);
+                } else {
+                  tabRefs.current.delete(tab.id);
+                }
+              }}
+              id={`tab-${tab.id}`}
+              type="button"
+              className="tab-activate"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls="markdown-preview"
+              tabIndex={isActive ? 0 : -1}
+              title={tab.path}
+              onClick={() => onActivate(tab.id)}
+              onKeyDown={(event) => handleKeyDown(event, index)}
+            >
+              <span className="tab-name">{tab.displayName}</span>
+              {stateLabel ? <span className="tab-state">{stateLabel}</span> : null}
+            </button>
+            <button
+              type="button"
+              className="tab-close"
+              aria-label={`Close ${tab.displayName}`}
+              title={`Close ${tab.displayName}`}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => close(tab.id)}
+            >
+              x
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
