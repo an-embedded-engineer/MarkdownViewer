@@ -9,9 +9,9 @@ components:
   - "markdown-viewer-tauri/src/App.tsx"
   - "markdown-viewer-tauri/src/App.css"
   - "docs/components/tauri_viewer"
-status: "active"
+status: "implemented"
 design_status: "done"
-impl_status: "in_review"
+impl_status: "done"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -21,6 +21,10 @@ related_commits:
   - "dcf409f : Phase 2 design review (conditional approval)"
   - "cd2fad4 : Phase 2 address Tauri multi-tab design review"
   - "27e7cf1 : Phase 2 approve Tauri multi-tab design (Round 2)"
+  - "e26c54d : Phase 3 implement Tauri multi-tab core"
+  - "9a92ec3 : Phase 3 implementation review (conditional approval)"
+  - "c4a6a09 : Phase 3 address Tauri multi-tab implementation review"
+  - "71a2861 : Phase 3 approve Tauri multi-tab implementation (Round 2)"
 source_todo_path: "docs/todo/todo.md#todo-2026-005-tauri-multi-tab-core-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
@@ -52,5 +56,5 @@ depends_on:
 | Phase 0 Requirements | Done (`19e2226`) |
 | Phase 1 Branch and meta | In progress |
 | Phase 2 Design review | Done (approved 2026-07-12, `27e7cf1`) |
-| Phase 3 Implementation and docs review | In review (`9a92ec3`, conditional approval) |
+| Phase 3 Implementation and docs review | Done (approved 2026-07-12, `71a2861`) |
 | Phase 4 Verification and completion | Not started |
