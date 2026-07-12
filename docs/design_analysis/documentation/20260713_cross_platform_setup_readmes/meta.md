@@ -10,8 +10,8 @@ components:
   - development_documentation
 status: draft
 design_status: done
-impl_status: draft
-completion_status: not_started
+impl_status: done
+completion_status: in_progress
 related_commits: []
 ---
 
