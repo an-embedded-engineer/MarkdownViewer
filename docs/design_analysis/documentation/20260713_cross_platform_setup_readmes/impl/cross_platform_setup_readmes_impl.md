@@ -32,7 +32,7 @@
 ```text
 git diff --check
 rg -n "npm install|WPE WebKit|WPE WebKit runtime|NativeWebView|publish_apps_with_plantuml" README.md Avalonia/MarkdownViewer.Avalonia/README.md markdown-viewer-tauri/README.md docs/setup docs/rules/development_workflow.md docs/rules/project_overview.md
-ruby による変更対象 Markdown の相対リンク存在確認
+ruby -e 'errors=[]; ARGV.each { |f| File.read(f).scan(/\[[^\]]*\]\(([^)]+)\)/).flatten.each { |href| next if href =~ /\A(?:https?:|mailto:|#)/; path=href.split("#",2).first; next if path.empty?; target=File.expand_path(path, File.dirname(f)); errors << "#{f}: #{href}" unless File.exist?(target) } }; puts(errors.empty? ? "relative links: OK (#{ARGV.size} files)" : errors.join("\n")); exit(errors.empty? ? 0 : 1)' README.md Avalonia/MarkdownViewer.Avalonia/README.md markdown-viewer-tauri/README.md docs/setup/README.md docs/setup/windows.md docs/setup/macos.md docs/setup/linux.md docs/rules/development_workflow.md docs/rules/project_overview.md docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/design/cross_platform_setup_readmes_design.md docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/impl/cross_platform_setup_readmes_impl.md
 rg -n "npm install" README.md Avalonia/MarkdownViewer.Avalonia/README.md markdown-viewer-tauri/README.md docs/setup docs/rules/development_workflow.md
 rg -n "WPE WebKit runtime libraries are required|Linux: WPE WebKit" Avalonia/MarkdownViewer.Avalonia/README.md docs/setup
 git diff --name-only --diff-filter=ACMRT

@@ -25,7 +25,7 @@
 
 ## 共通の依存復元
 
-次のコマンドは clone したリポジトリのルートで実行します。
+次のコマンドは clone したリポジトリのルートから開始し、`cd` 後は `markdown-viewer-tauri/` で `npm ci` を実行します。
 
 ```text
 dotnet restore Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj

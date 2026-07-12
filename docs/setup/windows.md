@@ -64,6 +64,10 @@ Set-Location markdown-viewer-tauri
 npm run tauri dev
 ```
 
+## PlantUML（任意）
+
+`java -version` で Java を確認し、開発時はリポジトリルートまたは各実装の runtime directory に `plantuml.jar` を配置します。jar はコミットしません。設定ファイルを使う場合を含む詳細は [共通 PlantUML 手順](README.md#plantuml任意)を参照してください。
+
 ## 5. publish / bundle
 
 Avalonia x64 self-contained publish:
