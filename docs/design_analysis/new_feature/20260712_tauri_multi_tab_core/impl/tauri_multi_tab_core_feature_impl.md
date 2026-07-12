@@ -94,12 +94,15 @@ publish済みTauriアプリで次を確認済み。
 - Reload後もactive tabが消えず、tab collectionが維持される。
 - フォルダ選択、Recent Folders、Markdown preview、Mermaid / PlantUML、相対画像、link、theme、ErrorBanner / StatusBarを含む既存機能にdegradationがない。
 
-受け入れ条件のうち、次は追加確認待ち。
+追加確認で次も問題ないことを確認済み。
 
 - active / non-active / last tab close時のselectionと未選択表示。
-- relative Markdown linkが既存tabをactivateし、未openなら新規tabを開き、anchorへscrollすること。
 - 多数tabのhorizontal overflowとArrowLeft / ArrowRight / Home / End、close後focus。
 - PlantUML描画中のtab切替 / close、および複数PlantUML文書の連続openでactive preview / errorが混線しないこと。
+
+受け入れ条件のうち、次は追加確認待ち。
+
+- relative Markdown linkが既存tabをactivateし、未openなら新規tabを開き、anchorへscrollすること。確認用に`sample_docs/multi_tab_links.md`と`sample_docs/multi_tab_link_target.md`を追加した。
 
 ## 既知制約
 
