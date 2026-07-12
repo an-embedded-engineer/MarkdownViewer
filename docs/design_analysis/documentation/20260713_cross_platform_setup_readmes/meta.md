@@ -9,8 +9,8 @@ components:
   - setup_docs
   - development_documentation
 status: draft
-design_status: in_review
-impl_status: not_started
+design_status: done
+impl_status: draft
 completion_status: not_started
 related_commits: []
 ---
