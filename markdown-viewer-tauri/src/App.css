@@ -306,6 +306,7 @@ button {
 }
 
 .explorer-pane,
+.preview-workspace,
 .preview-pane {
   min-height: 0;
   background: var(--panel-bg);
@@ -383,6 +384,99 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+}
+
+.preview-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tab-strip {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome-bg);
+  scrollbar-width: thin;
+}
+
+.tab-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  flex: 0 0 auto;
+  width: min(220px, 32vw);
+  min-width: 130px;
+  border-right: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--chrome-bg);
+}
+
+.tab-item.active {
+  color: var(--text);
+  background: var(--panel-bg);
+  box-shadow: inset 0 2px var(--accent);
+}
+
+.tab-item.tab-error {
+  box-shadow: inset 0 -2px var(--error-text);
+}
+
+.tab-activate,
+.tab-close {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+}
+
+.tab-activate {
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  padding: 7px 8px 6px 12px;
+  text-align: left;
+}
+
+.tab-activate:hover,
+.tab-close:hover {
+  background: var(--accent-soft);
+}
+
+.tab-activate:focus-visible,
+.tab-close:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tab-name,
+.tab-state {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-name {
+  font-size: 13px;
+}
+
+.tab-state {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.tab-error .tab-state {
+  color: var(--error-text);
+}
+
+.tab-close {
+  padding: 0;
+  color: var(--muted);
+  cursor: pointer;
 }
 
 .preview-pane {

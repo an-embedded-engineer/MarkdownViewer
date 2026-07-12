@@ -8,20 +8,19 @@
 | --- | --- | --- |
 | `rootPath` | 選択中フォルダ | `string \| null` |
 | `fileTree` | Explorer 用 root ノード | `FileTreeNode \| null` |
-| `selectedFilePath` | 表示中 Markdown の絶対パス | `string \| null` |
-| `selectedMarkdown` | Markdown 本文 | UTF-8 文字列 |
-| `previewRevision` | Reload / 再描画用カウンタ | 同一内容でも increment で再描画 |
+| `tabs` | open中Markdownと描画cache | `OpenDocumentTab[]`。pathはcollection内で一意 |
+| `activeTabId` | 単一preview paneが参照するtab | `string \| null` |
+| `pendingNavigation` | link先anchor | `{ tabId, anchor } \| null`。将来はpane単位へ移行 |
 | `theme` | `"light" \| "dark"` | `<html data-theme>` に反映 |
-| `errorMessage` | error strip の代表エラー表示 | Markdown / PlantUML / Mermaid 失敗の代表メッセージ |
-| `pendingAnchor` | 遷移先アンカー | 80ms 遅延でスクロール |
-| `isMarkdownLoading` | `read_text_file` 中フラグ | StatusBar の State 表示 |
+| `rootOperationError` | root / Recent Foldersの代表error | active tab errorより表示優先度が高い |
+| `isRootLoading` | root tree scan中フラグ | root collection交換操作のglobal busy |
 | `isRecentFoldersBusy` | Recent Folders command 実行中フラグ | app config JSON 読み書き中の重複操作を抑止 |
 | `recentFolders` | 最近開いた root folder 一覧 | `RecentFolderEntry[]`。app config JSON から復元 |
 | `activeMenu` | 開いている MenuBar dropdown | `"file"` / `"view"` / `null` |
-| `isBusy` | `isMarkdownLoading OR isPlantUmlRendering OR isRecentFoldersBusy` | MenuBar / Explorer を一時無効化するための aggregate busy フラグ |
-| `plantUmlRenderState` | `{ key, diagrams }` | `selectedFilePath:previewRevision` をキーに最新結果を保持 |
+| `isGlobalBusy` | `isRootLoading OR isRecentFoldersBusy` | root競合操作だけを抑止。tab activate / closeは許可 |
+| `nextTabIdRef` | tab ID採番 | close後も再利用しない単調増加counter |
 
-`previewRevision` は Markdown 本文が同一でも Reload 時に Mermaid / PlantUML を再描画するための更新番号である。
+各tabの`revision`はMarkdown本文が同一でもReload時に増加し、Mermaid / PlantUML再描画とstale async response排除に使う。active tab、error、loading表示は`tabs`と`activeTabId`から導出し、旧単一文書stateを並存させない。
 
 ## クラス / モジュール図
 
@@ -34,26 +33,30 @@ package "Frontend (src/App.tsx)" {
   class App {
     +rootPath
     +fileTree
-    +selectedFilePath
-    +selectedMarkdown
-    +previewRevision
+    +tabs
+    +activeTabId
+    +pendingNavigation
     +theme
     +recentFolders
     +activeMenu
-    +plantUmlRenderState
+    +isRootLoading
     +openFolder()
     +loadRoot(path)
     +recordRecentFolder(path)
     +openRecentFolder(path)
     +removeRecentFolder(path)
     +reload()
-    +loadMarkdown(root, file, anchor?)
+    +openOrActivateTab(root, file, anchor?)
+    +loadTab(tabId, root, file, revision)
+    +activateTab(tabId)
+    +closeTab(tabId)
     +handlePreviewClick(event)
   }
   class MenuBar
   class RootPathBar
   class FileTree
   class TreeNode
+  class TabStrip
   class MarkdownPreview
   class ErrorBanner
   class StatusBar
@@ -92,6 +95,7 @@ App --> MenuBar
 App --> RootPathBar
 App --> FileTree
 FileTree --> TreeNode
+App --> TabStrip
 App --> MarkdownPreview
 App --> ErrorBanner
 App --> StatusBar
@@ -125,15 +129,15 @@ render_plantuml_diagram --> sanitize_svg
 2. `scan_directory` command で Explorer 用ツリーを取得する。
 3. `record_recent_folder` command で選択 root を Recent Folders へ保存する。Markdown file が 1 つもない root でも、`scan_directory` が成功した directory であれば保存対象にする。
 4. `findReadme` → `findFirstMarkdown` の順で初期表示ファイルを決める。
-5. Explorer の Markdown 選択時に `read_text_file` command で本文を取得する。
+5. 初期Markdownをloading tabとして作成し、`read_text_file` commandで本文を取得する。Explorer選択も同じ`openOrActivateTab`を使い、同一pathなら既存tabをactivateする。
 6. `renderMarkdown` (`markdown-it`) で HTML 化する。fence rule で:
    - `mermaid` → `<div class="mermaid">`
    - `plantuml` / `puml` → `plantUmlDiagrams[i].html` (pending / 成功 / エラー)
    - 画像の `src` は `isRelativeResource` を満たす場合に `convertFileSrc` で asset URL に置換し、`loading="lazy"` を付ける。
    - heading は `slugify(name)` を `id` に付与する。
-7. `useEffect` が `selectedFilePath` / `selectedMarkdown` / `previewRevision` の変化を検知し、`extractPlantUmlSources` で PlantUML fence を抽出 → `render_plantuml_diagrams` を invoke。pending 中は `.plantuml-loading` プレースホルダで表示し、結果到着で `.plantuml-diagram` / `.plantuml-error` へ差し替える。
-8. 別の `useEffect` が `previewRevision` / `theme` / `plantUmlDiagrams` の変化で `mermaid.run` を実行する。`securityLevel: "strict"` を指定。
-9. `pendingAnchor` がある場合は 80ms 後に `previewRef` 内のアンカーへスクロールする。
+7. `loadTab`が`extractPlantUmlSources`でfenceを抽出し、tabへpending placeholderを設定して`render_plantuml_diagrams`をinvokeする。結果は`tabId + revision`一致時だけtab cacheへ反映する。
+8. `useEffect`がactive tab ID / revision / PlantUML結果 / themeの変化で`mermaid.run`を実行する。`securityLevel: "strict"`を指定。
+9. `pendingNavigation`のtabがactiveの場合は80ms後にanchorへscrollし、同じtab revisionを確認してclearする。
 
 ```plantuml
 @startuml
@@ -162,7 +166,7 @@ App -> Inv : invoke("read_text_file", { rootPath, path })
 Inv -> Read : command
 Read --> Inv : markdown text
 Inv --> App : markdown text
-App -> App : setSelectedMarkdown / previewRevision++
+App -> App : create tab / revision = 1
 App -> MD : renderMarkdown(markdown, path, plantUmlDiagrams)
 MD --> App : HTML
 App -> DOM : dangerouslySetInnerHTML = HTML
@@ -261,19 +265,29 @@ stop
 
 ### 再描画方針
 
-- Theme 切替だけでは `render_plantuml_diagrams` を再実行しない。invoke するのは `selectedFilePath` / `selectedMarkdown` / `previewRevision` のいずれかが変わった場合だけ。
-- PlantUML 結果待ちの図がある間は、React 側 (`isBusy` / `isPlantUmlRendering`) で StatusBar の State 欄に loading 状態を表示する。Markdown 読み込み中と PlantUML 描画中は併せて `Loading Markdown and rendering PlantUML diagrams...` を表示し、MenuBar / Explorer の操作を無効化して重複レンダリングを防ぐ。
+- Theme切替やtab activateだけでは`render_plantuml_diagrams`を再実行しない。invokeするのは新規tab読込またはactive tab Reload時だけで、結果をtab単位にcacheする。
+- PlantUML結果待ちのtabは`loadState=rendering`とし、activeの場合はStatusBarへ`Rendering PlantUML diagrams...`を表示する。別tabのactivate / close / openは許可するため複数Java processが並行し得るが、MVPでは上限・queueを設けずPhase 4で体感を確認する。
 - PlantUML の pending placeholder は `.plantuml-loading` で、最終失敗時のみ `.plantuml-error` を使う。これにより pending 状態と失敗状態が視覚的に区別される。
 
 ## ローカル画像
 
-相対画像は `resolveSiblingPath(selectedFilePath, src)` で絶対パスへ解決し、`convertFileSrc` で `asset://` URL へ変換する。`isRelativeResource` で `data:` / `file:` / `http(s)://` / `#anchor` / 絶対パスは対象外とする。
+相対画像は`resolveSiblingPath(activeTab.path, src)`で絶対パスへ解決し、`convertFileSrc`で`asset://` URLへ変換する。`isRelativeResource`で`data:` / `file:` / `http(s)://` / `#anchor` / 絶対パスは対象外とする。
+
+## Multi-tab処理
+
+- `OpenDocumentTab`は本文、revision、loadState、error、PlantUML結果を保持する。
+- 新規openは末尾へtabを追加してactivateする。同一pathは重複せず既存tabをactivateする。
+- active tab closeは右隣、なければ左隣へ移る。非active tab closeはselectionを変えない。
+- TabStripは横overflow、roving tabindex、ArrowLeft / ArrowRight / Home / Endを提供する。
+- Reloadはtree scan成功後、active tabの同じIDでrevisionを増やす。読込失敗時は直前contentを保持してerrorにする。
+- root scan成功をcommit pointとし、成功後に旧tabsを破棄する。scan失敗時は旧root / tabsを維持する。
+- async responseは`tabId + revision`でguardし、close済み、Reload前、旧rootの結果を無視する。
 
 ## リンク処理
 
 - `http(s)://` / `mailto:`: `@tauri-apps/plugin-opener` の `openUrl` で OS 既定ブラウザを開く。
 - `#anchor`: `previewRef` 内で `scrollIntoView`。
-- 相対 `.md` / `.markdown`: `resolveSiblingPath` でパス解決し、`loadMarkdown` で開く。`#anchor` 付きの場合は読み込み後 80ms 遅延でスクロール。
+- 相対 `.md` / `.markdown`: `resolveSiblingPath` でパス解決し、`openOrActivateTab`で既存tabを再利用または新規openする。`#anchor`はApp/pane-levelの`pendingNavigation`から読み込み後80msでscrollする。
 
 ## ファイル走査 (`scan_directory`)
 
