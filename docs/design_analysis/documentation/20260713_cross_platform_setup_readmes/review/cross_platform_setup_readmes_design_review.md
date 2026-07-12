@@ -1,11 +1,13 @@
 # クロスプラットフォーム環境構築・README 整備 設計レビュー
 
 **レビュー日**: 2026-07-13
+**再確認日**: 2026-07-13
 **対象ドキュメント**: `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/design/cross_platform_setup_readmes_design.md`
 **対象 meta**: `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-013
 **初回レビュー対象コミット**: `7ff0ce2 docs: design cross-platform setup documentation`
-**判定**: **条件付き承認 (Conditional Approval)**。Phase 3 進行可、ただし 1.1 / 1.2 を Phase 3 着手前に design へ反映すること。
+**再確認対象コミット**: `625d23e docs: address setup documentation design review`
+**判定**: **承認 (Approved)**。Phase 3 進行可。
 
 ---
 
@@ -132,4 +134,23 @@ npm install
 
 一方で、(1.1) `npm ci` を推す更新方針が「development_workflow.md とコマンドが一致すること」という自らの確認観点と自己矛盾しており、development_workflow.md 自体が対象文書に含まれていない点、(2.2) 既存 Avalonia README の「WPE WebKit を入れれば実行できる」という趣旨の Linux 記載を訂正する作業が対象文書一覧に明記されておらず、日本語化だけでは design 自身が禁止する誤案内が残存しかねない点の 2 点は、いずれも Phase 3 完了後に受け入れ条件「リンクと既存の開発コマンドとの整合が確認される」「Linux の制約が正しく文書化される」を壊しうる。これらは設計方針自体の転換ではなく、対象文書一覧への追記・既存記述の訂正方針の明記で解消できる規模のため、**条件付き承認**とする。Phase 3 着手前に 1.1 / 1.2 を design へ反映し、2.1 / 3.1 は Phase 3 の docs 反映時に併せて解消すればよい。
 
-未解決指摘: 1.1（development_workflow.md との npm ci/npm install 不一致）、1.2（Avalonia README Linux 記述の訂正漏れ）の 2 件。この 2 件を design へ反映した上で、再度レビュー担当 Agent に指摘対応確認を依頼すること。
+初回レビューでは、Phase 3 着手前に 1.1 (development_workflow.md との npm ci/npm install 不一致) / 1.2 (Avalonia README Linux 記述の訂正漏れ) を design へ反映することを必須条件、2.1 (meta.md components の粒度) / 3.1 (README 日本語化と language_rules.md 適用範囲) を Phase 3 docs 反映時の解消で可とする**条件付き承認**とした。
+
+### 再確認結果 (2026-07-13, commit `625d23e`)
+
+設計書 (`design/cross_platform_setup_readmes_design.md`) と `meta.md` を再確認した。
+
+- **1.1 `npm ci` 方針と development_workflow.md の不一致**: 対象文書一覧に「更新 `docs/rules/development_workflow.md`: clone 後の再現可能な依存復元コマンドを `npm ci` へ統一し、`npm install` は依存更新時に使うことを明記」(16 行) が追加された。これにより `development_workflow.md` 自体が `npm ci` を clone 直後の正本として明記する対象になり、更新方針 5 (39 行、行番号は今回の差分で 1 行ずれ) の `npm ci`/`npm install` 使い分けと、確認観点「development_workflow.md とコマンドが一致すること」が両立する構成になった。✓ 反映確認。
+- **1.2 Avalonia README の Linux 記述の訂正漏れ**: 対象文書一覧の Avalonia README 項目 (14 行) に「既存の『Linux では WPE WebKit runtime libraries が必要』という記載は、現構成の `NativeWebView` は Linux 実行をサポートしない旨へ訂正」が明記された。単なる日本語化ではなく既存記載の訂正であることが対象文書一覧のレベルで明示され、確認観点「必要パッケージを入れれば実行可能と誤案内しないこと」との矛盾が解消された。✓ 反映確認。
+- **2.1 `meta.md` components の粒度**: `components` に `setup_docs` (9 行) が追加され、`docs/setup/*` が独立コンポーネントとして追跡可能になった。✓ 反映確認。
+- **3.1 README 日本語化と language_rules.md 適用範囲**: 更新方針に 9 番目の項目「`docs/rules/language_rules.md` が日本語を明示している範囲は `docs/` 配下だが、利用者向け入口の言語を統一するため、本案件ではルートと各実装の README にも同じ日本語方針を適用する」(43 行) が追加され、既存ルールの明文を超える判断であることが design 上で自覚的に記録された。✓ 反映確認。
+
+再確認の過程で新たな自己矛盾や既存文書との齟齬は見つからなかった。
+
+**判定**: **承認 (Approved)**。
+
+- すべてのレビュー指摘 (高 2 件、低 2 件) に対応が記録され、未解決指摘はゼロ。
+- `meta.md` の `design_status` を `done` に更新可能な状態 (現状 `in_review`)。
+- Phase 3 (setup 文書新設、各 README/development_workflow.md/project_overview.md 更新) への進行を承認する。Phase 3 着手時は、本 review で確認した `npm ci`/`npm install` の使い分け、Avalonia README の Linux 記述訂正、`setup_docs` コンポーネントの追跡、README 日本語化方針をそのまま docs 反映へ反映すること。
+
+未解決指摘なし。本レビューでの承認をもって Phase 2 設計レビューを完了とする。
