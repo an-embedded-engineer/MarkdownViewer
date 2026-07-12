@@ -42,6 +42,14 @@ Phase 2承認設計に従い、Tauri frontendの単一Markdown stateを`OpenDocu
 - 設計差分なし。
 - 設計レビューRound 2で確定したroving focus、pane-level navigation、StatusBar優先順位、PlantUML並行実行の許容、非active close規則を実装へ反映した。
 
+## Phase 3レビュー反映
+
+- root errorはtab open / activateではclearせず、次のroot-wide operationまで保持するよう修正した。
+- `detail_design.md`のUI layoutをPreviewWorkspace / TabStrip / tabpanel構造へ同期した。
+- close後focus先は`App.closeTab`の戻り値を正本とし、TabStrip側の隣接選択重複を除去した。
+- tab collection更新を`updateTabs`経由へ統一し、ref / React state同期を単一helperへ閉じ込めた。
+- close buttonはactive tabだけをTab focus順に含める契約を`interface_spec.md`へ明記した。
+
 ## エラー・競合制御
 
 - root scan errorは`rootOperationError`へ置き、root / tabsをrollback不要なcommit前stateのまま維持する。

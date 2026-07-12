@@ -386,8 +386,11 @@ Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し
     <aside.explorer-pane>
       <FileTree/>      ← 再帰 TreeNode、Markdown / Image / Directory アイコン
     </aside>
-    <section.preview-pane>
-      <MarkdownPreview/> dangerouslySetInnerHTML
+    <section.preview-workspace>
+      <TabStrip/>        ← horizontal overflow / activate / close / roving focus
+      <div#markdown-preview.preview-pane role="tabpanel">
+        <MarkdownPreview/> dangerouslySetInnerHTML
+      </div>
     </section>
   </section>
   <ErrorBanner/>       ← 代表 error。エラー発生時のみ表示
@@ -397,7 +400,7 @@ Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し
 
 `MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload` を持ち、`View` dropdown は theme 切替を持つ。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
 
-`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
+`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`TabStrip` は PreviewWorkspace 上段でopen中Markdownを表示し、下段の単一`tabpanel`がactive tabを描画する。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
 
 `html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠には縦スクロールバーを出さない。スクロールは `.explorer-pane` と `.preview-pane` の `overflow: auto` に限定し、MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。`ErrorBanner` は条件付き描画のため、chrome 要素は CSS grid の自動配置に依存せず、`grid-row` で MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の行を明示する。
 

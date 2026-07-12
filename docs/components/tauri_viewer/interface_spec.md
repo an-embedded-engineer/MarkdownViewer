@@ -32,6 +32,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - 同一root内でopenしたMarkdownをopen順に表示する。同一pathのtabは重複作成しない。
 - active / Loading / Rendering / Errorを表示し、長いfile nameはellipsis、absolute pathは`title`で確認できる。
 - 多数tabは横scrollで到達可能にする。`role="tablist"` / `role="tab"` とroving tabindexを使う。
+- activate buttonとactive tabのclose buttonだけをTabキーのfocus順に含める。非active tabをcloseする場合は、先に矢印キーでactivateしてからclose buttonへ移動する。
 - tab永続化、reorder、pin、split viewは対象外。
 
 ## Error Strip 表示

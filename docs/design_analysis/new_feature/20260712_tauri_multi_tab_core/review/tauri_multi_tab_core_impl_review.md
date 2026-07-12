@@ -198,3 +198,19 @@ WBS (`wbs.md` WP-003) の `completion_criteria` とも齟齬なし。ただし�
 **条件付き承認**とする。Phase 4（ユーザ動作確認）着手前に 1.1（`rootOperationError` の clear 条件修正）を実装へ反映することを必須条件とし、2.1（`detail_design.md` の UI レイアウト図更新）もあわせて解消した上で Phase 4 に進めること。3.1 / 3.2 / 3.3 は Phase 4 の手動確認と合わせて解消するか、follow-up として記録すればよい。
 
 未対応指摘: 1.1 (Medium), 2.1 (Medium), 3.1 (Low), 3.2 (Low), 3.3 (Low)。
+
+---
+
+## 9. Round 1 指摘対応
+
+対応工程: `impl`
+
+| 指摘 | 重大度 | 対応 | ステータス |
+| --- | --- | --- | --- |
+| 1.1 root error clear条件 | Medium | `openOrActivateTab` / `activateTab`から`setRootOperationError(null)`を削除し、root-wide operation開始時だけclearする承認設計へ一致させた。 | 対応済み・再確認待ち |
+| 2.1 detail design UI図 | Medium | PreviewWorkspace内にTabStripと`role="tabpanel"`のpreview paneを持つ現在DOMへ図と説明を更新した。 | 対応済み・再確認待ち |
+| 3.1 close後focusロジック重複 | Low | `App.closeTab`が次のactive tab IDを返し、TabStripはその戻り値だけをfocusする構造へ統合した。 | 対応済み・再確認待ち |
+| 3.2 `updateTabs`再利用 | Low | root reset、新規tab追加、closeの3箇所を`updateTabs`経由へ統一した。 | 対応済み・再確認待ち |
+| 3.3 close buttonのfocus範囲 | Low | active tabのclose buttonだけを`tabIndex=0`、非activeを`-1`とし、keyboard操作契約を`interface_spec.md`へ明記した。 | 対応済み・再確認待ち |
+
+未解決事項: なし。Claude reviewerのfollow-up承認待ち。

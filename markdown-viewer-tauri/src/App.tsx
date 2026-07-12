@@ -135,8 +135,7 @@ function App() {
       setRootPath(path);
       setFileTree(tree);
       setIsRootLoading(false);
-      tabsRef.current = [];
-      setTabs([]);
+      updateTabs(() => []);
       setActiveTabId(null);
       setPendingNavigation(null);
 
@@ -229,7 +228,6 @@ function App() {
   }
 
   function openOrActivateTab(currentRootPath: string, filePath: string, anchor?: string) {
-    setRootOperationError(null);
     const existing = tabsRef.current.find((tab) => tab.path === filePath);
     if (existing) {
       setActiveTabId(existing.id);
@@ -248,8 +246,7 @@ function App() {
       errorMessage: null,
       plantUmlDiagrams: [],
     };
-    tabsRef.current = [...tabsRef.current, tab];
-    setTabs(tabsRef.current);
+    updateTabs((current) => [...current, tab]);
     setActiveTabId(tabId);
     setPendingNavigation(anchor ? { tabId, anchor } : null);
     void loadTab(tabId, currentRootPath, filePath, tab.revision);
@@ -312,25 +309,26 @@ function App() {
 
   function activateTab(tabId: string) {
     setActiveTabId(tabId);
-    setRootOperationError(null);
   }
 
-  function closeTab(tabId: string) {
+  function closeTab(tabId: string): string | null {
     const current = tabsRef.current;
     const closeIndex = current.findIndex((tab) => tab.id === tabId);
     if (closeIndex < 0) {
-      return;
+      return activeTabId;
     }
 
     const next = current.filter((tab) => tab.id !== tabId);
-    tabsRef.current = next;
-    setTabs(next);
+    updateTabs(() => next);
     setPendingNavigation((navigation) => (navigation?.tabId === tabId ? null : navigation));
 
     if (activeTabId === tabId) {
       const adjacent = next[closeIndex] ?? next[closeIndex - 1] ?? null;
       setActiveTabId(adjacent?.id ?? null);
+      return adjacent?.id ?? null;
     }
+
+    return activeTabId;
   }
 
   async function handlePreviewClick(event: React.MouseEvent<HTMLDivElement>) {
@@ -759,7 +757,7 @@ type TabStripProps = {
   tabs: OpenDocumentTab[];
   activeTabId: string | null;
   onActivate: (tabId: string) => void;
-  onClose: (tabId: string) => void;
+  onClose: (tabId: string) => string | null;
 };
 
 function TabStrip({ tabs, activeTabId, onActivate, onClose }: TabStripProps) {
@@ -811,12 +809,8 @@ function TabStrip({ tabs, activeTabId, onActivate, onClose }: TabStripProps) {
     }
   }
 
-  function close(tabId: string, index: number) {
-    const wasActive = tabId === activeTabId;
-    const nextFocusId = wasActive
-      ? (tabs[index + 1]?.id ?? tabs[index - 1]?.id ?? null)
-      : (activeTabId ?? null);
-    onClose(tabId);
+  function close(tabId: string) {
+    const nextFocusId = onClose(tabId);
     if (nextFocusId) {
       focusTab(nextFocusId);
     }
@@ -863,7 +857,8 @@ function TabStrip({ tabs, activeTabId, onActivate, onClose }: TabStripProps) {
               className="tab-close"
               aria-label={`Close ${tab.displayName}`}
               title={`Close ${tab.displayName}`}
-              onClick={() => close(tab.id, index)}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => close(tab.id)}
             >
               x
             </button>
