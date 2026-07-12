@@ -1,0 +1,1 @@
+`docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/prompts/phase2_design_review_initial_claude.md` を読んで、レビューを開始してください。
