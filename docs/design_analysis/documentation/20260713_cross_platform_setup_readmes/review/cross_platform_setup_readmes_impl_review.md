@@ -8,7 +8,8 @@
 **対象 design**: `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/design/cross_platform_setup_readmes_design.md`（承認済み、`review/cross_platform_setup_readmes_design_review.md` で Approved）
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-013
 **初回レビュー対象コミット**: `f3b38a1 docs: add cross-platform setup and readme navigation`
-**再確認対象コミット**: `4d0baa3 docs: address cross-platform setup implementation review`
+**再確認対象コミット (1回目)**: `4d0baa3 docs: address cross-platform setup implementation review`
+**再確認対象コミット (2回目)**: `8f5a22e docs: clarify PlantUML runtime directories`
 **判定**: **承認 (Approved)**。Phase 4 進行可。
 
 ---
@@ -176,4 +177,20 @@ ruby による変更対象 Markdown の相対リンク存在確認
 - `meta.md` の `impl_status` を `done` に更新可能な状態 (現状 `draft`)。
 - Phase 4 (文書最終確認、`change_report.md` 作成、TODO archive、history 反映) への進行を承認する。
 
-未解決の必須指摘なし。本レビューでの承認をもって Phase 3 実装レビューを完了とする。
+1 回目の再確認では、必須指摘 3 件がすべて反映済みであることを確認し承認としたが、その過程で把握した改善提案 3.1（Windows/macOS の PlantUML 節が Avalonia/Tauri の探索先を書き分けていない）は非ブロッキングの Low として記録し、次回の docs 更新時の解消を推奨するに留めていた。
+
+### 再確認結果 (2回目, 2026-07-13, commit `8f5a22e`)
+
+`docs/setup/README.md`・`windows.md`・`macos.md`・`impl/cross_platform_setup_readmes_impl.md` を再確認した。
+
+- **3.1 Windows/macOS の PlantUML 節が Avalonia/Tauri を書き分けていない**: `docs/setup/README.md` の共通 PlantUML 節が「開発時は実装ごとに次のいずれかを使用します」に修正され、「Avalonia: リポジトリルートから `dotnet run` する場合はリポジトリルート、または実行 assembly の directory」「Tauri: `markdown-viewer-tauri/src-tauri/`、Tauri process の current working directory、または Rust 実行ファイルの directory」と実装別に列挙された。`windows.md` / `macos.md` の「PlantUML（任意）」節も同様に「Avalonia はリポジトリルートから `dotnet run` する場合はリポジトリルート、Tauri は `markdown-viewer-tauri/src-tauri/`、Tauri process の current working directory、または Rust 実行ファイルの directory」と書き分けられた。Tauri 側の記載は `markdown-viewer-tauri/src-tauri/lib.rs` の `plantuml_runtime_directories`（`CARGO_MANIFEST_DIR`/`current_dir`/実行ファイル directory）と、Avalonia 側の記載は `PlantUmlRuntimeResolver.cs` の `GetRuntimeDirectories`（`GetCurrentDirectory`/`AppContext.BaseDirectory`）と一致する。`linux.md` は元々この区別ができていたため変更されておらず、これで `windows.md`/`macos.md`/`linux.md`/`docs/setup/README.md` の 4 文書間で表現が揃った。`impl/cross_platform_setup_readmes_impl.md` の「リンク・索引・参照元・archive・履歴の整合」節にも「PlantUML の開発時配置先は…実装別に記載した」という一文が追加され、この区別が意図的な判断であることが記録された。✓ 反映確認。
+
+相対リンクの実在確認を再実行し、`relative links: OK (9 files)`（終了コード 0）を確認した。新たな齟齬は見つからなかった。
+
+**判定**: **承認 (Approved)**。
+
+- 初回レビューの必須指摘 1.1 / 2.1 / 2.2、および 1 回目の再確認で記録した改善提案 3.1 のいずれも反映され、未解決の指摘（必須・改善提案とも）はゼロ。
+- `meta.md` の `impl_status` を `done` に更新可能な状態 (現状 `draft`)。
+- Phase 4 (文書最終確認、`change_report.md` 作成、TODO archive、history 反映) への進行を承認する。
+
+未解決指摘なし。本レビューでの承認をもって Phase 3 実装レビューを完了とする。
