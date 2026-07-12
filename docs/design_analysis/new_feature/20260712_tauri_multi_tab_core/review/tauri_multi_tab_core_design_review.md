@@ -1,12 +1,14 @@
 # Tauri Multi-tab core 導入 設計レビュー
 
 **レビュー日**: 2026-07-12
+**再確認日**: 2026-07-12
 **対象ドキュメント**: `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/design/tauri_multi_tab_core_feature_design.md`
 **対象 meta**: `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-005
 **対象 WBS**: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md` WP-003
-**レビュー対象コミット**: `24c0d4a Phase 2 draft Tauri multi-tab design`
-**判定**: **条件付き承認 (Conditional Approval)**。指摘 1.1 を設計書へ反映後、Phase 3 進行可。
+**初回レビュー対象コミット**: `24c0d4a Phase 2 draft Tauri multi-tab design`
+**再確認対象コミット**: `cd2fad4 Phase 2 address Tauri multi-tab design review`
+**判定**: **承認 (Approved)**。Phase 3 進行可（詳細は「10. Round 2 再確認結果」参照）。
 
 ---
 
@@ -207,3 +209,25 @@ WBS (`wbs.md` WP-003) の `completion_criteria` とも齟齬なし。`deferred_o
 | 3.2 非active tab close | Low | 非active tab closeでは`activeTabId`を変更せず、隣接選択はactive tab close時だけ行うと明記した。 | 対応済み・再確認待ち |
 
 未解決事項: なし。Claude reviewerのfollow-up承認待ち。
+
+---
+
+## 10. Round 2 再確認結果 (2026-07-12, commit `cd2fad4`)
+
+設計書 (`design/tauri_multi_tab_core_feature_design.md`) と `meta.md` の `dcf409f`→`cd2fad4` 差分を確認した。
+
+- **1.1 TabStrip の ARIA role と Arrow key roving focus の自己矛盾 (High)**: 推奨対応 (b) が採用された。「対象範囲と非対象」(design 44 行) から「Arrow key による tab roving focus」が削除され、`role="tablist"` / `role="tab"` の記載 (design 173 行) に「active tab だけを `tabIndex=0`、他を `tabIndex=-1` とする roving tabindex を採用する」が追記された。さらに `ArrowLeft` / `ArrowRight`（端で先頭/末尾へ循環）、`Home` / `End`、close 後の focus 移動先 (design 174 行) が明記され、WAI-ARIA Tabs パターンが要求する複合ウィジェット挙動と `role="tablist"` / `role="tab"` の採用が整合した。「テスト・ユーザ確認観点」10. (design 278 行) にも roving focus / selection の手動確認が追加されている。✓ 反映確認、自己矛盾は解消。
+- **1.2 `pendingAnchor` の tab 配置が split view 方針と不整合 (Medium)**: 推奨対応 (a) が採用された。`pendingAnchor` は `OpenDocumentTab` 型から削除され (design 103-108 行)、新設された `PendingNavigation = { tabId: string; anchor: string }` 型として `App` 直下の `pendingNavigation` state (design 120, 124 行) へ移動した。「Mermaid・PlantUML・anchor」(design 220 行) も `pendingNavigation` を参照するよう更新され、「target tab の active preview 描画後に scroll し、同じ `tabId + revision` を guard してclearする。対象 tab がcloseされた場合はclearする」という close 時の扱いも新規に追記されている。「後続 split view では各 pane state が同じ形の navigation を持つ」(design 120 行) と split view への移行方針も明記された。設計書全体を検索したが `pendingAnchor` の残存記載はない。✓ 反映確認、「tab自体へpane固有状態を埋め込まない」方針との矛盾は解消。
+- **2.1 StatusBar `State` の優先順位未規定 (Medium)**: 「UI設計」(design 184-192 行) に `isRootLoading` > `isRecentFoldersBusy` > active tab `loading` > active tab `rendering` > `Ready` の優先順位と表示文言（`Loading folder...` / `Updating recent folders...` / `Loading Markdown...` / `Rendering PlantUML diagrams...` / `Ready`）が明記された。Reload 時に `Loading folder...` → `Loading Markdown...` へ遷移する旨、root operation と tab load を意図的に並行開始しない旨も追記されている。✓ 反映確認。`interface_spec.md` への反映は Phase 3 docs 反映で行う。
+- **3.1 PlantUML 並行レンダリングの影響未検討 (Low)**: 「リスクとfollow-up」(design 288 行) に、busy gate 緩和により複数 tab の `render_plantuml_diagrams` と Java process が並行実行され得ること、今回は上限・直列 queue を実測根拠がないため導入しないこと、Phase 4 で複数 PlantUML 文書の連続 open を確認し問題があれば follow-up 化する方針が追記された。「テスト・ユーザ確認観点」8. (design 276 行) にも該当確認手順が追加されている。✓ 反映確認。
+- **3.2 非 active tab close 時の挙動明文化不足 (Low)**: 「責務分割と共通化方針」`closeTab` (design 139 行) が「closed tab が active の場合だけ右隣、なければ左隣を選び、非 active tab を閉じた場合は `activeTabId` を変更しない」と明文化された。✓ 反映確認。
+
+再確認の過程で新たな齟齬・記載漏れは見つからなかった。`meta.md` は `design_status: in_review` (dcf409f, conditional approval) に更新済みで、Phase Status 表にも反映されている。
+
+**判定**: **承認 (Approved)**。
+
+- Round 1 の指摘（高 1 件、中 2 件、低 2 件）すべてに対応が確認され、未解決指摘はゼロ。
+- `meta.md` の `design_status` を `done` へ更新可能な状態（現状 `in_review`）。実装 Agent が Phase 3 着手時に `done` へ更新し、コミットすること。
+- Phase 3（実装・恒久ドキュメント反映）への進行を承認する。Phase 3 着手時は、本 Round 2 で確認した roving tabindex + 矢印キー仕様、`pendingNavigation` の App/pane-level 配置、StatusBar `State` 優先順位、PlantUML 並行実行のリスク許容方針、非 active tab close の挙動を、実装および `docs/components/tauri_viewer/*` の恒久ドキュメント反映へそのまま引き継ぐこと。特に `interface_spec.md` の `State` 値一覧（現行 5 パターン）は、新しい優先順位・文言に合わせて更新すること。
+
+未解決指摘なし。本レビューでの承認をもって Phase 2 設計レビューを完了とする。
