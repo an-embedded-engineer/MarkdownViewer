@@ -1,13 +1,15 @@
 # クロスプラットフォーム環境構築・README 整備 実装レビュー
 
 **レビュー日**: 2026-07-13
+**再確認日**: 2026-07-13
 **対象文書**: `README.md`、`docs/setup/{README,windows,macos,linux}.md`、`Avalonia/MarkdownViewer.Avalonia/README.md`、`markdown-viewer-tauri/README.md`、`docs/rules/development_workflow.md`、`docs/rules/project_overview.md`
 **対象 impl**: `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/impl/cross_platform_setup_readmes_impl.md`
 **対象 meta**: `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/meta.md`
 **対象 design**: `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/design/cross_platform_setup_readmes_design.md`（承認済み、`review/cross_platform_setup_readmes_design_review.md` で Approved）
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-013
-**レビュー対象コミット**: `f3b38a1 docs: add cross-platform setup and readme navigation`
-**判定**: **条件付き承認 (Conditional Approval)**。Phase 4 進行可、ただし 1.1 を Phase 4 着手前に修正すること。
+**初回レビュー対象コミット**: `f3b38a1 docs: add cross-platform setup and readme navigation`
+**再確認対象コミット**: `4d0baa3 docs: address cross-platform setup implementation review`
+**判定**: **承認 (Approved)**。Phase 4 進行可。
 
 ---
 
@@ -88,7 +90,15 @@ ruby による変更対象 Markdown の相対リンク存在確認
 
 ## 3. 改善提案
 
-なし。
+### 3.1 Windows/macOS の PlantUML 節が「リポジトリルート」を Tauri dev 実行にも有効であるかのように読める
+
+**該当箇所**: 再確認対象コミットで追加された `windows.md` / `macos.md` の「PlantUML（任意）」節は「開発時はリポジトリルートまたは各実装の runtime directory に `plantuml.jar` を配置します」と記載する。Avalonia は `dotnet run` をリポジトリルートで実行するため `Directory.GetCurrentDirectory()`（`Avalonia/MarkdownViewer.Avalonia/Services/PlantUmlRuntimeResolver.cs` の `GetRuntimeDirectories`）がリポジトリルートに一致し、この記載は正しい。一方 Tauri 側の探索順（`markdown-viewer-tauri/src-tauri/lib.rs` の `plantuml_runtime_directories`）は `CARGO_MANIFEST_DIR`（debug ビルド時、`src-tauri` 固定）、`std::env::current_dir()`、実行ファイル directory のみであり、各文書が指示する `cd markdown-viewer-tauri && npm run tauri dev` の実行時 cwd はリポジトリルートにならないため、リポジトリルートへの配置は Tauri 側では拾われない可能性が高い。`linux.md` の同節は「`markdown-viewer-tauri/src-tauri/`、current working directory、または Rust 実行ファイルの directory」とだけ記載しており、この点は正確に書き分けられている。
+
+**差異**: Windows/macOS の記載は Avalonia と Tauri を区別せず「リポジトリルート」を共通の有効な配置先として提示しており、Tauri のみを使う利用者がリポジトリルートに jar を置いて動作しないケースを生みうる。ただし、この表現は今回の修正で新規に追加されたものというより、既に Approved 済みの `docs/setup/README.md` の PlantUML 節が持っていた同種の表現（「リポジトリルートに `plantuml.jar` を置く」という選択肢）を踏襲したものであり、実行時の cwd 挙動（特に `npm run tauri dev` 経由で起動する Rust プロセスの実際の cwd）は静的なコード確認だけでは断定できない部分もある。
+
+**推奨対応**: `windows.md` / `macos.md` の PlantUML 節を、`linux.md` と同様に Avalonia 実行時のリポジトリルートと Tauri 実行時の runtime directory を書き分けるか、実際に `npm run tauri dev` 実行時の cwd を一度手動確認した上で表現を確定する。
+
+**severity**: Low（ブロッキングではない。実行時 cwd の挙動確認が必要なため、次回の docs 更新または手動確認のタイミングでの見直しを推奨する）
 
 ---
 
@@ -147,4 +157,23 @@ ruby による変更対象 Markdown の相対リンク存在確認
 
 いずれも設計方針の転換を要する欠陥ではなく、文言修正・節追加・記録整備で解消できる規模のため、**条件付き承認**とする。Phase 4 の文書最終確認前に 1.1 を修正し、2.1 / 2.2 は Phase 4 完了処理までに解消すればよい。
 
-未解決指摘: 1.1（ルート実行基準の矛盾、中）、2.1（PlantUML 節の欠落・参照不揃い、中）、2.2（impl.md の実行不能な検証コマンド行、低）の 3 件。対応後、再度レビュー担当 Agent に指摘対応確認を依頼すること。
+初回レビューでは、Phase 4 着手前に 1.1 (ルート実行基準の矛盾) を修正することを必須条件、2.1 (PlantUML 節の欠落・参照不揃い) / 2.2 (impl.md の実行不能な検証コマンド行) を Phase 4 完了処理までの解消で可とする**条件付き承認**とした。
+
+### 再確認結果 (2026-07-13, commit `4d0baa3`)
+
+`README.md`、`docs/setup/{README,windows,macos,linux}.md`、`impl/cross_platform_setup_readmes_impl.md` を再確認した。
+
+- **1.1 ルート実行基準の矛盾**: `README.md` が「セットアップ後の最小確認コマンドは次のとおりです。リポジトリルートから開始し、`cd` がある場合は移動後の directory で後続コマンドを実行します。」に、`docs/setup/README.md` が「次のコマンドは clone したリポジトリのルートから開始し、`cd` 後は `markdown-viewer-tauri/` で `npm ci` を実行します。」に修正された。いずれも直後のコマンド列（`cd markdown-viewer-tauri` を含む）と矛盾しない表現になり、`windows.md`/`macos.md`/`linux.md` の「明記がない限りリポジトリルートで実行します」という表現と整合する。✓ 反映確認。
+- **2.1 PlantUML 節の欠落・参照不揃い**: `windows.md`・`macos.md`・`linux.md` の「4. 実行」と「5. publish / bundle」の間に、それぞれ独立した「PlantUML（任意）」節が追加され、`docs/setup/README.md#plantuml任意` への参照が 3 文書で揃った。`linux.md` は Tauri の runtime directory 探索順（`markdown-viewer-tauri/src-tauri/`、current working directory、Rust 実行ファイルの directory）を正確に反映している。✓ 反映確認（Windows/macOS の記載精度について 3.1 を新規記録、ブロッキングではない）。
+- **2.2 impl.md の実行不能な検証コマンド行**: 「文書検証コマンド」の該当行が、相対リンクの実在確認を行う実行可能な Ruby one-liner に置き換えられた。本レビューで実際にこのコマンドをそのまま実行し、`relative links: OK (11 files)`（終了コード 0）を確認した。✓ 反映確認、かつ実行結果も妥当。
+
+再確認の過程で、`windows.md`/`macos.md` の新設 PlantUML 節が Tauri の実行時ディレクトリ探索順と完全には一致しない可能性がある点を新たに把握したが（3.1、Low、非ブロッキング）、これは Approved 済みの `docs/setup/README.md` が元々持っていた表現を踏襲したものであり、実行時 cwd の確定には手動確認を要するため、今回の承認判定はブロックしない。
+
+**判定**: **承認 (Approved)**。
+
+- 初回レビューの必須指摘 1.1、および完了処理までの解消で可としていた 2.1 / 2.2 のいずれも反映され、未解決の必須指摘はゼロ。
+- 3.1 は改善提案（Low、非ブロッキング）として記録し、次回の docs 更新または手動確認の機会に見直すことを推奨する。
+- `meta.md` の `impl_status` を `done` に更新可能な状態 (現状 `draft`)。
+- Phase 4 (文書最終確認、`change_report.md` 作成、TODO archive、history 反映) への進行を承認する。
+
+未解決の必須指摘なし。本レビューでの承認をもって Phase 3 実装レビューを完了とする。
