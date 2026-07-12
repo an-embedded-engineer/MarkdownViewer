@@ -100,9 +100,14 @@ publish済みTauriアプリで次を確認済み。
 - 多数tabのhorizontal overflowとArrowLeft / ArrowRight / Home / End、close後focus。
 - PlantUML描画中のtab切替 / close、および複数PlantUML文書の連続openでactive preview / errorが混線しないこと。
 
-受け入れ条件のうち、次は追加確認待ち。
+追加した`sample_docs/multi_tab_links.md`と`sample_docs/multi_tab_link_target.md`を使い、relative Markdown linkについて次も確認済み。
 
-- relative Markdown linkが既存tabをactivateし、未openなら新規tabを開き、anchorへscrollすること。確認用に`sample_docs/multi_tab_links.md`と`sample_docs/multi_tab_link_target.md`を追加した。
+- targetがopen済みの場合は既存tabをactivateし、tabを重複作成しない。
+- targetが未openの場合は新規tabを開く。
+- target tabの指定anchorへscrollする。
+- 同一文書anchorでは新規tabを作成せずにscrollする。
+
+以上によりPhase 4-aのユーザー動作確認は全項目OK。
 
 ## 既知制約
 
