@@ -1,5 +1,16 @@
 # TODO
 
+## TODO-2026-013 クロスプラットフォーム環境構築・README 整備
+
+- status: in_progress
+- workflow: documentation
+- summary: clone 直後から Windows / macOS / Linux で開発を開始するための環境構築手順と、ルートおよび各実装 README の導線を整備する。
+- completion:
+  - Windows / macOS / Linux の前提ツール、clone、restore/install、build、実行手順が文書化される。
+  - Avalonia / Tauri の publish 手順と OS・実装ごとの制約が文書化される。
+  - ルート README から各実装と環境構築へ、各実装 README から環境構築・実行・publish へ遷移できる。
+  - リンクと既存の開発コマンドとの整合が確認される。
+
 ## TODO-2026-006 Tauri Split view 導入
 
 - status: open
