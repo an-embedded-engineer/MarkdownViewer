@@ -6,6 +6,7 @@ components:
   - root_readme
   - avalonia_readme
   - tauri_readme
+  - setup_docs
   - development_documentation
 status: draft
 design_status: in_review

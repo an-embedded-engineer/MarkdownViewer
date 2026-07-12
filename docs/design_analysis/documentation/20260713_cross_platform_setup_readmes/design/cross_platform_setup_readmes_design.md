@@ -11,8 +11,9 @@
 - 新規 `docs/setup/windows.md`: Windows の前提ツール、clone、セットアップ、build、実行、publish
 - 新規 `docs/setup/macos.md`: macOS の前提ツール、clone、セットアップ、build、実行、publish
 - 新規 `docs/setup/linux.md`: Linux の前提ツール、clone、セットアップ、build、実行、publish、Avalonia 制約
-- 更新 `Avalonia/MarkdownViewer.Avalonia/README.md`: 日本語化し、環境構築、実行、publish への導線を追加
+- 更新 `Avalonia/MarkdownViewer.Avalonia/README.md`: 日本語化し、環境構築、実行、publish への導線を追加。既存の「Linux では WPE WebKit runtime libraries が必要」という記載は、現構成の `NativeWebView` は Linux 実行をサポートしない旨へ訂正
 - 更新 `markdown-viewer-tauri/README.md`: 日本語化し、環境構築、実行、publish への導線を追加
+- 更新 `docs/rules/development_workflow.md`: clone 後の再現可能な依存復元コマンドを `npm ci` へ統一し、`npm install` は依存更新時に使うことを明記
 - 更新 `docs/rules/project_overview.md`: 利用者向け入口を追加
 - workflow 成果物、TODO archive
 
@@ -39,6 +40,7 @@
 6. publish は原則として対象 OS 上で行う。macOS 専用の統合スクリプトと、各実装の標準 CLI による OS 別 publish を区別する。
 7. Avalonia 版は `NativeWebView` を使用しており、現構成の Linux 実行はサポート対象外であることを明記する。Linux では Tauri 版の手順を提供し、Avalonia は restore/build 可否と実行対応を混同しない。
 8. PlantUML は任意機能として Java と `plantuml.jar` の配置方法を案内し、jar をコミットしない運用を維持する。
+9. `docs/rules/language_rules.md` が日本語を明示している範囲は `docs/` 配下だが、利用者向け入口の言語を統一するため、本案件ではルートと各実装の README にも同じ日本語方針を適用する。
 
 ## 削除・統合・移動・archive
 
