@@ -191,3 +191,19 @@ WBS (`wbs.md` WP-003) の `completion_criteria` とも齟齬なし。`deferred_o
 **条件付き承認**とする。Phase 3 着手前に 1.1（TabStrip の role 選択と非対象記載の整合）を設計書へ反映することを必須条件とし、1.2 / 2.1 も可能な限り設計書側で確定させた上で Phase 3 に進めること。3.1 / 3.2 は Phase 3 の実装・docs 反映と合わせて解消してよい。
 
 未対応指摘: 1.1 (High), 1.2 (Medium), 2.1 (Medium), 3.1 (Low), 3.2 (Low)。
+
+---
+
+## 9. Round 1 指摘対応
+
+対応工程: `design`
+
+| 指摘 | 重大度 | 対応 | ステータス |
+| --- | --- | --- | --- |
+| 1.1 TabStrip ARIA role と roving focus | High | 案(b)を採用。`role="tablist"` / `role="tab"` を維持し、roving tabindex、ArrowLeft / ArrowRight / Home / End、close後focusを最小提供範囲へ追加した。Arrow key navigationをnon-scopeから削除し、手動確認へ追加した。 | 対応済み・再確認待ち |
+| 1.2 `pendingAnchor` の配置 | Medium | `OpenDocumentTab` から削除し、App / pane-levelの `pendingNavigation: { tabId, anchor } | null` へ移した。後続split viewではpaneごとに保持する移行方針を明記した。 | 対応済み・再確認待ち |
+| 2.1 StatusBar `State` 優先順位 | Medium | `isRootLoading`、`isRecentFoldersBusy`、active tab loading、active tab rendering、Readyの順序と表示文言を確定した。Reload時の状態遷移も明記した。 | 対応済み・再確認待ち |
+| 3.1 PlantUML並行render | Low | Java processがtab単位で並行し得ること、今回は上限・queueを設けない判断、Phase 4の連続open確認と問題発生時のfollow-up方針を追記した。 | 対応済み・再確認待ち |
+| 3.2 非active tab close | Low | 非active tab closeでは`activeTabId`を変更せず、隣接選択はactive tab close時だけ行うと明記した。 | 対応済み・再確認待ち |
+
+未解決事項: なし。Claude reviewerのfollow-up承認待ち。

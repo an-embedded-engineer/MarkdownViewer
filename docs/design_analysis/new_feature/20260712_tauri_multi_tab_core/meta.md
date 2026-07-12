@@ -10,7 +10,7 @@ components:
   - "markdown-viewer-tauri/src/App.css"
   - "docs/components/tauri_viewer"
 status: "active"
-design_status: "draft"
+design_status: "in_review"
 impl_status: "not_started"
 completion_status: "not_started"
 verification_status: "not_started"
@@ -46,6 +46,6 @@ depends_on:
 | --- | --- |
 | Phase 0 Requirements | Done (`19e2226`) |
 | Phase 1 Branch and meta | In progress |
-| Phase 2 Design review | Draft |
+| Phase 2 Design review | In review (`dcf409f`, conditional approval) |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4 Verification and completion | Not started |

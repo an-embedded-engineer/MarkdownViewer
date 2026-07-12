@@ -41,7 +41,7 @@
 - タブ永続化、再起動復元、pin、reorder、drag and drop、編集、未保存状態、close confirmation。
 - root 外 Markdown、3ペイン以上、Avalonia multi-tab。
 - Rust command の新設・変更。既存 command 契約をそのまま利用する。
-- tab ごとのスクロール位置保存と Arrow key による tab roving focus。必要なら UX 評価後に follow-up とする。
+- tab ごとのスクロール位置保存。必要なら UX 評価後に follow-up とする。
 
 ## 最小提供範囲と後続拡張
 
@@ -103,8 +103,12 @@ type OpenDocumentTab = {
   revision: number;
   loadState: TabLoadState;
   errorMessage: string | null;
-  pendingAnchor: string | null;
   plantUmlDiagrams: PlantUmlDiagramResult[];
+};
+
+type PendingNavigation = {
+  tabId: string;
+  anchor: string;
 };
 ```
 
@@ -113,11 +117,11 @@ type OpenDocumentTab = {
 - `revision`: 初回読込と Reload のたびに増加する。async response 適用時に `tabId + revision` が現在値と一致する場合だけ更新する。
 - `loadState`: Markdown 読込と PlantUML 描画を tab 単位で表す。PlantUML fence がなければ Markdown 成功時点で `ready`。
 - `errorMessage`: 対象 tab の Markdown / PlantUML / Mermaid 代表 error。active tab の error だけを ErrorBanner に表示する。
-- `pendingAnchor`: 対象 tab activate 後、active preview の描画完了時に消費する。
+- `pendingNavigation`: `App` 直下に `{ tabId, anchor } | null` として保持する pane-level state。対象 tab が active preview に描画された後、`tabId + revision` を照合して消費する。後続 split view では各 pane state が同じ形の navigation を持つ。
 
 App 全体には次を保持する。
 
-- `rootPath`, `fileTree`, `tabs`, `activeTabId`, `theme`, `recentFolders`, `activeMenu`。
+- `rootPath`, `fileTree`, `tabs`, `activeTabId`, `pendingNavigation`, `theme`, `recentFolders`, `activeMenu`。
 - `rootOperationError`: root scan、recent folder、root 全体操作の代表 error。
 - `isRootLoading`, `isRecentFoldersBusy`: root collection を交換する操作だけの global busy。
 - `nextTabIdRef`: state 更新を発生させず一意 tab ID を採番する `useRef<number>`。
@@ -132,7 +136,7 @@ App 全体には次を保持する。
 - `loadTab(tabId, rootPath, filePath, revision, anchor?)`: `read_text_file` と PlantUML command を実行し、guard 付きで対象 tab を更新。
 - `updateTabIfCurrent(tabId, revision, updater)`: tab が存在し revision が一致する場合だけ immutable update。
 - `activateTab(tabId)`: active ID 更新。tab の pending anchor は preview effect が消費する。
-- `closeTab(tabId)`: 対象削除と deterministic な隣接 tab 選択。
+- `closeTab(tabId)`: 対象を削除する。closed tab が active の場合だけ右隣、なければ左隣を選び、非 active tab を閉じた場合は `activeTabId` を変更しない。
 - `reloadActiveTab()`: root scan 後に active tab の revision を増やし、同じ tab identity へ再読込。
 
 これらは App state を直接調停するため `App` 内 handler とする。renderer / path helper のような純粋処理ではなく、現段階で別 service や汎用 global utility へ抽象化しない。後続 split view で state transition が複雑化した時点で reducer 抽出を判断する。
@@ -166,7 +170,8 @@ workspace
 TabStrip:
 
 - container は `role="tablist"`, `aria-label="Open Markdown files"`。
-- activate button は `role="tab"`, `aria-selected`, `aria-controls="markdown-preview"` を持つ。
+- activate button は `role="tab"`, `aria-selected`, `aria-controls="markdown-preview"` を持つ。active tab だけを `tabIndex=0`、他を `tabIndex=-1` とする roving tabindex を採用する。
+- `ArrowLeft` / `ArrowRight` は前後 tab へ focus と selection を移し、端では先頭 / 末尾へ循環する。`Home` / `End` は先頭 / 末尾へ移る。close 後は新しい active tab の activate button へ focus を移す。
 - close は activate button とネストしない独立 button とし、`aria-label="Close <name>"` を持つ。
 - active、loading / rendering、error を text / title / class で識別できる。色だけに依存しない。
 - tab item は `flex: 0 0 auto`、container は `overflow-x: auto`。長い file name は ellipsis、絶対 path は `title` で確認できる。
@@ -176,7 +181,15 @@ PreviewContent は従来どおり1つだけ描画する。active tab がなけ�
 
 Explorer の selected 表示は `activeTab?.path` と一致する Markdown に付ける。文書 loading / PlantUML rendering 中も別 tab の activate と close、Explorer からの open-or-activate を許可する。root 変更、Recent Folders config 更新中は既存どおり root 競合操作を抑止する。
 
-StatusBar の `File` は active tab name、`State` は active tab の `Loading Markdown...` / `Rendering PlantUML diagrams...` / `Ready` を表示する。将来 tab count を追加可能だが、今回の最小範囲では既存2項目構成を維持する。
+StatusBar の `File` は active tab nameを表示する。`State` は次の優先順位で最初に一致した値を表示する。
+
+1. `isRootLoading`: `Loading folder...`
+2. `isRecentFoldersBusy`: `Updating recent folders...`
+3. active tab が `loading`: `Loading Markdown...`
+4. active tab が `rendering`: `Rendering PlantUML diagrams...`
+5. 上記以外: `Ready`
+
+Reload は root scan 中に `Loading folder...`、active tab 再読込開始後に `Loading Markdown...` へ遷移する。root operation と tab load を意図的に並行開始しないため、通常は複数条件が同時成立しないが、非同期 state commit の境界でも上記優先順位を正とする。将来 tab count を追加可能だが、今回の最小範囲では既存2項目構成を維持する。
 
 ## Root変更・Reload・失敗時動作
 
@@ -204,7 +217,7 @@ StatusBar の `File` は active tab name、`State` は active tab の `Loading M
 - PlantUML は tab load handler 内で抽出・invokeし、結果を tab cache に保存する。theme と activate だけでは再実行しない。
 - Mermaid は active `MarkdownPreview` DOM の生成後に `activeTab.id`, `activeTab.revision`, `theme`, `activeTab.plantUmlDiagrams` を依存として `mermaid.run` する。
 - Mermaid error は処理開始時の `tabId + revision` が現在も一致する場合だけ対象 tab error へ反映する。
-- anchor は link target tab の `pendingAnchor` に格納する。active preview 描画後に scroll し、同じ tab revision を guard してclearする。
+- anchor は App / pane-level の `pendingNavigation` に `{ tabId, anchor }` として格納する。target tab の active preview 描画後に scroll し、同じ `tabId + revision` を guard してclearする。対象 tab がcloseされた場合はclearする。
 - 同一ページ `#anchor` は現在の active preview 内ですぐ scroll し、tab state を変更しない。
 
 ## 互換性・移行方針
@@ -260,9 +273,9 @@ Rust backend、Cargo、Tauri config / capability に変更は予定しない。
 5. 相対 Markdown link が既存 tab をactivateまたは新規 tabを開き、anchorへ移動することを確認する。
 6. 相対画像、外部URL、同一ページanchorを確認する。
 7. Mermaid / PlantUML 混在文書、PlantUML pending / success / syntax error を確認する。
-8. PlantUML描画中に別tabへ切替・対象tabをcloseし、遅延結果がactive preview / errorを上書きしないことを確認する。
+8. PlantUML描画中に別tabへ切替・対象tabをcloseし、遅延結果がactive preview / errorを上書きしないことを確認する。PlantUMLを含む複数文書を短時間に連続openし、並行render中もUI操作と最終結果が破綻しないことを確認する。
 9. root変更成功で旧tabsが破棄され、scan失敗では旧root / tabsが維持されることを確認する。
-10. 多数tabを開き、横scrollで任意tabへ到達してactivate / closeできることを確認する。
+10. 多数tabを開き、横scrollで任意tabへ到達してactivate / closeできること、およびArrowLeft / ArrowRight / Home / Endでroving focusとselectionを操作できることを確認する。
 11. Recent Folders、MenuBar、RootPathBar、ErrorBanner、StatusBarの既存機能が退行しないことを確認する。
 
 ## リスクとfollow-up
@@ -270,7 +283,8 @@ Rust backend、Cargo、Tauri config / capability に変更は予定しない。
 - `App.tsx` の状態更新が増える。今回の操作が immutable helper で明瞭に保てない場合は reducer 抽出を実装前に再評価するが、互換経路との二重管理は行わない。
 - 大量・巨大文書を多数tabへ保持するとメモリ使用量が増える。上限やLRU cacheは実測要件がないため導入せず、問題が確認された場合にfollow-up化する。
 - tabごとのscroll位置は保持しない。Tauri先行UX評価で必要性を確認し、Avalonia反映仕様化前に判断する。
-- 横scrollの操作性やArrow key navigationはUX評価対象とし、必要なら独立TODOへ分離する。
+- busy gate 緩和により、複数 tab の `render_plantuml_diagrams` と Java process が並行実行され得る。今回、上限や直列queueは要件と実測根拠がないため導入せず、Phase 4で複数PlantUML文書の連続openを確認し、CPU / メモリまたは操作性の問題が確認された場合にfollow-up化する。
+- 横scrollの操作性はUX評価対象とし、dropdown等の追加導線が必要なら独立TODOへ分離する。
 - StatusBarへのtab count表示は現行レイアウトを変えるため今回含めず、UX評価で判断する。
 
 ## 設計完了条件
