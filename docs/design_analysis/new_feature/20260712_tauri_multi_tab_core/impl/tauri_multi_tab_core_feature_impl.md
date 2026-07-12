@@ -81,6 +81,26 @@ Phase 2承認設計に従い、Tauri frontendの単一Markdown stateを`OpenDocu
 - root変更成功 / scan失敗、Recent Folders、StatusBar / ErrorBanner。
 - 多数tab horizontal overflow、ArrowLeft / ArrowRight / Home / End、close後focus。
 
+## Phase 4-a ユーザー動作確認結果
+
+確認日: 2026-07-12
+
+publish済みTauriアプリで次を確認済み。
+
+- 複数のMarkdown fileを選択すると、それぞれtabとして表示される。
+- 別tabへ切り替えた後に既にopen済みのtabを選び直しても、Markdown / PlantUMLが再読込されない。
+- PlantUML parse error時に対象tabへ`Error`が表示される。
+- 別root directoryをopenすると旧tabがclearされ、新rootのdefault Markdownがtabでopenされる。
+- Reload後もactive tabが消えず、tab collectionが維持される。
+- フォルダ選択、Recent Folders、Markdown preview、Mermaid / PlantUML、相対画像、link、theme、ErrorBanner / StatusBarを含む既存機能にdegradationがない。
+
+受け入れ条件のうち、次は追加確認待ち。
+
+- active / non-active / last tab close時のselectionと未選択表示。
+- relative Markdown linkが既存tabをactivateし、未openなら新規tabを開き、anchorへscrollすること。
+- 多数tabのhorizontal overflowとArrowLeft / ArrowRight / Home / End、close後focus。
+- PlantUML描画中のtab切替 / close、および複数PlantUML文書の連続openでactive preview / errorが混線しないこと。
+
 ## 既知制約
 
 - split view、tab永続化、reorder、pin、drag and drop、tab別scroll位置は対象外。

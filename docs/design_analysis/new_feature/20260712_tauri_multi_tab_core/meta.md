@@ -13,7 +13,7 @@ status: "implemented"
 design_status: "done"
 impl_status: "done"
 completion_status: "not_started"
-verification_status: "not_started"
+verification_status: "in_progress"
 related_commits:
   - "19e2226 : Phase 0 define TODO-2026-005 scope"
   - "6f70fdb : Phase 1 initialize Tauri multi-tab workflow"
@@ -57,4 +57,4 @@ depends_on:
 | Phase 1 Branch and meta | In progress |
 | Phase 2 Design review | Done (approved 2026-07-12, `27e7cf1`) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-12, `71a2861`) |
-| Phase 4 Verification and completion | Not started |
+| Phase 4 Verification and completion | Phase 4-a user verification in progress |
