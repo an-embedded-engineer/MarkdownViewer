@@ -1,13 +1,15 @@
 # Tauri Multi-tab core 導入 実装レビュー
 
 **レビュー日**: 2026-07-12
+**再確認日**: 2026-07-12
 **対象ドキュメント**: `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/design/tauri_multi_tab_core_feature_design.md`
 **対象 impl 記録**: `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/impl/tauri_multi_tab_core_feature_impl.md`
 **対象 meta**: `docs/design_analysis/new_feature/20260712_tauri_multi_tab_core/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-005
 **Phase 2 reviewer approval**: `27e7cf1`
-**レビュー対象コミット**: `e26c54d Phase 3 implement Tauri multi-tab core`
-**判定**: **条件付き承認 (Conditional Approval)**。指摘 1.1 を実装へ反映後、Phase 4 進行可。
+**初回レビュー対象コミット**: `e26c54d Phase 3 implement Tauri multi-tab core`
+**再確認対象コミット**: `c4a6a09 Phase 3 address Tauri multi-tab implementation review`
+**判定**: **承認 (Approved)**。Phase 4 進行可（詳細は「10. Round 2 再確認結果」参照）。
 
 ---
 
@@ -214,3 +216,27 @@ WBS (`wbs.md` WP-003) の `completion_criteria` とも齟齬なし。ただし�
 | 3.3 close buttonのfocus範囲 | Low | active tabのclose buttonだけを`tabIndex=0`、非activeを`-1`とし、keyboard操作契約を`interface_spec.md`へ明記した。 | 対応済み・再確認待ち |
 
 未解決事項: なし。Claude reviewerのfollow-up承認待ち。
+
+---
+
+## 10. Round 2 再確認結果 (2026-07-12, commit `c4a6a09`)
+
+`markdown-viewer-tauri/src/App.tsx`、`docs/components/tauri_viewer/detail_design.md`、`docs/components/tauri_viewer/interface_spec.md`、`impl/tauri_multi_tab_core_feature_impl.md`、`meta.md` の `9a92ec3`→`c4a6a09` 差分をコードトレースで確認した。
+
+- **1.1 `rootOperationError` が tab 単位操作で意図せず clear される (Medium)**: `openOrActivateTab` (`App.tsx:228-256`) 冒頭の `setRootOperationError(null)` が削除され、`activateTab` (`App.tsx:310-312`) も `setActiveTabId(tabId)` のみの一行関数になった。`closeTab` も含め、tab 単位操作のいずれも `rootOperationError` を触らなくなり、root 全体操作（`openFolder` / `openRecentFolder` / `reload`）だけが `setRootOperationError(null)` を呼ぶ状態に統一された。承認済み設計の「次の root 全体操作開始時に clear」という契約と一致する。✓ 反映確認。
+- **2.1 `detail_design.md` の UI レイアウト図が TabStrip 未反映 (Medium)**: 「UI レイアウト」の ASCII 図が `section.preview-workspace` 配下に `TabStrip` と `role="tabpanel"` の `div#markdown-preview.preview-pane`（内側に `MarkdownPreview`）を持つ構造へ更新された。図直後の説明文にも「`TabStrip` は PreviewWorkspace 上段で open 中 Markdown を表示し、下段の単一 `tabpanel` が active tab を描画する」という一文が追加され、実装済みの DOM 構造と一致した。✓ 反映確認。
+- **3.1 close 後 focus ロジックの二重実装 (Low)**: `closeTab` の戻り値型が `string | null` になり、「closed tab が active でない場合は現在の `activeTabId` を返す」「active だった場合は隣接 tab 選択後の id（または `null`）を返す」「tab が見つからない場合は現在の `activeTabId` を返す」の 3 分岐を単一箇所に集約した。`TabStrip.close` は `onClose(tabId)` の戻り値をそのまま `focusTab` へ渡すだけになり (`App.tsx:809-814`)、`tabs[index±1]` を使った独立計算は削除された。`onClose` の型も `(tabId: string) => string | null` へ更新され、隣接タブ選択規則が `App.closeTab` 側の単一実装に統合された。✓ 反映確認。
+- **3.2 `updateTabs` ヘルパー未活用 (Low)**: `loadRoot` のタブリセット (`updateTabs(() => [])`)、`openOrActivateTab` のタブ追加 (`updateTabs((current) => [...current, tab])`)、`closeTab` のタブ削除 (`updateTabs(() => next)`) がいずれも `updateTabs` 経由に統一され、`tabsRef.current` への直接代入は残っていない。✓ 反映確認。
+- **3.3 close button が roving tabindex 対象外 (Low)**: `tab-close` button に `tabIndex={isActive ? 0 : -1}` が付与され、activate button と同じ roving tabindex 規則に組み込まれた。`interface_spec.md` の「TabStrip 表示」にも「activate button と active tab の close button だけを Tab キーの focus 順に含める。非 active tab を close する場合は、先に矢印キーで activate してから close button へ移動する」という契約が明記され、WAI-ARIA APG Tabs パターンが期待する「複合ウィジェット全体で Tab stop を最小限に抑える」挙動と実装・文書が揃った。✓ 反映確認。
+
+`npm run build`（`tsc && vite build`）、`cargo check`、`git diff --check`（`9a92ec3..c4a6a09`）を独立に再実行し、いずれも成功することを確認した。`TabStripProps.onClose` の型変更 (`(tabId: string) => string | null`) と呼び出し側 (`onClose={closeTab}`) の整合も型チェック（`tsc`）で確認済みである。
+
+再確認の過程で新たな齟齬・記載漏れは見つからなかった。`meta.md` は `impl_status: in_review` (`9a92ec3`, conditional approval) に更新済みで、Phase Status 表にも反映されている。
+
+**判定**: **承認 (Approved)**。
+
+- Round 1 の指摘（中 2 件、低 3 件）すべてに対応が確認され、未解決指摘はゼロ。
+- `meta.md` の `impl_status` を `done`、`status` を `implemented` へ更新可能な状態（現状 `impl_status: in_review`）。実装 Agent が Phase 4 着手時に更新し、コミットすること。
+- Phase 4（ユーザ動作確認・完了処理）への進行を承認する。Phase 4 着手時は、本 Round 2 で確認した root error の clear 条件、`TabStrip` / `PreviewWorkspace` の DOM 構造、close 後 focus の単一実装、`updateTabs` の一貫利用、close button の roving tabindex 契約を、`impl/` の Phase 4 手動確認項目（複数 PlantUML 文書の連続 open、多数 tab の横 overflow、`ArrowLeft` / `ArrowRight` / `Home` / `End` roving focus、close 後 focus、root scan 失敗時の state 維持、Recent Folders 記録失敗時の `ErrorBanner` 持続確認を含む）でそのまま検証すること。
+
+未解決指摘なし。本レビューでの承認をもって Phase 3 実装レビューを完了とする。
