@@ -24,7 +24,7 @@
 - `scan_directory` はExplorer用ツリー構築、`read_text_file` はMarkdown本文読み込み、`render_plantuml_diagrams` はPlantUML描画に責務を限定する。
 - 返却モデルは `serde::Serialize` を使い、TypeScript側の型と対応させる。
 - 除外ディレクトリや拡張子判定はRust側の小さな関数へ分離する。
-- 外部プロセスはshellを介さず `Command` の引数配列で起動し、stdout / stderrはUI表示可能な文字列へ変換する。
+- 外部プロセスはshellを介さず `Command` の引数配列で起動し、stdout / stderrはUI表示可能な文字列へ変換する。WindowsのGUI起動では`CREATE_NO_WINDOW`を指定し、子processごとのterminal window表示を抑止する。
 
 ## エラーハンドリングパターン
 

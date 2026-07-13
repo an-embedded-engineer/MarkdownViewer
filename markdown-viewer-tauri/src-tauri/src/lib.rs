@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Read, Write};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -84,6 +86,8 @@ const SKIPPED_DIRS: &[&str] = &[
 const PLANTUML_CONFIG_FILE_NAME: &str = "plantuml.config.json";
 const PLANTUML_JAR_FILE_NAME: &str = "plantuml.jar";
 const PLANTUML_RENDER_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const APP_CONFIG_FILE_NAME: &str = "settings.json";
 const MAX_RECENT_FOLDERS: usize = 10;
 
@@ -221,8 +225,7 @@ fn write_app_config(app: &tauri::AppHandle, config: &AppConfig) -> Result<(), St
 
     let content = serde_json::to_string_pretty(config)
         .map_err(|error| format!("Failed to serialize app config: {error}"))?;
-    fs::write(&config_path, content)
-        .map_err(|error| format!("Failed to write app config: {error}"))
+    fs::write(&config_path, content).map_err(|error| format!("Failed to write app config: {error}"))
 }
 
 fn app_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -348,7 +351,22 @@ fn extension(path: &Path) -> Option<String> {
 }
 
 fn path_to_string(path: &Path) -> String {
-    path.to_string_lossy().to_string()
+    path_for_external_use(path).to_string_lossy().to_string()
+}
+
+fn path_for_external_use(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let value = path.to_string_lossy();
+        if let Some(unc_path) = value.strip_prefix(r"\\?\UNC\") {
+            return PathBuf::from(format!(r"\\{unc_path}"));
+        }
+        if let Some(local_path) = value.strip_prefix(r"\\?\") {
+            return PathBuf::from(local_path);
+        }
+    }
+
+    path.to_path_buf()
 }
 
 fn render_plantuml_diagram(source: &str) -> PlantUmlDiagramResult {
@@ -371,14 +389,20 @@ fn render_plantuml_diagram(source: &str) -> PlantUmlDiagramResult {
 
 fn render_plantuml_svg(source: &str) -> Result<String, String> {
     let runtime = resolve_plantuml_runtime()?;
-    let mut child = Command::new("java")
+    let mut command = Command::new("java");
+    command
         .arg("-jar")
-        .arg(&runtime.jar_path)
+        .arg(path_for_external_use(&runtime.jar_path))
         .arg("-tsvg")
         .arg("-pipe")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    let mut child = command
         .spawn()
         .map_err(|error| format!("Failed to start Java: {error}"))?;
 
@@ -681,6 +705,37 @@ fn escape_html(value: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ordinary_path_is_unchanged_for_external_use() {
+        let path = Path::new("docs/sample.md");
+        assert_eq!(path_for_external_use(path), path);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_verbatim_disk_prefix_is_removed_for_external_use() {
+        let path = Path::new(r"\\?\D:\docs\sample.md");
+        assert_eq!(
+            path_for_external_use(path),
+            PathBuf::from(r"D:\docs\sample.md")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_verbatim_unc_prefix_is_converted_for_external_use() {
+        let path = Path::new(r"\\?\UNC\server\share\sample.md");
+        assert_eq!(
+            path_for_external_use(path),
+            PathBuf::from(r"\\server\share\sample.md")
+        );
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

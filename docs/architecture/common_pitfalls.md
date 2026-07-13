@@ -34,5 +34,6 @@
 
 ## 7. Windows固有の注意点
 
+- Rustの`Path::canonicalize`はWindowsで`\\?\`付きのverbatim pathを返す。filesystem検証にはそのまま使い、Java processの引数やfrontendへ返す文字列では通常のdrive / UNC pathへ変換する。
 - WebView2の`NavigateToString`にはHTML size上限がある。Mermaid runtimeを埋め込んだHTMLは上限を超えるため、Avalonia版は一時HTML fileへ書き出してfile URIへnavigateする。
 - .NET正規表現のmultiline `$`はCRLFの`\r`より前には一致しない。fenced code blockの終了行を判定する場合は末尾の`\r?`を明示し、LF / CRLFの両方を扱う。

@@ -176,7 +176,7 @@ App -> Mer : mermaid.run({ nodes })
 
 ## PlantUML レンダリング
 
-PlantUML 表示は Rust 側の `render_plantuml_diagrams` command で行う。React は Markdown 本文から `plantuml` / `puml` fenced code block を抽出し、source 配列として command へ渡す。Rust command は `tauri::async_runtime::spawn_blocking` 経由で各 source を順次 `java -jar <plantuml.jar> -tsvg -pipe` に渡し、SVG HTML またはエラー HTML を返す。
+PlantUML 表示は Rust 側の `render_plantuml_diagrams` command で行う。React は Markdown 本文から `plantuml` / `puml` fenced code block を抽出し、source 配列として command へ渡す。Rust command は `tauri::async_runtime::spawn_blocking` 経由で各 source を順次 `java -jar <plantuml.jar> -tsvg -pipe` に渡し、SVG HTML またはエラー HTML を返す。Windowsでは`CREATE_NO_WINDOW`を指定し、Java起動時のterminal windowを表示しない。
 
 ```plantuml
 @startuml

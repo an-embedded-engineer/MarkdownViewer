@@ -18,14 +18,14 @@ OS 連携とファイルシステム境界は Rust command へ寄せ、画面状
 | field | 型 | 補足 |
 |---|---|---|
 | `name` | string | ファイル / ディレクトリ名 |
-| `path` | string | OS 絶対パス |
+| `path` | string | OS絶対パス。Windowsではfrontend境界で`\\?\`を除いた通常形式を返す |
 | `relativePath` | string | root からの相対パス |
 | `nodeType` | `"directory" \| "markdown" \| "image"` | enum |
 | `children` | `FileTreeNode[]` | directory のみ非空、Directory→Markdown→Image の順で整列 |
 
 PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRenderResponse` / `PlantUmlDiagramResult`)。
 
-`RecentFolderEntry` は Rust とフロントエンドで camelCase で対応し、保存時点の canonical path を正本とする。
+`RecentFolderEntry` は Rust とフロントエンドで camelCase で対応し、保存時点の canonical path を正本とする。Windowsのfilesystem内部ではverbatim pathを維持し、frontend・設定保存・Java process引数の境界で通常のdrive / UNC pathへ変換する。
 
 | field | 型 | 補足 |
 |---|---|---|
