@@ -8,11 +8,16 @@ components:
   - tauri_readme
   - setup_docs
   - development_documentation
-status: draft
+status: implemented
 design_status: done
 impl_status: done
-completion_status: in_progress
-related_commits: []
+completion_status: done
+related_commits:
+  - "7ff0ce2"
+  - "f3b38a1"
+  - "4d0baa3"
+  - "8f5a22e"
+  - "7218abb"
 ---
 
 # クロスプラットフォーム環境構築・README 整備
