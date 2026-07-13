@@ -10,7 +10,7 @@ Avalonia UI と C# による Markdown Viewer 実装。
 - ViewModel: `ViewModels/MainWindowViewModel.cs`, `ViewModels/FileTreeNodeViewModel.cs`
 - Service: `Services/FileTreeService.cs`, `Services/MarkdownRenderService.cs`, `Services/PlantUmlRenderService.cs`, `Services/PlantUmlRuntimeResolver.cs`, `Services/HtmlTemplateService.cs`
 - Model: `Models/FileTreeNode.cs`, `Models/FileNodeType.cs`, `Models/AppTheme.cs`
-- Markdown 表示: NativeWebView に HTML を渡して表示する。
+- Markdown 表示: 生成HTMLを一時fileへ書き出し、NativeWebViewでfile URIへnavigateして表示する。
 - PlantUML 表示: ローカル Java / `plantuml.jar` を使ってSVG化し、HTML fragmentへ差し替える。
 
 ### Tauri Viewer (`markdown-viewer-tauri/`)

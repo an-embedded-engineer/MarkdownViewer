@@ -66,7 +66,7 @@ public sealed partial class MarkdownRenderService : IMarkdownRenderService
         return Task.FromResult($"""<div class="mermaid">{escapedCode}</div>""");
     }
 
-    [GeneratedRegex(@"(?ms)^```[ \t]*(?<language>mermaid|plantuml|puml)[^\r\n]*\r?\n(?<code>.*?)\r?\n```[ \t]*$")]
+    [GeneratedRegex(@"(?ms)^```[ \t]*(?<language>mermaid|plantuml|puml)[^\r\n]*\r?\n(?<code>.*?)\r?\n```[ \t]*\r?$")]
     private static partial Regex DiagramFenceRegex();
 
     private enum DiagramType

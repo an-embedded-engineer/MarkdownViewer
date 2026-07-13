@@ -106,7 +106,7 @@ FileTreeNodeViewModel --> FileTreeNode
 5. `OpenMarkdownAsync` が Markdown を `File.ReadAllTextAsync` で読み込み、`MarkdownRenderService.RenderToHtmlFragmentAsync` へ渡す。
 6. `MarkdownRenderService` は `mermaid` / `plantuml` / `puml` fence をプレースホルダで抽出し、Markdig でテキスト本体を HTML へ変換した後、Mermaid は `<div class="mermaid">`、PlantUML は `PlantUmlRenderService.RenderToHtmlAsync` の結果（SVG または `.plantuml-error`）に差し替える。
 7. `HtmlTemplateService.BuildHtmlDocument` が `<base href>`、CSS、Mermaid script、リンクハンドラ JS を含む完全な HTML 文書を組み立てる。
-8. `MainWindowViewModel.PreviewRequested` イベントを通じて `MainWindow` 側で `PreviewWebView.NavigateToString` を呼び、WebView に反映する。
+8. `MainWindowViewModel.PreviewRequested` イベントを通じて `MainWindow` 側でHTMLを一時fileへ書き出し、`PreviewWebView.Navigate`でfile URIへnavigateしてWebViewに反映する。これはMermaid runtimeを含むHTMLがWindows WebView2の`NavigateToString` size上限を超えることを避けるためである。
 9. `IsBusy` 解除と `StatusMessage` 更新で UI を確定状態に戻す。
 
 ```plantuml
@@ -139,7 +139,8 @@ MRS --> VM : bodyHtml
 VM -> HTS : BuildHtmlDocument(bodyHtml, path, theme)
 HTS --> VM : documentHtml
 VM -> V : PreviewRequested(documentHtml)
-V -> WV : NavigateToString(documentHtml)
+V -> V : 一時HTML fileへ書き出し
+V -> WV : Navigate(fileUri)
 VM -> VM : IsBusy = false,\nStatusMessage = relative path
 @enduml
 ```

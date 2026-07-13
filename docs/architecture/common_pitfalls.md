@@ -31,3 +31,8 @@
 - Tauri devでは `markdown-viewer-tauri/src-tauri/`、Tauri bundleでは `.app/Contents/MacOS/`、Avalonia publishでは実行ファイルのdirectoryをruntime directoryとして扱う。
 - Finder起動時のworking directoryは `/` になり得るため、Tauri bundleのjar探索をworking directory前提にしない。
 - Theme切替だけでPlantUML CLIを再実行すると多数図の文書で体感遅延が出るため、SVG再生成はMarkdown本文またはReload更新時に限定する。
+
+## 7. Windows固有の注意点
+
+- WebView2の`NavigateToString`にはHTML size上限がある。Mermaid runtimeを埋め込んだHTMLは上限を超えるため、Avalonia版は一時HTML fileへ書き出してfile URIへnavigateする。
+- .NET正規表現のmultiline `$`はCRLFの`\r`より前には一致しない。fenced code blockの終了行を判定する場合は末尾の`\r?`を明示し、LF / CRLFの両方を扱う。
