@@ -70,6 +70,38 @@ npm run tauri dev
 
 ## 5. publish / bundle
 
+Avalonia / Tauri の publish と `plantuml.jar` 配置は、原則として PowerShell script でまとめて実行します。リポジトリ直下の `plantuml.jar` を既定で使用します。
+
+```powershell
+# Default: .\plantuml.jar を publish へコピーする
+.\scripts\publish_apps_with_plantuml.ps1
+
+# jar の場所を明示する場合
+.\scripts\publish_apps_with_plantuml.ps1 -PlantUmlJar C:\path\to\plantuml.jar
+
+# ARM64 の Avalonia publish を作る場合
+.\scripts\publish_apps_with_plantuml.ps1 -Runtime win-arm64
+
+# MSI も作る場合
+.\scripts\publish_apps_with_plantuml.ps1 -TauriBundles "nsis,msi"
+
+# 片方だけ publish する場合
+.\scripts\publish_apps_with_plantuml.ps1 -SkipTauri
+.\scripts\publish_apps_with_plantuml.ps1 -SkipAvalonia
+```
+
+既定の出力先:
+
+- Avalonia: `publish/avalonia/win-x64/`
+- Tauri 実行ファイルと jar: `publish/tauri/raw/`
+- Tauri NSIS bundle: `publish/tauri/bundle/nsis/`
+
+`-TauriBundles "nsis,msi"` を指定した場合は MSI も `publish/tauri/bundle/msi/` へ出力されます。
+
+Tauri installer には `plantuml.jar` が resource として組み込まれ、install 後は実行ファイルと同じ directory に配置されます。
+
+個別に実行する必要がある場合は、以下を使います。
+
 Avalonia x64 self-contained publish:
 
 ```powershell
@@ -80,7 +112,7 @@ dotnet publish Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj `
   -o publish/avalonia/win-x64
 ```
 
-ARM64 では RID を `win-arm64` に変更します。PlantUML を含める場合は、出力 directory に `plantuml.jar` を手動でコピーしてください。
+ARM64 では RID を `win-arm64` に変更します。個別実行で PlantUML を含める場合は、出力 directory に `plantuml.jar` を手動でコピーしてください。
 
 Tauri bundle:
 

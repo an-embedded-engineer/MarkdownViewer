@@ -93,6 +93,22 @@ scripts/publish_apps_with_plantuml.sh --plantuml-jar /absolute/path/to/plantuml.
 scripts/publish_apps_with_plantuml.sh --tauri-bundles app,dmg
 ```
 
+Windows PowerShell では以下を使う。
+
+```powershell
+# Default: .\plantuml.jar を publish へコピーする
+.\scripts\publish_apps_with_plantuml.ps1
+
+# jar の場所を明示する場合
+.\scripts\publish_apps_with_plantuml.ps1 -PlantUmlJar C:\path\to\plantuml.jar
+
+# Avalonia ARM64 publish
+.\scripts\publish_apps_with_plantuml.ps1 -Runtime win-arm64
+
+# MSI も作る場合
+.\scripts\publish_apps_with_plantuml.ps1 -TauriBundles "nsis,msi"
+```
+
 先頭に `. ` を付けて source 実行しない。source 実行すると shell option や終了処理が現在のターミナルへ影響するため、スクリプト側で検出して中断する。
 
 出力先:
@@ -103,6 +119,9 @@ scripts/publish_apps_with_plantuml.sh --tauri-bundles app,dmg
 - Avalonia 用 `plantuml.jar`: `publish/avalonia/raw/plantuml.jar`
 - Avalonia app bundle 用 `plantuml.jar`: `publish/avalonia/MarkdownViewer.Avalonia.app/Contents/MacOS/plantuml.jar`
 - Tauri 用 `plantuml.jar`: `publish/tauri/markdown-viewer-tauri.app/Contents/MacOS/plantuml.jar`
+- Windows Avalonia: `publish/avalonia/win-x64/`
+- Windows Tauri raw: `publish/tauri/raw/`
+- Windows Tauri installer: `publish/tauri/bundle/`
 
 個別に実行する必要がある場合は以下を使う。
 
