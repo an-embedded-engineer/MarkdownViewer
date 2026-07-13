@@ -31,3 +31,10 @@ MarkdownViewer は、VSCode やコーディングエージェントが生成し�
 - Tauri Viewer: `docs/components/tauri_viewer/README.md`
 - テスト: `docs/tests/README.md`
 - MVP 比較設計: `docs/design_analysis/new_feature/markdown_viewer_mvp_comparison_initial_design/markdown_viewer_mvp_design_tauri_avalonia.md`
+
+## 利用者向け入口
+
+- プロジェクト README: `README.md`
+- 環境構築ガイド: `docs/setup/README.md`
+- Avalonia 版: `Avalonia/MarkdownViewer.Avalonia/README.md`
+- Tauri 版: `markdown-viewer-tauri/README.md`

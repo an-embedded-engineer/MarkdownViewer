@@ -1,5 +1,32 @@
 # TODO Archive 2026
 
+## TODO-2026-013 クロスプラットフォーム環境構築・README 整備
+
+- Status: `done`
+- Category: `documentation`
+- Created: `2026-07-13`
+- Completed: `2026-07-13`
+- Branch: `documentation/cross-platform-setup-readmes`
+- Design analysis:
+  - `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/`
+- Change report:
+  - `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/change_report.md`
+- Review records:
+  - `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/review/cross_platform_setup_readmes_design_review.md`
+  - `docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/review/cross_platform_setup_readmes_impl_review.md`
+- Summary:
+  - Added the repository root README as the entry point for the Avalonia and Tauri implementations.
+  - Added setup guides for Windows, macOS, and Linux from clone through build, run, and publish/bundle.
+  - Documented that the current Avalonia `NativeWebView` implementation does not run on Linux and directed Linux users to the Tauri implementation.
+  - Synchronized dependency restoration on `npm ci` and clarified implementation-specific PlantUML runtime directories.
+- Verification:
+  - User approved the documentation and docs-only result on `2026-07-13`.
+  - Relative links resolved for the 11 target Markdown files.
+  - `git diff --check` passed.
+  - Design and implementation reviews completed with no unresolved findings.
+- Follow-up:
+  - OS-specific problems discovered during future Windows, macOS, or Linux use will be tracked as separate issues.
+
 ## TODO-2026-001 PlantUML Rendering Support
 
 - Status: `done`

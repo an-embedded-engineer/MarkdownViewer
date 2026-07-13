@@ -16,8 +16,10 @@ dotnet restore Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj
 
 # Tauri
 cd markdown-viewer-tauri
-npm install
+npm ci
 ```
+
+clone 直後や CI では `package-lock.json` の内容を再現する `npm ci` を使う。依存 package を更新し、`package-lock.json` も更新する場合に限り `npm install` を使う。
 
 ### PlantUML
 

@@ -1,0 +1,1 @@
+`docs/design_analysis/documentation/20260713_cross_platform_setup_readmes/prompts/phase2_design_review_initial_claude.md` を読んで、レビューを開始してください。

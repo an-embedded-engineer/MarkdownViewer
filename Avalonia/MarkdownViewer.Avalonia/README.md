@@ -1,32 +1,46 @@
-# Markdown Viewer Avalonia MVP
+# MarkdownViewer Avalonia 版
 
-Avalonia UI + C# + NativeWebView based read-only Markdown viewer.
+Avalonia UI、C#、`NativeWebView` で実装した読み取り専用 Markdown Viewer です。プロジェクト全体は [ルート README](../../README.md) を参照してください。
 
-## Requirements
+## 対応 OS と要件
 
-- .NET SDK 10.0 or newer for the current template output
-- macOS: WKWebView is provided by the OS
-- Windows: WebView2 runtime is required
-- Linux: WPE WebKit runtime libraries are required by `NativeWebView`
+- .NET SDK 10.0 以上
+- Windows: Microsoft Edge WebView2 Runtime
+- macOS: OS 組み込みの WKWebView
+- Linux: 現構成の `NativeWebView` は非対応。restore/build は可能でもアプリ実行はサポート対象外
+- PlantUML 表示を使う場合: Java と `plantuml.jar`
 
-## Run
+clone 直後の OS 固有手順:
 
-```bash
-DOTNET_CLI_HOME=/private/tmp/codex_dotnet_home dotnet restore Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj
-DOTNET_CLI_HOME=/private/tmp/codex_dotnet_home dotnet run --project Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj
+- [Windows](../../docs/setup/windows.md)
+- [macOS](../../docs/setup/macos.md)
+- [Linux の制約](../../docs/setup/linux.md)
+
+## 実行
+
+リポジトリルートで実行します。
+
+```text
+dotnet restore Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj
+dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj
+dotnet run --project Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj
 ```
 
-## Implemented MVP Scope
+最初の手動確認には `Avalonia/MarkdownViewer.Avalonia/sample_docs/` を開いてください。
 
-- Open Folder via Avalonia `StorageProvider`
-- Explorer-style tree for directories, `.md`, `.markdown`, and image files
-- Markdown rendering via Markdig
-- Mermaid code block rendering via bundled `Assets/mermaid.min.js`
-- Light/Dark theme toggle for both Avalonia UI and rendered Markdown
-- Relative image resolution through an HTML `<base>` tag
-- Relative Markdown link navigation through WebView-to-C# messages
-- External HTTP/HTTPS links opened with the OS default browser
+## Publish
 
-## Notes
+- [Windows publish](../../docs/setup/windows.md#5-publish--bundle)
+- [macOS publish](../../docs/setup/macos.md#5-publish--bundle)
+- [共通の開発・publish ルール](../../docs/rules/development_workflow.md#publish)
 
-Use `sample_docs/README.md` as the first manual smoke test folder.
+## 主な機能
+
+- native folder picker からフォルダを開く
+- directory、Markdown、画像を Explorer tree に表示
+- Markdig による Markdown rendering
+- 同梱 `Assets/mermaid.min.js` による Mermaid rendering
+- ローカル Java / `plantuml.jar` による PlantUML rendering
+- Light / Dark theme 切替
+- 相対画像表示、相対 Markdown link のアプリ内遷移
+- HTTP/HTTPS link を既定ブラウザで開く
