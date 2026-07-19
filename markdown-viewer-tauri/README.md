@@ -42,6 +42,7 @@ cargo check
 - GitHub Flavored Markdown の基本表示
 - Mermaid / PlantUML fenced code block の描画
 - Light / Dark theme 切替
+- window size、Theme、PlantUML jar pathの永続化と`File > Settings...` UI
 - Tauri asset protocol による相対画像表示
 - 相対 Markdown link のアプリ内遷移と外部 URL の既定ブラウザ起動
 - 複数タブ、active tab の Reload、recent folders

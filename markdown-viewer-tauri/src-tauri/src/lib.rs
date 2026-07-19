@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -41,12 +44,13 @@ struct PlantUmlRuntimeConfig {
     plant_uml_jar_path: Option<String>,
 }
 
+#[derive(Debug)]
 struct PlantUmlRuntimeOptions {
     jar_path: PathBuf,
     _config_path: Option<PathBuf>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RecentFolderEntry {
     path: String,
@@ -54,15 +58,105 @@ struct RecentFolderEntry {
     last_opened_at: String,
 }
 
-#[derive(Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AppConfig {
-    recent_folders: Vec<RecentFolderEntry>,
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum AppTheme {
+    Light,
+    Dark,
 }
 
-#[derive(Default)]
+impl Default for AppTheme {
+    fn default() -> Self {
+        Self::Light
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+struct WindowSize {
+    width: u32,
+    height: u32,
+}
+
+impl Default for WindowSize {
+    fn default() -> Self {
+        Self {
+            width: DEFAULT_WINDOW_WIDTH,
+            height: DEFAULT_WINDOW_HEIGHT,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+struct ViewerSettings {
+    theme: AppTheme,
+    window_size: WindowSize,
+    plant_uml_jar_path: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ViewerSettingsLoadResult {
+    settings: ViewerSettings,
+    warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+struct AppConfig {
+    recent_folders: Vec<RecentFolderEntry>,
+    viewer_settings: ViewerSettings,
+}
+
 struct AppConfigStore {
     lock: Mutex<()>,
+    temp_sequence: AtomicU64,
+}
+
+impl Default for AppConfigStore {
+    fn default() -> Self {
+        Self {
+            lock: Mutex::new(()),
+            temp_sequence: AtomicU64::new(1),
+        }
+    }
+}
+
+impl AppConfigStore {
+    fn load(&self, app: &tauri::AppHandle) -> Result<AppConfig, String> {
+        let _guard = self
+            .lock
+            .lock()
+            .map_err(|_| "Failed to lock app config store.".to_string())?;
+        read_app_config(app)
+    }
+
+    fn update<T>(
+        &self,
+        app: &tauri::AppHandle,
+        updater: impl FnOnce(&mut AppConfig) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let _guard = self
+            .lock
+            .lock()
+            .map_err(|_| "Failed to lock app config store.".to_string())?;
+        let mut config = read_app_config(app)?;
+        let result = updater(&mut config)?;
+        let sequence = self.temp_sequence.fetch_add(1, Ordering::Relaxed);
+        write_app_config(app, &config, sequence)?;
+        Ok(result)
+    }
+
+    fn viewer_settings(&self, app: &tauri::AppHandle) -> Result<ViewerSettingsLoadResult, String> {
+        let config = self.load(app)?;
+        Ok(normalize_viewer_settings(&config.viewer_settings))
+    }
+
+    fn plantuml_runtime(&self, app: &tauri::AppHandle) -> Result<PlantUmlRuntimeOptions, String> {
+        let config = self.load(app)?;
+        resolve_plantuml_runtime(config.viewer_settings.plant_uml_jar_path.as_deref())
+    }
 }
 
 #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -90,6 +184,11 @@ const PLANTUML_RENDER_TIMEOUT: Duration = Duration::from_secs(10);
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const APP_CONFIG_FILE_NAME: &str = "settings.json";
 const MAX_RECENT_FOLDERS: usize = 10;
+const DEFAULT_WINDOW_WIDTH: u32 = 800;
+const DEFAULT_WINDOW_HEIGHT: u32 = 600;
+const MIN_WINDOW_WIDTH: u32 = 640;
+const MIN_WINDOW_HEIGHT: u32 = 480;
+const MAX_WINDOW_DIMENSION: u32 = 10_000;
 
 #[tauri::command]
 fn scan_directory(root_path: String) -> Result<FileTreeNode, String> {
@@ -118,10 +217,56 @@ fn read_text_file(root_path: String, path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRenderResponse, String> {
-    tauri::async_runtime::spawn_blocking(move || render_plantuml_diagrams_blocking(sources))
-        .await
-        .map_err(|error| format!("PlantUML render task failed: {error}"))?
+async fn render_plantuml_diagrams(
+    app: tauri::AppHandle,
+    store: State<'_, AppConfigStore>,
+    sources: Vec<String>,
+) -> Result<PlantUmlRenderResponse, String> {
+    let runtime = store.plantuml_runtime(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        render_plantuml_diagrams_blocking(sources, runtime)
+    })
+    .await
+    .map_err(|error| format!("PlantUML render task failed: {error}"))?
+}
+
+#[tauri::command]
+fn load_viewer_settings(
+    app: tauri::AppHandle,
+    store: State<'_, AppConfigStore>,
+) -> Result<ViewerSettingsLoadResult, String> {
+    store.viewer_settings(&app)
+}
+
+#[tauri::command]
+fn save_viewer_preferences(
+    app: tauri::AppHandle,
+    store: State<'_, AppConfigStore>,
+    theme: AppTheme,
+    plant_uml_jar_path: Option<String>,
+) -> Result<ViewerSettingsLoadResult, String> {
+    let normalized_path = normalize_configured_plantuml_path(plant_uml_jar_path)?;
+    let settings = store.update(&app, |config| {
+        config.viewer_settings.theme = theme;
+        config.viewer_settings.plant_uml_jar_path = normalized_path;
+        Ok(config.viewer_settings.clone())
+    })?;
+    Ok(normalize_viewer_settings(&settings))
+}
+
+#[tauri::command]
+fn save_window_size(
+    app: tauri::AppHandle,
+    store: State<'_, AppConfigStore>,
+    width: u32,
+    height: u32,
+) -> Result<WindowSize, String> {
+    let size = WindowSize { width, height };
+    validate_window_size(size)?;
+    store.update(&app, |config| {
+        config.viewer_settings.window_size = size;
+        Ok(size)
+    })
 }
 
 #[tauri::command]
@@ -129,11 +274,7 @@ fn load_recent_folders(
     app: tauri::AppHandle,
     store: State<'_, AppConfigStore>,
 ) -> Result<Vec<RecentFolderEntry>, String> {
-    let _guard = store
-        .lock
-        .lock()
-        .map_err(|_| "Failed to lock app config store.".to_string())?;
-    Ok(read_app_config(&app)?.recent_folders)
+    Ok(store.load(&app)?.recent_folders)
 }
 
 #[tauri::command]
@@ -147,26 +288,23 @@ fn record_recent_folder(
         return Err("Selected path is not a directory.".into());
     }
 
-    let _guard = store
-        .lock
-        .lock()
-        .map_err(|_| "Failed to lock app config store.".to_string())?;
-    let mut config = read_app_config(&app)?;
     let canonical_path_text = path_to_string(&canonical_path);
-    config
-        .recent_folders
-        .retain(|entry| entry.path != canonical_path_text);
-    config.recent_folders.insert(
-        0,
-        RecentFolderEntry {
-            path: canonical_path_text,
-            name: recent_folder_name(&canonical_path),
-            last_opened_at: current_unix_seconds(),
-        },
-    );
-    config.recent_folders.truncate(MAX_RECENT_FOLDERS);
-    write_app_config(&app, &config)?;
-    Ok(config.recent_folders)
+    let folder_name = recent_folder_name(&canonical_path);
+    store.update(&app, |config| {
+        config
+            .recent_folders
+            .retain(|entry| entry.path != canonical_path_text);
+        config.recent_folders.insert(
+            0,
+            RecentFolderEntry {
+                path: canonical_path_text,
+                name: folder_name,
+                last_opened_at: current_unix_seconds(),
+            },
+        );
+        config.recent_folders.truncate(MAX_RECENT_FOLDERS);
+        Ok(config.recent_folders.clone())
+    })
 }
 
 #[tauri::command]
@@ -175,24 +313,21 @@ fn remove_recent_folder(
     store: State<'_, AppConfigStore>,
     path: String,
 ) -> Result<Vec<RecentFolderEntry>, String> {
-    let _guard = store
-        .lock
-        .lock()
-        .map_err(|_| "Failed to lock app config store.".to_string())?;
-    let mut config = read_app_config(&app)?;
-    config.recent_folders.retain(|entry| entry.path != path);
-    write_app_config(&app, &config)?;
-    Ok(config.recent_folders)
+    store.update(&app, |config| {
+        config.recent_folders.retain(|entry| entry.path != path);
+        Ok(config.recent_folders.clone())
+    })
 }
 
 fn render_plantuml_diagrams_blocking(
     sources: Vec<String>,
+    runtime: PlantUmlRuntimeOptions,
 ) -> Result<PlantUmlRenderResponse, String> {
     let mut diagrams = Vec::with_capacity(sources.len());
     let mut first_error = None;
 
     for source in sources {
-        let result = render_plantuml_diagram(&source);
+        let result = render_plantuml_diagram(&source, &runtime);
         if let Some(error) = &result.error {
             first_error.get_or_insert_with(|| error.clone());
         }
@@ -216,16 +351,113 @@ fn read_app_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
     serde_json::from_str(&content).map_err(|error| format!("Failed to parse app config: {error}"))
 }
 
-fn write_app_config(app: &tauri::AppHandle, config: &AppConfig) -> Result<(), String> {
+fn write_app_config(
+    app: &tauri::AppHandle,
+    config: &AppConfig,
+    sequence: u64,
+) -> Result<(), String> {
     let config_path = app_config_path(app)?;
+    write_app_config_to_path(&config_path, config, sequence)
+}
+
+fn write_app_config_to_path(
+    config_path: &Path,
+    config: &AppConfig,
+    sequence: u64,
+) -> Result<(), String> {
     if let Some(parent) = config_path.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| format!("Failed to create app config directory: {error}"))?;
     }
 
-    let content = serde_json::to_string_pretty(config)
+    let mut content = serde_json::to_vec_pretty(config)
         .map_err(|error| format!("Failed to serialize app config: {error}"))?;
-    fs::write(&config_path, content).map_err(|error| format!("Failed to write app config: {error}"))
+    content.push(b'\n');
+    let temp_path = app_config_temp_path(config_path, sequence)?;
+    let write_result = (|| {
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temp_path)
+            .map_err(|error| format!("Failed to create temporary app config: {error}"))?;
+        file.write_all(&content)
+            .map_err(|error| format!("Failed to write temporary app config: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("Failed to sync temporary app config: {error}"))?;
+        replace_app_config_file(&temp_path, config_path)?;
+        sync_app_config_directory(config_path)?;
+        Ok(())
+    })();
+
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+    write_result
+}
+
+fn app_config_temp_path(config_path: &Path, sequence: u64) -> Result<PathBuf, String> {
+    let parent = config_path
+        .parent()
+        .ok_or_else(|| "App config path has no parent directory.".to_string())?;
+    let file_name = config_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "App config file name is not valid UTF-8.".to_string())?;
+    Ok(parent.join(format!(
+        ".{file_name}.{}.{}.tmp",
+        std::process::id(),
+        sequence
+    )))
+}
+
+#[cfg(windows)]
+fn replace_app_config_file(source: &Path, destination: &Path) -> Result<(), String> {
+    use windows_sys::Win32::Storage::FileSystem::{
+        MoveFileExW, MOVE_FILE_REPLACE_EXISTING, MOVE_FILE_WRITE_THROUGH,
+    };
+
+    let source_wide: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+    let destination_wide: Vec<u16> = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    // SAFETY: both buffers are NUL-terminated UTF-16 paths and remain alive for the call.
+    let result = unsafe {
+        MoveFileExW(
+            source_wide.as_ptr(),
+            destination_wide.as_ptr(),
+            MOVE_FILE_REPLACE_EXISTING | MOVE_FILE_WRITE_THROUGH,
+        )
+    };
+    if result == 0 {
+        return Err(format!(
+            "Failed to replace app config: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn replace_app_config_file(source: &Path, destination: &Path) -> Result<(), String> {
+    fs::rename(source, destination)
+        .map_err(|error| format!("Failed to replace app config: {error}"))
+}
+
+#[cfg(unix)]
+fn sync_app_config_directory(config_path: &Path) -> Result<(), String> {
+    let parent = config_path
+        .parent()
+        .ok_or_else(|| "App config path has no parent directory.".to_string())?;
+    File::open(parent)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| format!("Failed to sync app config directory: {error}"))
+}
+
+#[cfg(not(unix))]
+fn sync_app_config_directory(_config_path: &Path) -> Result<(), String> {
+    Ok(())
 }
 
 fn app_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -233,6 +465,63 @@ fn app_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .app_config_dir()
         .map(|directory| directory.join(APP_CONFIG_FILE_NAME))
         .map_err(|error| format!("Failed to resolve app config directory: {error}"))
+}
+
+fn normalize_viewer_settings(settings: &ViewerSettings) -> ViewerSettingsLoadResult {
+    let mut normalized = settings.clone();
+    let mut warnings = Vec::new();
+    if let Err(error) = validate_window_size(settings.window_size) {
+        normalized.window_size = WindowSize::default();
+        warnings.push(format!(
+            "Saved window size is invalid and was reset to {} x {}: {error}",
+            DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
+        ));
+    }
+    ViewerSettingsLoadResult {
+        settings: normalized,
+        warnings,
+    }
+}
+
+fn validate_window_size(size: WindowSize) -> Result<(), String> {
+    if !(MIN_WINDOW_WIDTH..=MAX_WINDOW_DIMENSION).contains(&size.width) {
+        return Err(format!(
+            "Window width must be between {MIN_WINDOW_WIDTH} and {MAX_WINDOW_DIMENSION}."
+        ));
+    }
+    if !(MIN_WINDOW_HEIGHT..=MAX_WINDOW_DIMENSION).contains(&size.height) {
+        return Err(format!(
+            "Window height must be between {MIN_WINDOW_HEIGHT} and {MAX_WINDOW_DIMENSION}."
+        ));
+    }
+    Ok(())
+}
+
+fn normalize_configured_plantuml_path(path: Option<String>) -> Result<Option<String>, String> {
+    let Some(path) = path.map(|value| value.trim().to_string()) else {
+        return Ok(None);
+    };
+    if path.is_empty() {
+        return Ok(None);
+    }
+
+    let path = PathBuf::from(path);
+    if !path.is_absolute() {
+        return Err("PlantUML jar path must be absolute.".into());
+    }
+    if !is_jar_path(&path) {
+        return Err("PlantUML jar path must have a .jar extension.".into());
+    }
+    if !path.is_file() {
+        return Err(format!("PlantUML jar was not found: {}", path.display()));
+    }
+    normalize_path(path).map(|value| Some(path_to_string(&value)))
+}
+
+fn is_jar_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("jar"))
 }
 
 fn recent_folder_name(path: &Path) -> String {
@@ -369,8 +658,11 @@ fn path_for_external_use(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
-fn render_plantuml_diagram(source: &str) -> PlantUmlDiagramResult {
-    match render_plantuml_svg(source) {
+fn render_plantuml_diagram(
+    source: &str,
+    runtime: &PlantUmlRuntimeOptions,
+) -> PlantUmlDiagramResult {
+    match render_plantuml_svg(source, runtime) {
         Ok(svg) => PlantUmlDiagramResult {
             ok: true,
             html: format!(
@@ -387,8 +679,7 @@ fn render_plantuml_diagram(source: &str) -> PlantUmlDiagramResult {
     }
 }
 
-fn render_plantuml_svg(source: &str) -> Result<String, String> {
-    let runtime = resolve_plantuml_runtime()?;
+fn render_plantuml_svg(source: &str, runtime: &PlantUmlRuntimeOptions) -> Result<String, String> {
     let mut command = Command::new("java");
     command
         .arg("-jar")
@@ -500,7 +791,13 @@ fn join_plantuml_pipe(
         .map_err(|_| "Failed to read PlantUML output: reader thread panicked.".to_string())?
 }
 
-fn resolve_plantuml_runtime() -> Result<PlantUmlRuntimeOptions, String> {
+fn resolve_plantuml_runtime(
+    configured_jar_path: Option<&str>,
+) -> Result<PlantUmlRuntimeOptions, String> {
+    if let Some(configured_jar_path) = configured_jar_path {
+        return resolve_configured_plantuml_runtime(configured_jar_path);
+    }
+
     for directory in plantuml_runtime_directories()? {
         let config_path = directory.join(PLANTUML_CONFIG_FILE_NAME);
         if config_path.is_file() {
@@ -516,7 +813,29 @@ fn resolve_plantuml_runtime() -> Result<PlantUmlRuntimeOptions, String> {
         }
     }
 
-    Err("PlantUML runtime is not configured. Place plantuml.jar next to the executable or set plantUmlJarPath in plantuml.config.json.".into())
+    Err("PlantUML runtime is not configured. Choose plantuml.jar in File > Settings, place it next to the executable, or set plantUmlJarPath in plantuml.config.json.".into())
+}
+
+fn resolve_configured_plantuml_runtime(
+    configured_jar_path: &str,
+) -> Result<PlantUmlRuntimeOptions, String> {
+    let jar_path = PathBuf::from(configured_jar_path);
+    if !jar_path.is_absolute() {
+        return Err("Configured PlantUML jar path must be absolute.".into());
+    }
+    if !is_jar_path(&jar_path) {
+        return Err("Configured PlantUML jar path must have a .jar extension.".into());
+    }
+    if !jar_path.is_file() {
+        return Err(format!(
+            "Configured PlantUML jar was not found: {}",
+            jar_path.display()
+        ));
+    }
+    Ok(PlantUmlRuntimeOptions {
+        jar_path: normalize_path(jar_path)?,
+        _config_path: None,
+    })
 }
 
 fn resolve_plantuml_runtime_from_config(
@@ -711,6 +1030,150 @@ fn escape_html(value: &str) -> String {
 mod tests {
     use super::*;
 
+    fn test_directory(name: &str) -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("test clock must be after Unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "markdown-viewer-{name}-{}-{suffix}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&directory).expect("test directory must be created");
+        directory
+    }
+
+    #[test]
+    fn legacy_config_defaults_viewer_settings() {
+        let config: AppConfig = serde_json::from_str(
+            r#"{"recentFolders":[{"path":"/docs","name":"docs","lastOpenedAt":"1"}]}"#,
+        )
+        .expect("legacy config must deserialize");
+
+        assert_eq!(config.recent_folders.len(), 1);
+        assert_eq!(config.viewer_settings, ViewerSettings::default());
+    }
+
+    #[test]
+    fn invalid_window_size_preserves_other_settings_and_returns_warning() {
+        let settings = ViewerSettings {
+            theme: AppTheme::Dark,
+            window_size: WindowSize {
+                width: 320,
+                height: 200,
+            },
+            plant_uml_jar_path: Some("/tmp/plantuml.jar".into()),
+        };
+
+        let result = normalize_viewer_settings(&settings);
+
+        assert_eq!(result.settings.theme, AppTheme::Dark);
+        assert_eq!(result.settings.window_size, WindowSize::default());
+        assert_eq!(
+            result.settings.plant_uml_jar_path.as_deref(),
+            Some("/tmp/plantuml.jar")
+        );
+        assert_eq!(result.warnings.len(), 1);
+    }
+
+    #[test]
+    fn window_size_validation_accepts_boundaries() {
+        assert!(validate_window_size(WindowSize {
+            width: MIN_WINDOW_WIDTH,
+            height: MIN_WINDOW_HEIGHT,
+        })
+        .is_ok());
+        assert!(validate_window_size(WindowSize {
+            width: MAX_WINDOW_DIMENSION,
+            height: MAX_WINDOW_DIMENSION,
+        })
+        .is_ok());
+        assert!(validate_window_size(WindowSize {
+            width: MIN_WINDOW_WIDTH - 1,
+            height: MIN_WINDOW_HEIGHT,
+        })
+        .is_err());
+    }
+
+    #[test]
+    fn jar_extension_is_ascii_case_insensitive() {
+        assert!(is_jar_path(Path::new("plantuml.jar")));
+        assert!(is_jar_path(Path::new("PLANTUML.JAR")));
+        assert!(!is_jar_path(Path::new("plantuml.zip")));
+    }
+
+    #[test]
+    fn atomic_config_write_replaces_complete_document() {
+        let directory = test_directory("atomic-config");
+        let config_path = directory.join(APP_CONFIG_FILE_NAME);
+        fs::write(&config_path, "old content").expect("old config must be written");
+        let config = AppConfig {
+            viewer_settings: ViewerSettings {
+                theme: AppTheme::Dark,
+                ..ViewerSettings::default()
+            },
+            ..AppConfig::default()
+        };
+
+        write_app_config_to_path(&config_path, &config, 1)
+            .expect("atomic config write must succeed");
+        let stored: AppConfig = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("new config must be readable"),
+        )
+        .expect("new config must be complete JSON");
+
+        assert_eq!(stored, config);
+        fs::remove_file(&config_path).expect("test config must be removed");
+        fs::remove_dir(&directory).expect("test directory must be removed");
+    }
+
+    #[test]
+    fn atomic_config_write_failure_preserves_existing_document() {
+        let directory = test_directory("atomic-config-failure");
+        let config_path = directory.join(APP_CONFIG_FILE_NAME);
+        let old_config = AppConfig::default();
+        fs::write(
+            &config_path,
+            serde_json::to_vec_pretty(&old_config).expect("old config must serialize"),
+        )
+        .expect("old config must be written");
+        let temp_path = app_config_temp_path(&config_path, 1).expect("temp path must resolve");
+        fs::write(&temp_path, "collision").expect("collision file must be written");
+        let new_config = AppConfig {
+            viewer_settings: ViewerSettings {
+                theme: AppTheme::Dark,
+                ..ViewerSettings::default()
+            },
+            ..AppConfig::default()
+        };
+
+        assert!(write_app_config_to_path(&config_path, &new_config, 1).is_err());
+        let stored: AppConfig = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("old config must remain readable"),
+        )
+        .expect("old config must remain complete JSON");
+
+        assert_eq!(stored, old_config);
+        fs::remove_file(&config_path).expect("test config must be removed");
+        fs::remove_dir(&directory).expect("test directory must be removed");
+    }
+
+    #[test]
+    fn invalid_explicit_plantuml_path_does_not_use_automatic_discovery() {
+        let directory = test_directory("missing-explicit-jar");
+        let configured_path = directory.join("missing.jar");
+
+        let error = resolve_plantuml_runtime(Some(
+            configured_path
+                .to_str()
+                .expect("test path must be valid UTF-8"),
+        ))
+        .expect_err("missing explicit jar must fail");
+
+        assert!(error.contains("Configured PlantUML jar was not found"));
+        fs::remove_dir(&directory).expect("test directory must be removed");
+    }
+
     #[test]
     fn ordinary_path_is_unchanged_for_external_use() {
         let path = Path::new("docs/sample.md");
@@ -744,10 +1207,34 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppConfigStore::default())
+        .setup(|app| {
+            let store = app.state::<AppConfigStore>();
+            match store.viewer_settings(app.handle()) {
+                Ok(result) => {
+                    for warning in result.warnings {
+                        eprintln!("Viewer settings warning: {warning}");
+                    }
+                    if let Some(window) = app.get_webview_window("main") {
+                        let size = result.settings.window_size;
+                        if let Err(error) = window.set_size(tauri::LogicalSize::new(
+                            size.width as f64,
+                            size.height as f64,
+                        )) {
+                            eprintln!("Failed to restore window size: {error}");
+                        }
+                    }
+                }
+                Err(error) => eprintln!("Failed to load viewer settings: {error}"),
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             scan_directory,
             read_text_file,
             render_plantuml_diagrams,
+            load_viewer_settings,
+            save_viewer_preferences,
+            save_window_size,
             load_recent_folders,
             record_recent_folder,
             remove_recent_folder

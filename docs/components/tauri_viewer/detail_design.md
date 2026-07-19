@@ -334,9 +334,9 @@ Recent Folders は React の MenuBar dropdown から操作し、永続化と pat
 | `name` | Rust 側で保存時に確定した basename snapshot。frontend は通常 `getFileName(entry.path)` で再導出しない |
 | `lastOpenedAt` | Unix seconds 文字列 |
 
-Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し、`load_recent_folders` / `record_recent_folder` / `remove_recent_folder` の app config JSON 読み書きを同一 lock で直列化する。lock 範囲は settings read/write に限定し、`scan_directory`、Markdown 読み込み、PlantUML rendering は対象外とする。
+Rust は `AppConfigStore` を Tauri state として管理し、Recent Folders、Viewer settings、PlantUML runtime設定のreadとapp config JSON更新を同一 lockで直列化する。lock範囲は短いsettings read/writeに限定し、`scan_directory`、Markdown読み込み、Java processによるPlantUML rendering本体は対象外とする。
 
-設定ファイルは Tauri app config directory 配下の `settings.json` で、構造は次の通り。
+設定ファイルは Tauri app config directory 配下の `settings.json` で、Recent Folders部分は次の通り。完全schemaは後述のViewer Settingsを参照する。
 
 ```json
 {
@@ -350,6 +350,8 @@ Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し
 }
 ```
 
+`AppConfigStore` はRecent FoldersとViewer settingsのfield-specific updateを同じlock内のread-modify-writeへ集約する。保存は同じdirectoryのtemporary fileへ全量write / syncし、Unixはrename、Windowsはreplace-existing + write-throughでdestinationを置換する。serialize / temporary write / replace失敗時は既存`settings.json`を維持する。
+
 `record_recent_folder` は directory であることを確認してから同一 `path` の既存 entry を削除し、新しい entry を先頭へ挿入する。最大件数は 10 件で、超過分は末尾から切り捨てる。保存後に folder が OS 側でリネームされた場合、既存 entry の `name` は保存時点の snapshot のまま残る。
 
 ### UI と操作
@@ -361,6 +363,28 @@ Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し
 - `x` delete button は `remove_recent_folder` を呼び、entry を明示削除する。
 - 保存済み path が存在しない場合、recent entry click は `scan_directory` / `record_recent_folder` の失敗を error strip に表示し、entry を自動削除しない。
 
+## Viewer Settings
+
+app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar pathを保存する。既存の`recentFolders`だけのJSONはserde defaultで読み、次回保存時に新schemaへ更新する。
+
+```json
+{
+  "recentFolders": [],
+  "viewerSettings": {
+    "theme": "dark",
+    "windowSize": { "width": 1200, "height": 800 },
+    "plantUmlJarPath": "/absolute/path/to/plantuml.jar"
+  }
+}
+```
+
+- `Builder::setup`がmain windowへ保存済みlogical sizeを適用する。範囲外sizeだけは800 x 600へ正規化してwarningを返し、frontendが正常値を再保存する。
+- frontendは`load_viewer_settings`と`load_recent_folders`を`Promise.allSettled`で読み、Dark themeのstartup flashを避けるため完了までloading shellを表示する。
+- `View > Theme`と`File > Settings...`は同じ`save_viewer_preferences`を使う。Settings dialogはdraftを持ち、Save成功前にapp Theme / runtimeを変更しない。
+- window resizeはphysical sizeをscale factorでlogical sizeへ変換し、500ms debounce後に`save_window_size`へ送る。maximized / minimized / fullscreen中は保存しない。resize commandは直列queueにし、最新pending sizeを追送する。
+- foreground config操作はoperation countでbusyを管理する。background resizeはMenuBarをdisableせず、backend lockとfield-specific updateでRecent Folders / preferencesとの競合を防ぐ。
+- 明示`plantUmlJarPath`がある場合は最優先し、削除済み・無効pathをruntime directory探索へfallbackしない。`Clear`した場合だけ`plantuml.config.json`、同梱`plantuml.jar`の探索へ戻る。
+
 ## エラーハンドリング
 
 | 失敗箇所 | 表示 |
@@ -368,6 +392,8 @@ Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し
 | Tauri command 失敗 | `errorMessage` を StatusBar 直上の error strip に表示 |
 | Markdown 読み込み失敗 | 同上 + 直前の選択ファイルは維持 |
 | Recent Folders 読み書き失敗 | error strip に表示。missing path は自動削除しない |
+| Settings validation / 保存失敗 | Settings dialog内の`role="alert"`へ表示し、draftを維持 |
+| startup / background window size保存失敗 | error stripに表示。malformed configは自動上書きしない |
 | Mermaid 描画失敗 | error strip に `Mermaid render failed: ...` で表示 |
 | PlantUML 図単位失敗 | 該当位置に `.plantuml-error`、`firstError` を `errorMessage` にも反映 |
 | PlantUML pending | 該当位置に `.plantuml-loading`、`MenuBar / Explorer` を一時無効化して重複操作を抑止 |
@@ -380,7 +406,7 @@ Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し
 
 ```text
 <main.app-shell>
-  <MenuBar/>           ← File: Open Folder / Recent Folders / Reload、View: Theme
+  <MenuBar/>           ← File: Open Folder / Recent Folders / Reload / Settings、View: Theme
   <RootPathBar/>       ← root path。未選択時は No folder selected
   <section.workspace>
     <aside.explorer-pane>
@@ -396,6 +422,7 @@ Rust は `AppConfigStore { lock: Mutex<()> }` を Tauri state として管理し
   <ErrorBanner/>       ← 代表 error。エラー発生時のみ表示
   <StatusBar/>         ← File / State
 </main>
+<SettingsDialog/>      ← modal。Theme / window size / PlantUML jar path
 ```
 
 `MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload` を持ち、`View` dropdown は theme 切替を持つ。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。

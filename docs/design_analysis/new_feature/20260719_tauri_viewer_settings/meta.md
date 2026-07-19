@@ -13,7 +13,7 @@ components:
   - "docs/rules/development_workflow.md"
 status: "active"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "draft"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -21,6 +21,8 @@ related_commits:
   - "7e22284 : Phase 1 initialize Tauri viewer settings workflow"
   - "4db51a5 : Phase 2 draft Tauri viewer settings design"
   - "eb13890 : Phase 2 design review (conditional approval)"
+  - "628373d : Phase 2 address Tauri viewer settings design review"
+  - "0d7342e : Phase 2 approve Tauri viewer settings design"
 source_todo_path: "docs/todo/todo.md#todo-2026-014-tauri-viewer-設定永続化と設定-ui-導入"
 depends_on:
   - "TODO-2026-006 Tauri Split view introduction"
@@ -58,5 +60,5 @@ follow_up:
 | Phase 0 Requirements | Done (`4b50af2`) |
 | Phase 1 Branch and meta | Done (Phase 1 initialization commit) |
 | Phase 2 Design review | Done (approved 2026-07-19) |
-| Phase 3 Implementation and docs review | Not started |
+| Phase 3 Implementation and docs review | Draft ready for review |
 | Phase 4 Verification and completion | Not started |

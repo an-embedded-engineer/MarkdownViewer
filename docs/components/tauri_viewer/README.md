@@ -7,8 +7,8 @@ Tauri v2 + React + TypeScript + Rust による Markdown Viewer MVP 実装。
 ## 責務
 
 - Tauri dialog plugin でフォルダを選択する。
-- Rust command でファイルツリー構築、Markdown 読み込み、Recent Folders 設定永続化を行う。
-- React で MenuBar dropdown、Recent Folders、root path strip、Explorer、TabStrip、Markdown preview、error strip、StatusBar を表示する。
+- Rust command でファイルツリー構築、Markdown 読み込み、Recent Folders / Viewer settings の永続化を行う。
+- React で MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、TabStrip、Markdown preview、error strip、StatusBar を表示する。
 - 同一 root 内の Markdown を複数タブで保持し、active tabだけを単一preview paneへ描画する。
 - `markdown-it`、`mermaid`、Rust 側 PlantUML command で Markdown / Mermaid / PlantUML を描画する。
 
@@ -36,7 +36,7 @@ markdown-viewer-tauri/
 ├── public/                       — favicon / アイコンなど静的 asset
 ├── src/                          — React + TypeScript フロントエンド
 │   ├── main.tsx                  — React エントリーポイント
-│   ├── App.tsx                   — UI + tab状態管理 + Markdown 描画
+│   ├── App.tsx                   — UI + tab / settings状態管理 + Markdown 描画
 │   ├── App.css                   — Light / Dark テーマ + MenuBar / TabStrip / 2 ペイン / StatusBar レイアウト
 │   └── vite-env.d.ts             — Vite 型定義
 └── src-tauri/                    — Rust バックエンド (Tauri 本体)
@@ -47,7 +47,7 @@ markdown-viewer-tauri/
     └── src/
         ├── main.rs               — exe エントリ → lib::run
         └── lib.rs                — commands (scan_directory / read_text_file /
-                                     render_plantuml_diagrams / recent folders)
+                                     render_plantuml_diagrams / app settings)
 ```
 
 ## 主要要素
@@ -55,12 +55,14 @@ markdown-viewer-tauri/
 | 要素 | 役割 | ソース |
 | --- | --- | --- |
 | `main.tsx` | React DOM ルートに `App` をマウント | [markdown-viewer-tauri/src/main.tsx](../../../markdown-viewer-tauri/src/main.tsx) |
-| `App` / `MenuBar` / `RootPathBar` / `FileTree` / `TabStrip` / `MarkdownPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`tabs` / `activeTabId` を文書状態の正本とし、Markdown / PlantUML結果とloading/errorをtab単位で保持する。root操作とRecent Foldersだけをglobal busyとして扱う | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
-| `App.css` | Light / Dark テーマ、MenuBar、TabStripのactive/loading/error/横overflow、2ペイン、error strip、StatusBar、Markdown図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
+| `App` / `MenuBar` / `SettingsDialog` / `RootPathBar` / `FileTree` / `TabStrip` / `MarkdownPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`tabs` / `activeTabId` を文書状態の正本とし、Theme / window size / PlantUML path を typed settings として扱う。foreground config 操作と background resize 保存を分離する | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
+| `App.css` | Light / Dark テーマ、MenuBar、Settings dialog、TabStripのactive/loading/error/横overflow、2ペイン、error strip、StatusBar、Markdown図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
 | `scan_directory` | Rust command。root 配下を再帰走査して `FileTreeNode` を返す。除外ディレクトリあり | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `read_text_file` | Rust command。root 配下チェックと Markdown 拡張子チェックの後 UTF-8 で読み込む | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `render_plantuml_diagrams` | Rust command。`spawn_blocking` で各 source を `java -jar plantuml.jar -tsvg -pipe` に渡し、SVG / エラー HTML を返す | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `load_recent_folders` / `record_recent_folder` / `remove_recent_folder` | Rust command。app config JSON の `recentFolders` を読み込み、成功した root folder を最大 10 件で保存し、明示削除を反映する | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
+| `load_viewer_settings` / `save_viewer_preferences` / `save_window_size` | Rust command。Theme、logical window size、PlantUML jar pathを型付き app config JSON で読み書きする | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
+| `AppConfigStore` | Store lock 内で config 全体を read-modify-writeし、temporary fileのsync後にatomic replaceする | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | Tauri config | window 設定 / asset protocol / bundle target | [markdown-viewer-tauri/src-tauri/tauri.conf.json](../../../markdown-viewer-tauri/src-tauri/tauri.conf.json) |
 | Capability | `core:default` / `dialog:default` / `opener:default` | [markdown-viewer-tauri/src-tauri/capabilities/default.json](../../../markdown-viewer-tauri/src-tauri/capabilities/default.json) |
 | Cargo manifest | `tauri-plugin-dialog` / `tauri-plugin-opener` / `serde` 依存 | [markdown-viewer-tauri/src-tauri/Cargo.toml](../../../markdown-viewer-tauri/src-tauri/Cargo.toml) |
