@@ -43,4 +43,5 @@ Tauri版を継続利用する際、window sizeとThemeを起動ごとに調整�
   - `5321270` Phase 3 implementation approved
   - `dc97286` Phase 4-a user verification
   - `0d12d31` Phase 4-b completion artifacts
+  - `099b9a0` Phase 4-c `main` merge (`--no-ff`)
 - Completed: `2026-07-19`

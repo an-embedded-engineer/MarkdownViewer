@@ -11,7 +11,7 @@ components:
   - "markdown-viewer-tauri/src-tauri/capabilities"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -29,6 +29,7 @@ related_commits:
   - "5321270 : Phase 3 approve Tauri settings implementation review"
   - "dc97286 : Phase 4-a record Tauri settings user verification"
   - "0d12d31 : Phase 4-b complete report, diff archive, TODO archive, and history"
+  - "099b9a0 : Phase 4-c merge feature branch into main with --no-ff"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-014-tauri-viewer-設定永続化と設定-ui-導入"
 depends_on:
   - "TODO-2026-005 Tauri Multi-tab core introduction"
@@ -36,6 +37,7 @@ follow_up:
   - "TODO-2026-006 Tauri Split view introduction (independent work package after TODO-2026-005)"
   - "TODO-2026-007 Tauri UX evaluation and Avalonia specification"
   - "TODO-2026-015 Avalonia Viewer settings persistence and settings UI rollout"
+  - "TODO-2026-016 Tauri Viewer settings Windows platform verification"
 ---
 
 # TODO-2026-014 Tauri Viewer settings persistence and settings UI meta
@@ -68,4 +70,4 @@ follow_up:
 | Phase 1 Branch and meta | Done (Phase 1 initialization commit) |
 | Phase 2 Design review | Done (approved 2026-07-19) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-19, unresolved 0) |
-| Phase 4 Verification and completion | Phase 4-b completion artifacts done; awaiting Phase 4-c merge approval |
+| Phase 4 Verification and completion | Done (merged into `main` at `099b9a0`) |
