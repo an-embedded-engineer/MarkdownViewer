@@ -6,7 +6,9 @@
 **Phase 2 review**: `docs/design_analysis/spec_change/20260719_tauri_html_document_viewing/review/tauri_html_document_viewing_design_review.md`
 **対象 meta**: `docs/design_analysis/spec_change/20260719_tauri_html_document_viewing/meta.md`
 **レビュー対象コミット**: `05039bb Phase 3 implement Tauri HTML document viewing`
-**判定**: **承認 (Approved)**。Phase 4-a (実機検証) へ進行可。指摘は Low 4 件のみで、いずれも Phase 4 進行を妨げない。
+**再確認日**: 2026-07-19
+**再確認対象コミット**: `4bf5da6 Phase 3 address Tauri HTML implementation review`
+**判定**: **承認 (Approved)・未解決指摘ゼロ**。初回承認時の Low 4 件はすべて `4bf5da6` で解決済みと再確認した。Phase 4-a (実機検証) へ進行可。
 
 ---
 
@@ -40,7 +42,7 @@ Phase 2 の全指摘 (root-relative segment URL、ready handshake、Origin gatin
 
 **修正案**: listener 作成時に capture した `tabId` / `revision` と callback 時点の active 値の実比較を渡すか、少なくとも「構造的に真であることを keyed remount が保証する」旨のコメント / docs 追記を行う。TODO-2026-006 の設計時に再評価すること。
 
-**工程**: Phase 3追補。 **status**: 対応済み（再レビュー待ち）
+**工程**: Phase 3追補。 **status**: 解決済み（2026-07-19 再確認、commit `4bf5da6`）
 
 **対応**: `HtmlPreview`へactive tab id / revisionを明示的に渡し、listenerがcaptureした`tabId` / `revision`との実比較を`tabMatches` / `revisionMatches`へ渡すよう変更した。keyed remountだけへ暗黙依存しない契約にした。
 
@@ -52,7 +54,7 @@ Phase 2 の全指摘 (root-relative segment URL、ready handshake、Origin gatin
 
 **修正案**: `tauri::async_runtime::spawn_blocking` の共有 pool へ寄せる。既存 PlantUML 経路と同じ手段に揃うため §12 の共通化方針とも整合する。
 
-**工程**: Phase 3追補。 **status**: 対応済み（再レビュー待ち）
+**工程**: Phase 3追補。 **status**: 解決済み（2026-07-19 再確認、commit `4bf5da6`）
 
 **対応**: protocol callbackのper-request `thread::spawn`を`tauri::async_runtime::spawn_blocking`へ変更し、Tauri共有blocking poolへ統合した。
 
@@ -64,7 +66,7 @@ Phase 2 の全指摘 (root-relative segment URL、ready handshake、Origin gatin
 
 **修正案**: `protocol_serves_get_and_head_with_security_headers_and_cors_policy` へ JSON GET body の等価 assert と残り 3 header の assert を追加する。
 
-**工程**: Phase 3追補。 **status**: 対応済み（再レビュー待ち）
+**工程**: Phase 3追補。 **status**: 解決済み（2026-07-19 再確認、commit `4bf5da6`）
 
 **対応**: success responseの`Cache-Control`、`Referrer-Policy`、`Cross-Origin-Resource-Policy`を直接assertし、JSON GET bodyの完全一致、bridge非注入、resource responseへHTML CSPが付かないことをtestへ追加した。
 
@@ -76,7 +78,7 @@ Phase 2 の全指摘 (root-relative segment URL、ready handshake、Origin gatin
 
 **修正案**: malicious.html へ上記 probe を追記して結果を `#results` へ記録するか、Phase 4-a 手順書に手動確認手順として明記する。
 
-**工程**: Phase 3追補。 **status**: 対応済み（再レビュー待ち）
+**工程**: Phase 3追補。 **status**: 解決済み（2026-07-19 再確認、commit `4bf5da6`）
 
 **対応**: malicious fixtureへexternal fetch / WebSocket、asset / unknown protocol、top / self navigation、download、forged `openExternal` / burst probeを追加した。navigation probeは明示button操作に限定し、その他は結果を`#results`へ記録する。
 
@@ -151,3 +153,16 @@ success_metrics の必須 command はレビュー時に独立再実行してす�
 実装は承認済み設計を忠実に反映しており、Phase 2 レビューの全指摘 (High 1 / Medium 2 / Low 3) が実装・test・恒久 docs まで一貫して反映されている。root-relative segment URL による相対 resource 解決、ready handshake による実装可能な load 判定、Origin gating の明確化はいずれも設計どおりで、`convertFileSrc` fallback・absolute path 露出・互換 wrapper・権限緩和は存在しない。Rust 22 件 / Vitest 20 件の自動 test は成功系・境界値・拒否系を設計 §17 にほぼ対応する粒度で検証しており、レビュー時の独立再実行でも全 PASS を確認した。恒久 docs は source と一致する。
 
 指摘は Low 4 件 (3.1〜3.4) のみで、いずれも現時点の動作・安全性に影響せず、Phase 4-a 進行の blocker ではない。3.4 (malicious fixture の probe 追加) は Phase 4-a 開始前の対応を推奨する。以上より Phase 3 実装を**承認 (Approved)** とし、**Phase 4-a (macOS / Windows / Linux 実機検証) へ進行可能**であることを明示する。
+
+### 再確認結果 (2026-07-19, commit `4bf5da6`)
+
+実装担当による Low 4 件の追補を差分と検証再実行で再確認し、全件を解決済みと判定した。
+
+- **3.1 — 解決済み**: `HtmlPreview` へ `activeTabId` / `activeRevision` を明示 props として追加し、listener が capture した `tabId` / `revision` との実比較を `tabMatches` / `revisionMatches` へ渡す契約に変更された (effect 依存配列も更新済み)。keyed remount への暗黙依存が解消され、split view (TODO-2026-006) で mount 構成が変わっても policy 入力が実検証のまま残る。
+- **3.2 — 解決済み**: protocol callback の per-request `thread::spawn` が `tauri::async_runtime::spawn_blocking` へ変更され、Tauri 共有 blocking pool (既存 PlantUML 経路と同一手段) に統合された。
+- **3.3 — 解決済み**: success response の `Cache-Control: no-store` / `Referrer-Policy: no-referrer` / `Cross-Origin-Resource-Policy: cross-origin` の直接 assert、JSON GET body の完全一致 assert、非 HTML resource への bridge 非注入・CSP header 非付与の assert が追加された。
+- **3.4 — 解決済み**: malicious fixture へ external `fetch` / WebSocket、asset protocol / unknown custom protocol の image probe、download 属性 link、top / self navigation (誤爆防止のため明示 button 操作に限定)、forged `openExternal` / burst message (user activation なし送信) が追加され、結果が `#results` へ記録される。設計 §17.4 fixture 5 の全項目を fixture で再現できる。
+
+追補による新たな齟齬・退行は検出しなかった。検証 command (`npm run build`、`npm test -- --run` 20 件、`cargo fmt -- --check`、`cargo test` 22 件) を再確認時に独立再実行し、すべて PASS を確認した。実装記録 §8 の反映記載とも一致する。
+
+**未解決指摘はゼロである。** Phase 3 を最終承認とし、Phase 4-a (macOS / Windows / Linux 実機検証) への進行を可とする。
