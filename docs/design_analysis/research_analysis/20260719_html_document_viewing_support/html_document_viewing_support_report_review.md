@@ -1,9 +1,9 @@
 # HTML形式仕様書の表示対応 調査レポートレビュー
 
 - review kind: research report review
-- review target: `report.md` / `meta.md`（review target commit `0f021b9`）
+- review target: `report.md` / `meta.md`（review target commit `0f021b9`、Round 2は対応commit `e8441af`）
 - reviewer: Claude Code（レビュー担当 Agent）
-- review date: 2026-07-19
+- review date: 2026-07-19（Round 1 / Round 2）
 
 ## 1. 総評
 
@@ -87,3 +87,22 @@
 **条件付き承認**。
 
 調査の網羅性、実装との整合性、推奨方式の実現可能性、spec-change workflowへ渡す粒度はいずれも要求水準を満たしている。ただし、指摘1～3は次workflowの設計判断（security boundaryの実現手段、既存経路の遡及修正範囲）に直接影響するため、report.mdへの反映を承認条件とする。指摘4～6は軽微であり、同時反映を推奨するが承認条件とはしない。
+
+## 5. Round 2 確認結果（対応commit `e8441af`）
+
+対応commit `e8441af`のreport.md差分を全件確認し、現行実装・依存packageとの再突き合わせを行った。結果、**指摘1～6はすべて解消**と判定する。
+
+| 指摘 | 判定 | 確認内容 |
+| --- | --- | --- |
+| 指摘1 | 解消 | §8.2でsubresource監視をadapter固有APIが使えるplatform限定の追加防御へ格下げし、主境界を「trusted project root契約 + `NavigationStarted`によるtop-level navigation制御 + host bridge制限」へ変更。`NewWindowRequested`前提の記述は削除され、新規window制御はinjected click bridgeの`preventDefault`を主経路とする記述へ置換。macOS WebKitのfile read access scopeによりroot内`../` resourceが読めない可能性（許可・拒否の両方向確認）も§8.2・§11.1へ追加。§10.2 / §10.3 / §13 / §15および未解決事項12も整合して更新済み。 |
+| 指摘2 | 解消 | §2.1と§10.1を「Tauriは`html: false`で新規受入れ、AvaloniaのMarkdig pipelineは`DisableHtml()`未設定でraw HTML / scriptを既に通す」へ修正。§4.1へ`MarkdownRenderService.cs`の根拠を追加し、`DisableHtml()`採否を未解決事項11として追加。実装（`MarkdownRenderService.cs:18-20`）と整合。 |
+| 指摘3 | 解消 | §8.2変更候補へ「既存Markdownと新規HTMLの両経路で`HandleWebMessageAsync`の`openExternal`を`http:` / `https:` allowlistへ制限」を追加。§11.1テスト候補を「Markdown / HTMLの両経路で拒否」へ拡張し、§13リスク表と§15採用案（共通host handler）にも反映済み。 |
+| 指摘4 | 解消 | §4.1を「`scan_directory`はMarkdownと画像を列挙し、`read_text_file`はMarkdown拡張子のみ受け付ける」へ修正。`lib.rs`の実装と一致。 |
+| 指摘5 | 解消 | §8.3と§10.5表へ、現行Tauri Markdownが`mailto:`を`openUrl`へ委譲済みで挙動差が生じる旨を追記し、未解決事項4を「HTMLも許可するか、全経路を`http(s)`へ統一するか」の決定事項へ更新。 |
+| 指摘6 | 解消 | §11.1 Tauri / Frontendテスト候補へ「sandboxed iframeのopaque origin（`Origin: null`）からのroot内resource / JSON `fetch`をmacOS / Windows / Linuxで確認」を追加。 |
+
+旧記述の残存も確認した。`WebResourceRequested`は「共通利用できることを確認できなかった」という否定形の記述にのみ残り、`NewWindowRequested`への依存は消えている。Round 1指摘に対する対応漏れ・新規の不整合はない。
+
+### Round 2承認
+
+**承認**。承認条件とした指摘1～3を含む全指摘が解消されており、report.mdは次のspec-change workflowへの入力として承認する。
