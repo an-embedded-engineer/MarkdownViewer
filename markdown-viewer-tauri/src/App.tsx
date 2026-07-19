@@ -884,6 +884,8 @@ function App() {
                 key={`${activeTab.id}-${activeTab.revision}`}
                 tabId={activeTab.id}
                 revision={activeTab.revision}
+                activeTabId={activeTab.id}
+                activeRevision={activeTab.revision}
                 previewUrl={activeTab.previewUrl}
                 onReady={markHtmlReady}
                 onError={markHtmlError}
@@ -1532,6 +1534,8 @@ function MarkdownPreview({
 type HtmlPreviewProps = {
   tabId: string;
   revision: number;
+  activeTabId: string;
+  activeRevision: number;
   previewUrl: string;
   onReady: (tabId: string, revision: number) => void;
   onError: (tabId: string, revision: number, message: string) => void;
@@ -1541,6 +1545,8 @@ type HtmlPreviewProps = {
 function HtmlPreview({
   tabId,
   revision,
+  activeTabId,
+  activeRevision,
   previewUrl,
   onReady,
   onError,
@@ -1577,8 +1583,8 @@ function HtmlPreview({
       const decision = evaluateHtmlBridgeMessage(event.data, {
         sourceMatches: event.source === iframeRef.current?.contentWindow,
         origin: event.origin,
-        tabMatches: true,
-        revisionMatches: true,
+        tabMatches: activeTabId === tabId,
+        revisionMatches: activeRevision === revision,
         readyAccepted,
         hasTransientUserActivation: navigator.userActivation?.isActive === true,
         duplicateExternalOpen,
@@ -1602,7 +1608,7 @@ function HtmlPreview({
       window.clearTimeout(timeout);
       window.removeEventListener("message", handleMessage);
     };
-  }, [tabId, revision]);
+  }, [tabId, revision, activeTabId, activeRevision]);
 
   return (
     <iframe

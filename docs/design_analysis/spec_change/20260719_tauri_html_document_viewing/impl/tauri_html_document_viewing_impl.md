@@ -113,3 +113,14 @@ Phase 3レビュー依頼前の最終実行結果を以下へ記録する。
 - root swapとin-flight protocol request、Markdown regression。
 
 Windows / Linux実機はPhase 3のローカル自動検証では確認できないため、成功と推定せずPhase 4-aのplatform matrixへ残す。
+
+## 8. 実装レビュー反映
+
+Claude実装レビュー `609c70a` はPhase 3を承認し、非blockerのLow改善提案4件を挙げた。Phase 4開始前に全件を追補した。
+
+- active tab / revisionのpolicy入力を固定値から明示比較へ変更した。
+- protocol requestのblocking readをper-request OS threadからTauri共有blocking poolへ変更した。
+- protocol security headerとnon-HTML body非変換の直接assertを追加した。
+- malicious fixtureへexternal fetch / WebSocket、asset / unknown protocol、top / self navigation、download、forged message burstを追加した。
+
+追補後にPhase 3必須commandを再実行し、Claude follow-upで未解決指摘ゼロを確認する。

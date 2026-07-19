@@ -8,10 +8,15 @@
     <h1>Boundary checks</h1>
     <ul id="results"></ul>
     <img src="https://example.com/external.png" alt="External image must be blocked" />
+    <img id="asset-probe" src="asset://localhost/etc/passwd" alt="Asset protocol must be blocked" />
+    <img id="custom-probe" src="unknown-protocol://host/resource.png" alt="Unknown protocol must be blocked" />
     <form action="https://example.com/submit"><button type="submit">Blocked form</button></form>
     <a href="file:///etc/passwd">Blocked file URL</a>
     <a href="../../outside.html">Blocked root escape</a>
     <a href="https://example.com/popup" target="_blank">External link via host bridge</a>
+    <a href="data:text/plain,blocked" download="blocked.txt">Blocked download</a>
+    <button id="top-navigation" type="button">Attempt blocked top navigation</button>
+    <button id="self-navigation" type="button">Attempt blocked self navigation</button>
     <script>
       const results = document.querySelector("#results");
       const record = (label, value) => {
@@ -23,6 +28,32 @@
       record("__TAURI_INTERNALS__", typeof window.__TAURI_INTERNALS__);
       record("isTauri", typeof window.isTauri);
       try { window.open("https://example.com/popup"); } catch { record("popup", "blocked"); }
+
+      fetch("https://example.com/external.json")
+        .then(() => record("external fetch", "unexpected success"))
+        .catch(() => record("external fetch", "blocked"));
+      try {
+        const socket = new WebSocket("wss://example.com/socket");
+        socket.addEventListener("open", () => record("WebSocket", "unexpected success"));
+        socket.addEventListener("error", () => record("WebSocket", "blocked"), { once: true });
+      } catch { record("WebSocket", "blocked"); }
+
+      document.querySelector("#asset-probe").addEventListener("error", () => record("asset protocol", "blocked"), { once: true });
+      document.querySelector("#custom-probe").addEventListener("error", () => record("unknown protocol", "blocked"), { once: true });
+      document.querySelector("#top-navigation").addEventListener("click", () => {
+        record("top navigation", "attempted");
+        try { window.top.location.href = "https://example.com/top"; } catch { record("top navigation", "blocked"); }
+      });
+      document.querySelector("#self-navigation").addEventListener("click", () => {
+        record("self navigation", "attempted");
+        try { window.location.href = "https://example.com/self"; } catch { record("self navigation", "blocked"); }
+      });
+
+      parent.postMessage({ channel: "markdown-viewer-html", type: "openExternal", href: "https://example.com/forged" }, "*");
+      for (let index = 0; index < 4; index += 1) {
+        parent.postMessage({ channel: "markdown-viewer-html", type: "openExternal", href: "https://example.com/burst" }, "*");
+      }
+      record("forged openExternal burst", "sent without user activation");
     </script>
   </body>
 </html>

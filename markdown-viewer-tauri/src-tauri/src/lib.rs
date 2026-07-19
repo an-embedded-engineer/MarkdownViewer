@@ -1721,10 +1721,26 @@ mod tests {
             response.headers()[header::X_CONTENT_TYPE_OPTIONS],
             "nosniff"
         );
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(response.headers()[header::REFERRER_POLICY], "no-referrer");
+        assert_eq!(
+            response.headers()["Cross-Origin-Resource-Policy"],
+            "cross-origin"
+        );
         assert!(response
             .headers()
             .contains_key(header::CONTENT_SECURITY_POLICY));
         assert!(String::from_utf8_lossy(response.body()).contains(HTML_BRIDGE));
+
+        let json = store.serve_protocol_request(&protocol_request(
+            Method::GET,
+            "/document/data.json",
+            Some("null"),
+        ));
+        assert_eq!(json.status(), StatusCode::OK);
+        assert_eq!(json.body(), br#"{"ok":true}"#);
+        assert!(!String::from_utf8_lossy(json.body()).contains(HTML_BRIDGE));
+        assert!(!json.headers().contains_key(header::CONTENT_SECURITY_POLICY));
 
         let head = store.serve_protocol_request(&protocol_request(
             Method::HEAD,
@@ -2117,7 +2133,9 @@ pub fn run() {
                 .state::<DocumentStore>()
                 .inner()
                 .clone();
-            thread::spawn(move || responder.respond(store.serve_protocol_request(&request)));
+            tauri::async_runtime::spawn_blocking(move || {
+                responder.respond(store.serve_protocol_request(&request));
+            });
         })
         .setup(|app| {
             let store = app.state::<AppConfigStore>();

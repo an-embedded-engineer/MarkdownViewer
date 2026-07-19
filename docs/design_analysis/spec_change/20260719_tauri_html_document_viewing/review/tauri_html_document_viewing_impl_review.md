@@ -40,7 +40,9 @@ Phase 2 の全指摘 (root-relative segment URL、ready handshake、Origin gatin
 
 **修正案**: listener 作成時に capture した `tabId` / `revision` と callback 時点の active 値の実比較を渡すか、少なくとも「構造的に真であることを keyed remount が保証する」旨のコメント / docs 追記を行う。TODO-2026-006 の設計時に再評価すること。
 
-**工程**: Phase 3 追補または TODO-2026-006 設計時。 **status**: 未対応 (Phase 4 進行の blocker ではない)
+**工程**: Phase 3追補。 **status**: 対応済み（再レビュー待ち）
+
+**対応**: `HtmlPreview`へactive tab id / revisionを明示的に渡し、listenerがcaptureした`tabId` / `revision`との実比較を`tabMatches` / `revisionMatches`へ渡すよう変更した。keyed remountだけへ暗黙依存しない契約にした。
 
 ### 3.2 protocol handler が request ごとに `thread::spawn` する
 
@@ -50,7 +52,9 @@ Phase 2 の全指摘 (root-relative segment URL、ready handshake、Origin gatin
 
 **修正案**: `tauri::async_runtime::spawn_blocking` の共有 pool へ寄せる。既存 PlantUML 経路と同じ手段に揃うため §12 の共通化方針とも整合する。
 
-**工程**: Phase 3 追補 (任意)。 **status**: 未対応
+**工程**: Phase 3追補。 **status**: 対応済み（再レビュー待ち）
+
+**対応**: protocol callbackのper-request `thread::spawn`を`tauri::async_runtime::spawn_blocking`へ変更し、Tauri共有blocking poolへ統合した。
 
 ### 3.3 Rust test の header / 非変換 assert に微小な抜けがある
 
@@ -60,7 +64,9 @@ Phase 2 の全指摘 (root-relative segment URL、ready handshake、Origin gatin
 
 **修正案**: `protocol_serves_get_and_head_with_security_headers_and_cors_policy` へ JSON GET body の等価 assert と残り 3 header の assert を追加する。
 
-**工程**: Phase 3 追補または Phase 4-a と同時。 **status**: 未対応
+**工程**: Phase 3追補。 **status**: 対応済み（再レビュー待ち）
+
+**対応**: success responseの`Cache-Control`、`Referrer-Policy`、`Cross-Origin-Resource-Policy`を直接assertし、JSON GET bodyの完全一致、bridge非注入、resource responseへHTML CSPが付かないことをtestへ追加した。
 
 ### 3.4 malicious fixture が設計 §17.4 fixture 5 の一部項目を含まない
 
@@ -70,7 +76,9 @@ Phase 2 の全指摘 (root-relative segment URL、ready handshake、Origin gatin
 
 **修正案**: malicious.html へ上記 probe を追記して結果を `#results` へ記録するか、Phase 4-a 手順書に手動確認手順として明記する。
 
-**工程**: Phase 4-a 開始前推奨。 **status**: 未対応
+**工程**: Phase 3追補。 **status**: 対応済み（再レビュー待ち）
+
+**対応**: malicious fixtureへexternal fetch / WebSocket、asset / unknown protocol、top / self navigation、download、forged `openExternal` / burst probeを追加した。navigation probeは明示button操作に限定し、その他は結果を`#results`へ記録する。
 
 ---
 
