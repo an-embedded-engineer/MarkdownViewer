@@ -189,3 +189,50 @@ extension を Unicode ではなく ASCII case-insensitive で `.jar` と比較�
 無効 window size の typed load result と部分復旧、platform-specific atomic replace、foreground / background config operation の所有権、`.jar` extension の比較規則が設計へ追記された。指摘 1.1 / 1.2 / 2.1 / 3.1 と未解決事項 U-01 から U-04 はすべて解消したため、**承認 (Approved)** とする。
 
 **未対応指摘**: なし。
+
+---
+
+## 9. Round 2 検証結果
+
+**再確認日**: 2026-07-19
+
+**再確認対象コミット**: `628373d docs: address Tauri settings design review`
+
+**初回レビューコミット**: `eb13890 docs: review Tauri viewer settings design`
+
+### 9.1 初回指摘の確認
+
+| 指摘 | 重大度 | 確認結果 | status |
+| --- | --- | --- | --- |
+| 1.1 範囲外 window size の load / warning / 復旧契約 | High | `ViewerSettingsLoadResult { settings, warnings }` が追加され、deserialize 可能な範囲外 size は window size だけ 800 x 600 へ正規化し、有効な Theme / jar path / Recent Folders を維持する契約になった。malformed JSON は command `Err` のまま区別される。frontend warning、`save_window_size` による永続値の修復、対応 unit test も明記され、初回指摘を解消している。 | resolved |
+| 1.2 config write の atomicity | High | sibling temporary file への全量 write / `sync_all` 後に destination を置換する契約が追加された。Unix の same-directory rename、Windows の `MoveFileExW(REPLACE_EXISTING \| WRITE_THROUGH)` 相当、失敗時の旧 destination 維持と temporary file 削除、target-specific dependency、failure test が明記され、初回指摘を解消している。 | resolved |
+| 2.1 app config operation の busy 所有権 | Medium | startup は `Promise.allSettled` 相当の単一 scope、foreground は functional update による operation count、background resize は busy 表示から分離された直列 queue として定義された。pending 最新 size の追送と revision guard、近接操作の手動確認も追加され、初回指摘を解消している。 | resolved |
+| 3.1 `.jar` extension の case 規則 | Low | ASCII case-insensitive 比較を採用し、`.jar` / `.JAR` を許可、他拡張子を拒否する契約と unit test が明記され、初回指摘を解消している。 | resolved |
+
+### 9.2 未解決事項の確認
+
+| ID | 確認結果 | status |
+| --- | --- | --- |
+| U-01 | typed load response、window size の部分正規化、warning、有効設定の維持、`save_window_size` による修復、unit test が確定した。 | resolved |
+| U-02 | cross-platform atomic replace と失敗時に旧 config を維持する write 契約が確定した。 | resolved |
+| U-03 | startup / foreground / background resize の busy・直列化・pending 規則が確定した。 | resolved |
+| U-04 | ASCII case-insensitive validation と `.jar` / `.JAR` test が確定した。 | resolved |
+
+### 9.3 新規自己矛盾の確認
+
+`628373d` の design / review / meta 差分を、初回指摘への対応箇所とその隣接契約に限定して再確認した。次の接続が一貫している。
+
+- `ViewerSettingsLoadResult` は Rust model、Tauri command、frontend startup、unit test の各記載で同じ `settings + warnings` 契約を使う。
+- atomic write は Store 責務、platform dependency、failure test、リスク対策で同じ「成功時だけ全体置換、失敗時は旧 destination 維持」を使う。
+- foreground operation count は UI busy の所有権だけを扱い、background resize の正しさは frontend の単一 command queueと backend Store lock / field-specific update に委ねるため、責務が重複しない。
+- `meta.md` の対象範囲、依存関係、follow-up は設計変更後も維持され、Avalonia 水平展開を本案件へ混入させていない。
+
+新たな重大な自己矛盾は確認されなかった。
+
+### 9.4 最終判定
+
+初回指摘 1.1 / 1.2 / 2.1 / 3.1 と未解決事項 U-01〜U-04 はすべて解消した。Phase 3 の実装へ引き継げる具体性があり、追加の条件はない。
+
+**最終判定**: **承認 (Approved)**。
+
+**未解決指摘数**: **0**。
