@@ -288,3 +288,79 @@ Viewer settings の型付き永続化、Recent Folders 互換、部分更新、P
 | 3.2 MenuBar detail docs | detail designへseparator + `Settings...`とdialog close後のFile trigger focus returnを追記した。 | UI tree / prose / interfaceの一致 |
 
 再検証結果は実装記録6へ反映した。初回レビューの未解決表と判定は履歴として維持し、follow-up reviewで各statusと最終未解決数を更新する。
+
+---
+
+## 10. Round 2 follow-up implementation review
+
+**再確認日**: 2026-07-19
+
+**response commit**: `cd13c37 fix: address Tauri settings implementation review`
+
+**base review commit**: `46f505f docs: review Tauri viewer settings implementation`
+**initial implementation**: `0923219 feat: persist Tauri viewer settings`
+
+### 10.1 初回 8 指摘の再確認
+
+| 指摘 | 初回重大度 | 独立確認結果 | status |
+| --- | --- | --- | --- |
+| 1.1 Split view prerequisite 未達 | High | `docs/todo/todo.md`、WBS、案件 design、meta、impl record が正式改訂され、TODO-2026-014 と TODO-2026-006 は TODO-2026-005 後の独立 work package、両者の統合確認は両方へ依存する TODO-2026-007 として一致した。settings 実装単体の Phase 3 scope は現行 single pane で閉じ、依存順の自己矛盾は解消した。 | resolved |
+| 1.2 post-replace directory sync failure | High | `replace` 成功を logical commit point とし、後続 directory sync failure は `Option<String>` warning として返して wrapper が stderr へ記録する。command は success を維持するため persisted state と frontend state が食い違わない。注入 test で warning と新 config 維持を確認した。 | resolved |
+| 1.3 保存中 modal focus trap | High | background app shell に `inert` + `aria-hidden`、dialog に `tabIndex={-1}` / `aria-busy` を追加した。保存開始時は dialog container へ focus し、enabled control 0 件の Tab も prevent して container に保持する。通常時 loop / close 後 focus return の既存契約とも両立する。 | resolved |
+| 2.1 atomic / Windows failure tests | Medium | create collision、注入 replace failure、post-replace directory sync warning、正常 replace の test があり、pre-commit failure と post-commit warning の境界を直接確認できる。temporary write / file sync は replace より前の同一 error cleanup 経路にあり、source ordering も確認した。Windows branch の実環境検証は host 制約により未実施だが、target-specific dependencyと `#[cfg(windows)]` 境界、未実施項目、Phase 4 verification が明記されたため Phase 3 blocker にはしない。 | resolved for Phase 3 / Phase 4 verification carry-over |
+| 2.2 PlantUML response contract | Medium | app config / runtime 解決 failure は blocking task 前の command-level `Err`、runtime 解決後の構文 / Java process / timeout は図単位 result と design / detail / interface が source に一致した。frontend の command `Err` から全 placeholder error への変換も維持される。 | resolved |
+| 2.3 file picker error handling | Medium | `openDialog` を `try/catch` し、plugin / OS failure を `settingsError` へ表示する。`null` Cancel は error にせず、unhandled rejection は解消した。 | resolved |
+| 3.1 diff check 記録 | Low | 余分な EOF 空行を解消した。reviewer が `git diff 46f505f..cd13c37 --check` を再実行し、exit 0 / output なしを確認した。 | resolved |
+| 3.2 MenuBar detail docs | Low | detail design の UI 操作と MenuBar prose の双方に separator + `Settings...`、application-wide 操作、close 後の File trigger focus return が反映され、source / interface spec と一致した。 | resolved |
+
+### 10.2 U-01〜U-05 の確認
+
+| ID | 確認結果 | status |
+| --- | --- | --- |
+| U-01 | TODO / WBS / design / meta / impl record の dependency を正式改訂し、TODO-2026-007 を Split view と Viewer settings の統合 UX 評価点にした。 | resolved |
+| U-02 | replace を commit point とし、post-replace sync failure を logical success + stderr durability warning に統一した。failure injection test も成功した。 | resolved |
+| U-03 | inert、dialog fallback focus、enabled control 0件時のTab抑止を source / docs へ反映した。 | resolved |
+| U-04 | Windows target / 実機未検証を impl record と Phase 4 platform verification へ明記した。Phase 3 の code review 上は target-specific API 境界と dependency を確認済みであり、platform verification の carry-over として close 可能と判定する。 | resolved for Phase 3 / Phase 4 verification carry-over |
+| U-05 | runtime failure の command-level / diagram-level 境界を source / design / detail / interface で統一した。 | resolved |
+
+### 10.3 Windows verification 制約の判定
+
+review host に install 済みの Rust target は `aarch64-apple-darwin` のみであり、`MoveFileExW` branch の Windows compile / runtime test は実施できない。次の理由により、これは **Phase 3 の未解決 implementation blocker ではなく、Phase 4 の platform verification carry-over** と判定する。
+
+- Windows API は `#[cfg(windows)]` と target-specific `windows-sys` dependency に閉じ、Unix implementationへ混入していない。
+- commit point と pre/post failure semantics は platform-neutral helper と注入 test で検証できている。
+- 未確認範囲が「Windows target build、既存 destination replace、Unicode / verbatim path」と具体化され、impl record の既知制約と Phase 4 引継ぎに残っている。
+- 完了時に Windows 対応を表明するには Phase 4 で当該 verification が必要であり、未実施のまま completion を close してはならない。
+
+### 10.4 再検証結果
+
+2026-07-19 に reviewer が response commit へ再実行した。
+
+| Command | Result |
+| --- | --- |
+| `cd markdown-viewer-tauri && npm run build` | Pass。既存 Mermaid chunk size warningのみ |
+| `cd markdown-viewer-tauri/src-tauri && cargo check` | Pass |
+| `cd markdown-viewer-tauri/src-tauri && cargo test` | Pass。10 tests、0 failed |
+| `cd markdown-viewer-tauri/src-tauri && cargo fmt -- --check` | Pass |
+| `git diff 46f505f..cd13c37 --check` | Pass。exit 0 / output なし |
+| `git status --short`（review追記前） | clean |
+| Windows target build / runtime test | host制約により未実施。Phase 4 platform verificationへ引継ぎ |
+
+### 10.5 新規重大不整合の確認
+
+初回指摘対応に伴う source / design / TODO / WBS / impl record / 恒久 docs の隣接契約を確認し、新たな High / Medium の不整合は検出しなかった。
+
+- dependency 改訂後も TODO-2026-007 が TODO-2026-006 と TODO-2026-014 の両方に依存し、Tauri UX 評価前に両機能が合流する。
+- atomic replace の logical success、stderr warning、failure test、恒久 docs が同じ commit-point 定義を使う。
+- `inert` は Settings dialog の sibling である app shell のみに適用され、dialog 自身を inert subtreeへ入れていない。
+- PlantUML runtime command-level errorでも frontend が Markdown / Mermaid と placeholder error表示を維持する。
+
+### 10.6 最終判定
+
+初回 8 指摘と U-01〜U-05 は、Phase 3 の source / design / docs / tests としてすべて解消した。Windows 実環境検証は implementation defect の未解決ではなく、明示された Phase 4 platform verification として継続追跡する。
+
+**最終判定**: **承認 (Approved)**。Phase 3 implementation / docs review 完了。
+
+**Phase 3 未解決指摘数**: **0**。
+
+**Phase 4 明示引継ぎ**: Windows target build、`MoveFileExW` による既存 destination 置換、Unicode / verbatim path の platform verification 1 件。
