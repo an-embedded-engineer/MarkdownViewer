@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File, OpenOptions};
+#[cfg(unix)]
+use std::fs::File;
+use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 #[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
@@ -435,7 +437,7 @@ fn app_config_temp_path(config_path: &Path, sequence: u64) -> Result<PathBuf, St
 #[cfg(windows)]
 fn replace_app_config_file(source: &Path, destination: &Path) -> Result<(), String> {
     use windows_sys::Win32::Storage::FileSystem::{
-        MoveFileExW, MOVE_FILE_REPLACE_EXISTING, MOVE_FILE_WRITE_THROUGH,
+        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
     };
 
     let source_wide: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
@@ -449,7 +451,7 @@ fn replace_app_config_file(source: &Path, destination: &Path) -> Result<(), Stri
         MoveFileExW(
             source_wide.as_ptr(),
             destination_wide.as_ptr(),
-            MOVE_FILE_REPLACE_EXISTING | MOVE_FILE_WRITE_THROUGH,
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
         )
     };
     if result == 0 {
