@@ -6,7 +6,7 @@
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-017
 **source report**: `docs/design_analysis/research_analysis/20260719_html_document_viewing_support/report.md`
 **初回レビュー対象コミット**: `88aae68 Phase 2 draft Tauri HTML document viewing design`
-**判定**: **要修正 (Changes Requested)**。指摘 1.1 (High) の設計書修正と再レビューが完了するまで Phase 3 進行不可。
+**判定**: **指摘対応済み・再レビュー待ち**。初回判定はChanges Requested。実装担当が全指摘を設計書へ反映済みで、Claude follow-up承認までPhase 3進行不可。
 
 ---
 
@@ -50,7 +50,9 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 2（設計書修正・再レビュー）
 
-**status**: 未対応
+**status**: 対応済み（再レビュー待ち）
+
+**対応**: 案Aと案Bを組み合わせ、`open_document`がcurrent-root-relative path segmentsを個別encodeした完全`previewUrl`をRustで生成する契約へ変更した。HTML URLでは`convertFileSrc`を使わない。protocol pathは`/document/<segments>`とし、query / fragment除外、segment単位decode、decode後separator / dot segment / drive / UNC拒否、root join後canonicalizeを明記した。URL往復と攻撃segmentのRust test、risk / referenceも同期した。
 
 ### 1.2 top-level HTML の「iframe load error で error 遷移」は cross-origin iframe では検出できない
 
@@ -64,7 +66,9 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 2（設計書修正）
 
-**status**: 未対応
+**status**: 対応済み（再レビュー待ち）
+
+**対応**: success HTMLへbridge初期化直後の`ready` handshakeを追加し、frontendはsource / origin / tab revisionを検証したhandshakeだけをreadyの正本とする方式へ変更した。mount後5秒timeout、revision / unmount時clear、iframe load / error eventをprotocol判定へ使わない契約とtestを追記した。
 
 ### 1.3 `Origin` header による gating を全 request へ適用すると no-cors subresource が読めなくなる
 
@@ -78,7 +82,9 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 2（設計書修正）
 
-**status**: 未対応
+**status**: 対応済み（再レビュー待ち）
+
+**対応**: `Origin`不在requestはno-cors subresourceとして許可し、headerが存在する場合だけ厳密な`null`を要求する契約へ修正した。request種別を`Sec-Fetch-*`で推定せず、全success responseへ`Access-Control-Allow-Origin: null`を付与する。unit testと3 platform matrixへOrigin header有無を追加した。
 
 ### 1.4 GET / HEAD 限定 (405) により CORS preflight を要する fetch は失敗する
 
@@ -92,7 +98,9 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 2（設計書修正）
 
-**status**: 未対応
+**status**: 対応済み（再レビュー待ち）
+
+**対応**: root内JSONはpreflight不要のsimple GETだけを対応範囲とし、custom header、credential、OPTIONS preflightは非対応、OPTIONSは405と明記した。エラー表とRust testを同期した。
 
 ### 1.5 sort 順の正本が derive `Ord` と既存 `node_sort_rank` の 2 箇所になり得る
 
@@ -106,7 +114,9 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 3（実装時確定で可）
 
-**status**: 未対応
+**status**: 対応済み（再レビュー待ち）
+
+**対応**: existing `node_sort_rank`をsort順の唯一の正本として維持し、`FileNodeType`から`PartialOrd` / `Ord` deriveを外した。rankをDirectory=0、Markdown=1、Html=2、Image=3と設計へ明記した。
 
 ---
 
@@ -124,7 +134,9 @@ value: function (filePath, protocol = 'asset') {
 
 **severity**: Low
 
-**status**: 未対応
+**status**: 対応済み（再レビュー待ち）
+
+**対応**: shell originがplatformで異なり、messageが非機密の固定type / URLだけで、受信側が全面再検証するためtarget origin `"*"`を選ぶことをlink bridge設計へ明記した。
 
 ---
 
@@ -133,7 +145,7 @@ value: function (filePath, protocol = 'asset') {
 | `docs/todo/todo.md` completion 条件 | 設計書での対応箇所 | 結果 |
 | --- | --- | --- |
 | 選択 root 配下の UTF-8 HTML を Explorer から開ける | §2.2 表 1 行目、§7 (typed model / `open_document`)、§11.4 (icon / 初期 open 順) | ✓ 整合。初期 open 順「README、最初の Markdown、最初の HTML」は現行 `findReadme(tree) ?? findFirstMarkdown(tree)` (`App.tsx:183`) と互換 |
-| self-contained HTML と root 内相対 resource を表示できる | §4.1、§8、§9 | ✗ **指摘 1.1 により相対 resource が設計のまま成立しない**。self-contained のみ成立 |
+| self-contained HTML と root 内相対 resource を表示できる | §4.1、§8、§9 | ✓ 指摘1.1対応でRust生成のroot-relative segment URLへ変更。relative resourceのURL構造を保持する |
 | inline SVG / Canvas / 描画済み UML / root 内 runtime diagram | §2.2 表 3 行目、§10.2 (inline script / style 許可、`data:` image)、§17.4 fixture 1-3 | ✓ 整合 |
 | `http(s)` link を Viewer 内遷移させず OS 標準ブラウザで開く | §9.1 (bridge)、§11.3 (message policy)、§10.3 (`frame-src` で remote 拒否) | ✓ 整合。`event.isTrusted` + transient user activation + active source + duplicate guard は trusted 契約と釣り合う |
 | root 外 / 外部 network / `file:` / `javascript:` / 許可外 protocol 拒否 | §8.2 (path 検証)、§8.4 (allowlist)、§10.1-10.3 (sandbox / CSP)、§17.4 fixture 5 | ✓ 整合。多層防御であり、frontend 判定を境界にしない |
@@ -190,4 +202,6 @@ success_metrics の必須 command は §17.3 が網羅する (`npm test -- --run
 
 設計は TODO-2026-017 の要求・非対象・受け入れ条件を丁寧に追跡しており、trusted 前提と強制境界の区別、多層防御の構成、fallback を作らない失敗時契約、既存 Markdown 経路の維持はいずれも高品質である。恒久 docs・テスト計画・platform matrix も受け入れ条件を追跡できる粒度で具体的である。
 
-ただし、相対 resource 解決という本変更の中核要求に対し、採用手段である `convertFileSrc` が path 全体を単一 percent-encoded segment として生成するため相対 URL 解決が成立しない齟齬 (指摘 1.1, High) を lock 済み crate 実ソースで確認した。これは §4.1 / §4.2 / §8.2 / §9.2 / §17 にまたがる URL 契約の再設計を要するため、**要修正 (Changes Requested)** とする。指摘 1.1 の設計書修正と再レビュー完了、および指摘 1.2 / 1.3 の設計書追記をもって Phase 3 進行可とする。指摘 1.4 / 1.5 / 3.1 は Phase 3 内での確定で差し支えない。
+初回レビューでは、相対 resource解決という本変更の中核要求に対し、採用手段である`convertFileSrc`がpath全体を単一percent-encoded segmentとして生成するため相対URL解決が成立しない齟齬（指摘1.1, High）を確認し、**要修正 (Changes Requested)** とした。
+
+実装担当は指摘1.1から1.5および改善提案3.1をすべて設計書へ反映した。現在はClaude follow-upによる再レビュー待ちであり、明示承認までPhase 3へ進まない。

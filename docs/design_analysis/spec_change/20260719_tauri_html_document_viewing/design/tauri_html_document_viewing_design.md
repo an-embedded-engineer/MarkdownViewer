@@ -65,7 +65,7 @@ Tauri版Viewerは、選択root配下のMarkdownをExplorerから開き、React D
 
 1. RustとTypeScriptへ`DocumentType`を追加し、Markdown / HTMLを型で分岐する。
 2. Rustの`DocumentStore`がcurrent rootを保持し、directory scan、document open、protocol requestで同じroot境界を使う。
-3. HTML sourceはReactへ返さない。`open_document`はHTMLを検証し、frontendはcanonical pathを`convertFileSrc(path, "mvhtml")`でplatform適合URLへ変換する。
+3. HTML sourceはReactへ返さない。`open_document`はHTMLを検証し、current rootからのrelative path segmentを個別にpercent-encodeしたplatform適合`previewUrl`をRustで生成して返す。
 4. `mvhtml` custom URI protocolがHTMLとallowlist resourceを配信する。
 5. HTMLは`<iframe sandbox="allow-scripts">`へ表示する。`allow-same-origin`、`allow-forms`、`allow-popups`、`allow-top-navigation`、`allow-downloads`は付けない。
 6. shell CSPはiframe sourceを`mvhtml:` / `http://mvhtml.localhost`に限定し、protocol response CSPはroot内resourceと必要なinline contentだけを許可する。
@@ -76,7 +76,7 @@ Tauri版Viewerは、選択root配下のMarkdownをExplorerから開き、React D
 
 - iframeによりHTML documentのCSS、ID、script、scroll、themeをViewer shellから分離できる。
 - custom protocol handlerをRustへ置くことで、frontend文字列判定ではなくcanonical filesystem pathをsecurity boundaryにできる。
-- `convertFileSrc`のprotocol引数を使うことで、macOS / Linuxの`mvhtml://localhost/...`とWindowsの`http://mvhtml.localhost/...`をfrontend独自分岐なしで生成できる。
+- URL生成をRustへ集約することで、macOS / Linuxの`mvhtml://localhost/document/<segments>`とWindowsの`http://mvhtml.localhost/document/<segments>`というplatform差、segment単位のencode規則、root-relative契約をunit testで固定できる。path全体を単一segmentへencodeする`convertFileSrc`はHTML preview URLに使わない。
 - Tauri 2.11.2のIPC初期化scriptはmain frame onlyであり、sandboxed iframeへ`__TAURI_INTERNALS__`を注入しない。これを単独の境界とはせず、opaque origin、parent DOM分離、capability非remote化、CSP、malicious fixtureで補強する。
 - trusted HTML自身のscriptは必要なため、sanitizeしてstatic HTMLへ落とす方式は要求を満たさない。
 
@@ -114,7 +114,7 @@ Tauri版Viewerは、選択root配下のMarkdownをExplorerから開き、React D
 ### 7.1 Rust model
 
 ```rust
-#[derive(Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 enum FileNodeType {
     Directory,
@@ -135,16 +135,16 @@ enum DocumentType {
 struct OpenDocumentResponse {
     document_type: DocumentType,
     source_text: Option<String>,
-    preview_path: Option<String>,
+    preview_url: Option<String>,
 }
 ```
 
 契約は次の排他的組合せとする。
 
-| `documentType` | `sourceText` | `previewPath` |
+| `documentType` | `sourceText` | `previewUrl` |
 | --- | --- | --- |
 | `markdown` | UTF-8 Markdown | `null` |
-| `html` | `null` | canonical HTML path |
+| `html` | `null` | Rustが生成した`mvhtml` platform URL |
 
 不正な組合せは生成しない。TypeScript側はdiscriminated unionへ変換し、`any`やoptional fieldの同時fallbackを設けない。
 
@@ -155,8 +155,8 @@ type DocumentType = "markdown" | "html";
 type FileNodeType = "directory" | DocumentType | "image";
 
 type OpenDocumentResponse =
-  | { documentType: "markdown"; sourceText: string; previewPath: null }
-  | { documentType: "html"; sourceText: null; previewPath: string };
+  | { documentType: "markdown"; sourceText: string; previewUrl: null }
+  | { documentType: "html"; sourceText: null; previewUrl: string };
 
 type OpenDocumentTab = {
   id: string;
@@ -183,6 +183,7 @@ open_document(path) -> OpenDocumentResponse
 
 - `scan_directory`はrootをcanonicalizeし、tree構築が成功した後だけ`DocumentStore.current_root`を差し替える。失敗時は既存rootを維持する。
 - `open_document`はcurrent root未設定、root外、directory、unsupported extension、非UTF-8を明示的errorにする。
+- HTML responseの`previewUrl`はcanonical file pathを直接公開せず、current rootからのrelative pathを`/document/<segment...>`へ変換する。各segmentを独立してpercent-encodeし、path separator構造を保持する。
 - 既存`read_text_file(rootPath, path)`は`open_document(path)`へ置換し、互換wrapperを残さない。
 - `render_plantuml_diagrams`はMarkdown branchだけから呼ぶ既存契約を維持する。
 
@@ -211,20 +212,23 @@ DocumentStore
 
 すべてのdocument / resource requestで次を順に行う。
 
-1. protocol URL pathを1回だけpercent-decodeする。
-2. platform URL形式からabsolute filesystem pathを復元する。
-3. NUL、decode error、relative path、unsupported prefixを拒否する。
-4. `canonicalize`する。
-5. current canonical rootの`starts_with`を確認する。
-6. symlink先がroot外なら拒否する。
-7. regular fileであることを確認する。
-8. extension allowlistとrequest用途を確認する。
+1. request URIからqueryとfragmentを除外し、pathが`/document/` prefixを持つことを確認する。
+2. `/document/`以降をseparatorで分け、各segmentを1回だけpercent-decodeする。
+3. decode error、NUL、空segment、`.`、`..`、decode後に`/`または`\\`を含むsegment、Windows drive / UNC prefixを拒否する。
+4. decoded segmentsをcurrent canonical rootへ`PathBuf::push`してjoinする。
+5. joined pathを`canonicalize`する。
+6. current canonical rootの`starts_with`を確認する。
+7. symlink先がroot外なら拒否する。
+8. regular fileであることを確認する。
+9. extension allowlistとrequest用途を確認する。
 
-文字列prefix、decode前の`..`除去だけ、frontend側検証はsecurity boundaryにしない。Windowsのverbatim disk / UNC pathはfilesystem検証中は保持し、frontendへ返す`previewPath`だけ既存`path_for_external_use`を使う。
+文字列prefix、decode前の`..`除去だけ、frontend側検証はsecurity boundaryにしない。Windowsのverbatim disk / UNC pathはfilesystem検証中だけに現れ、root-relative protocol URLへdrive / UNC情報を含めない。既存`path_for_external_use`はExplorer node等の既存外部表示契約でのみ継続利用する。
 
 ### 8.3 Protocol登録
 
 `tauri::Builder::register_asynchronous_uri_scheme_protocol("mvhtml", ...)`を使用する。handlerは`UriSchemeContext.webview_label()`が`main`であることを確認し、blocking filesystem readはasync responderのblocking taskへ渡す。
+
+`DocumentStore::preview_url`はroot-relative segmentsから完全URLを生成する。Windowsは`http://mvhtml.localhost/document/<segments>`、macOS / Linuxは`mvhtml://localhost/document/<segments>`をcompile-time `cfg`で選ぶ。frontend独自のOS分岐や`convertFileSrc` fallbackは設けない。
 
 対応methodは`GET`と`HEAD`だけとする。その他は`405 Method Not Allowed`、未設定rootは`409 Conflict`、decode / extension不正は`400 Bad Request`、root外は`403 Forbidden`、missingは`404 Not Found`、read failureは`500 Internal Server Error`を返す。error bodyはplain textとし、filesystem absolute pathを必要以上に露出しない。
 
@@ -259,7 +263,9 @@ HTML / CSS / JS / JSONはUTF-8として読めることを要求する。binary i
 - `Referrer-Policy: no-referrer`
 - `Cross-Origin-Resource-Policy: cross-origin`
 
-JSON `fetch`用にsandbox opaque originへ`Access-Control-Allow-Origin: null`を返し、credentialは許可しない。`Origin`が`null`以外のfetchは許可しない。platform engineが異なるOriginを送る場合は実機結果を根拠に設計レビューへ戻し、`*`への緩和は行わない。
+JSON `fetch`用にsandbox opaque originへ`Access-Control-Allow-Origin: null`を全success responseで返し、credentialは許可しない。requestの`Origin` headerが不在なら画像、CSS、JS、font等のno-cors subresourceとして許可する。`Origin` headerが存在する場合は値が厳密に`null`のrequestだけを許可し、それ以外を拒否する。request種別を`Sec-Fetch-*`だけで推定しない。platform engineが異なるOriginを送る場合は実機結果を根拠に設計レビューへ戻し、`*`への緩和は行わない。
+
+root内JSON `fetch`の対応範囲はpreflight不要のsimple `GET`に限定する。custom request header、credential、`OPTIONS` preflightは対応せず、`OPTIONS`は他の未対応methodと同じく`405 Method Not Allowed`を返す。
 
 ## 9. HTML response変換
 
@@ -271,17 +277,18 @@ top-level `.html` responseだけにViewer管理scriptを注入する。resource 
 
 bridgeの責務は次に限定する。
 
-1. capture phaseで`event.isTrusted`を満たすclickから最寄り`a[href]`を得る。synthetic clickは拒否する。
-2. same-document fragmentはbrowser既定動作へ渡す。
-3. `http:` / `https:`は`preventDefault()`し、固定message typeとabsolute URLを`parent.postMessage(..., "*")`で送る。
-4. relative document link、`file:`、`javascript:`、`data:`、`mailto:`、`tel:`、unknown schemeは`preventDefault()`する。
-5. `submit`、`auxclick`、drag/drop navigationを抑止する。
+1. bridge初期化直後に固定typeの`ready` handshakeをparentへ送る。
+2. capture phaseで`event.isTrusted`を満たすclickから最寄り`a[href]`を得る。synthetic clickは拒否する。
+3. same-document fragmentはbrowser既定動作へ渡す。
+4. `http:` / `https:`は`preventDefault()`し、固定message typeとabsolute URLを`parent.postMessage(..., "*")`で送る。
+5. relative document link、`file:`、`javascript:`、`data:`、`mailto:`、`tel:`、unknown schemeは`preventDefault()`する。
+6. `submit`、`auxclick`、drag/drop navigationを抑止する。
 
-bridgeはTauri APIを呼ばず、parent DOMへ直接accessしない。HTML scriptは同じmessageを偽装できるため、message自体をuntrusted inputとして親側で再検証する。本件はtrusted document契約であり、bridgeをarbitrary malicious HTMLに対する認証境界とはみなさない。
+bridgeはTauri APIを呼ばず、parent DOMへ直接accessしない。target originを`"*"`とするのは、shell originがplatformにより`tauri://localhost` / `http://tauri.localhost`等へ変わり、message内容が非機密なURLと固定typeだけで、受信側が全面的に再検証するためである。HTML scriptは同じmessageを偽装できるため、message自体をuntrusted inputとして親側で再検証する。本件はtrusted document契約であり、bridgeをarbitrary malicious HTMLに対する認証境界とはみなさない。
 
 ### 9.2 Reload
 
-HTML tabの`previewUrl`は`convertFileSrc(previewPath, "mvhtml")`へ`revision` queryを付ける。Reloadでrevisionを増加させiframeを再mountし、document scriptとscrollを初期状態から再実行する。Theme変更だけではURL / keyを変えず、HTMLを再読込しない。
+HTML tabの`previewUrl`はRust responseのURLへfrontendが`revision` queryだけを付ける。Reloadでrevisionを増加させiframeを再mountし、document scriptとscrollを初期状態から再実行する。protocol handlerはqueryをfilesystem pathへ含めない。Theme変更だけではURL / keyを変えず、HTMLを再読込しない。
 
 ## 10. CSP / sandbox / IPC境界
 
@@ -349,9 +356,10 @@ developmentはVite dev server / HMRに必要なsourceだけを`devCsp`へ追加�
   - PlantUML source抽出、pending、Rust render commandを既存どおり実行する。
   - Mermaid effectを既存どおり実行する。
 - HTML:
-  - `previewPath`を`convertFileSrc(..., "mvhtml")`へ渡す。
+  - Rust responseの`previewUrl`をtabへ保持し、revision queryだけを付けてiframeへ渡す。
   - `sourceText`とPlantUML resultsを保持しない。
-  - iframe loadで`ready`、iframe error / protocol errorで`error`へ遷移する。
+  - bridgeの`ready` handshakeを受信した時だけ`ready`へ遷移する。iframeの`load` / `error` eventをprotocol成功判定の正本にしない。
+  - mountから5秒以内にhandshakeが届かない場合は、protocol errorまたはbridge初期化失敗として`error`へ遷移する。error response本文はiframe内にも表示され得る。tab revision変更またはunmount時はtimeoutを解除する。
   - Mermaid / PlantUML処理を呼ばない。
 
 旧Markdown pathとの二重read、HTML失敗時のMarkdown fallback、asset protocol fallbackは設けない。
@@ -373,11 +381,12 @@ PreviewPane
 1. active HTML iframeが存在する。
 2. `event.source === iframe.contentWindow`。
 3. `event.origin === "null"`。platform差が確認された場合もexact allowlistとし、任意originを許可しない。
-4. dataがplain objectで固定`type`とstring `href`だけを持つ。
-5. `new URL(href).protocol`が`http:`または`https:`。
-6. active tab id / revisionがlistener作成時の値と一致する。
-7. `navigator.userActivation.isActive`が`true`であり、iframe内clickから伝播したtransient user activationが残っている。
-8. 外部openが進行中でない。短時間の重複messageは無視する。
+4. dataがplain objectで、`ready`または`openExternal`の固定message unionに一致する。
+5. active tab id / revisionがlistener作成時の値と一致する。
+6. `ready`はhrefを持たず、未ready状態から1回だけ受理する。
+7. `openExternal`はstring `href`を持ち、`new URL(href).protocol`が`http:`または`https:`。
+8. `openExternal`では`navigator.userActivation.isActive`が`true`であり、iframe内clickから伝播したtransient user activationが残っている。
+9. 外部openが進行中でない。短時間の重複messageは無視する。
 
 message拒否をerror bannerへ出してtrusted document閲覧を妨げないが、development consoleで理由を確認できるようにする。`openUrl` failureは既存error UIへ表示する。transient user activationが対象WebViewで利用できない場合に自動openへfallbackせず、当該platformのHTML external linkを未対応として設計へ戻す。
 
@@ -401,6 +410,7 @@ message拒否をerror bannerへ出してtrusted document閲覧を妨げないが
 - scheme / message validationは専用`documentPolicy.ts` moduleへ置き、App component内へ散らさない。これは副作用を持たないpolicy contractであり、class instance化よりpure functionの方が入力 / 出力とunit testを明確にできるため、module-level functionの限定例外とする。
 - RustのTauri command / protocol callbackはframework要求によるmodule-level adapterとし、実処理を`DocumentStore` methodへ委譲する。
 - MIME mappingとextension allowlistは1つのtyped table / matchを正本にし、列挙・open・protocol配信の判定が不一致にならないようにする。
+- Explorer sort順の正本は既存`node_sort_rank`に維持し、`FileNodeType`へ`PartialOrd` / `Ord`をderiveしない。rankはDirectory=0、Markdown=1、Html=2、Image=3とする。
 
 ## 13. エラーハンドリング
 
@@ -412,7 +422,8 @@ message拒否をerror bannerへ出してtrusted document閲覧を妨げないが
 | HTML非UTF-8 | tab error。iframeへ渡さない |
 | resource missing | protocol 404。iframe内resource error。Viewer shellは維持 |
 | CSP / sandbox block | HTML内だけ失敗。manual fixtureとWebView consoleで原因確認 |
-| iframe top-level load error | active tabをerror表示にする |
+| iframe top-level load / protocol error | `ready` handshake timeoutでactive tabをerror表示にする。iframe eventやresponse DOM読取へ依存しない |
+| preflight付きJSON fetch | `OPTIONS`を405として拒否する。simple GETだけが対応範囲 |
 | external URL invalid / unsupported | openせずHTML表示を維持する |
 | `openUrl` failure | active tab / error stripへ英語messageを表示する |
 | lock poison |明示error。旧rootやasset fallbackへ逃がさない |
@@ -473,9 +484,12 @@ Phase 3でsource差分と同時に次を更新する。
 - sortはDirectory -> Markdown -> Html -> Image、同種case-insensitive name順とする。
 - `open_document`がMarkdown / HTMLの排他的responseを返す。
 - current root未設定、root外、directory、unsupported extension、非UTF-8を拒否する。
-- URL decode、encoded space / Unicode、`..`、absolute path、symlink escape、Windows drive / UNCを検証する。
+- root-relative URLをsegment単位でencodeし、space / Unicodeを含むpathのencode -> relative resource resolve -> decode / root joinが往復することを検証する。
+- encoded `%2F` / `%5C`、`.` / `..`、empty segment、absolute path、Windows drive / UNCをsegment注入として拒否する。
 - MIME allowlistの全extensionとunknown extensionを検証する。
 - protocolのGET / HEAD、400 / 403 / 404 / 405 / 409 / 500を検証する。
+- `Origin`不在を許可し、`Origin: null`を許可し、その他originを拒否する。全success responseが`Access-Control-Allow-Origin: null`を持つことを検証する。
+- simple JSON GETが成功し、`OPTIONS` preflightが405になることを検証する。
 - HTML bridge injection位置と、resource body非変換を検証する。
 - CSP、CORS、nosniff、no-store、referrer policy headerを検証する。
 - root切替成功 / 失敗時のstore状態を検証する。
@@ -488,7 +502,8 @@ Phase 3でsource差分と同時に次を更新する。
 - HTML preview URLのprotocol / revision。
 - message source不一致、origin不一致、shape不正、stale revisionを拒否する。
 - `http:` / `https:`を許可し、`file:` / `javascript:` / `data:` / `mailto:` / custom schemeを拒否する。
-- transient user activationなしのmessageとduplicate openを拒否する。
+- `ready` handshakeのsource / origin / stale revision / duplicateを検証し、timeout時にerrorへ遷移する。
+- transient user activationなしのexternal-open messageとduplicate openを拒否する。
 - HTML branchでPlantUML sourceを抽出しないことを、branch helperまたはcomponent境界で確認する。
 
 ### 17.3 必須command
@@ -526,7 +541,8 @@ macOS / Windows / Linuxで少なくとも次を記録する。
 | 観点 | macOS | Windows | Linux |
 | --- | --- | --- | --- |
 | protocol URL / relative resource | Required | Required | Required |
-| sandbox `Origin: null` / JSON fetch | Required | Required | Required |
+| sandbox `Origin: null` / JSON simple GET | Required | Required | Required |
+| no-cors subresourceの`Origin` header有無 | Required | Required | Required |
 | iframe IPC非公開 | Required | Required | Required |
 | shell / response CSP | Required | Required | Required |
 | external link / popup拒否 | Required | Required | Required |
@@ -552,7 +568,7 @@ macOS / Windows / Linuxで少なくとも次を記録する。
 | Linux iframeとwindow requestを区別できない | main-frame-only IPC init、opaque origin、remote capabilityなし、fixture | IPCが利用できたらLinux HTMLを無効化し別WebView設計 |
 | authored scriptがbridge messageを偽装 | trusted contract、`isTrusted`、transient user activation、active source、duplicate guard | untrusted対応時はconfirmation UI / separate WebView |
 | authored meta CSPがdocument resourceを制限 | bridgeをhead先頭へ注入し、document CSPはさらに厳しくする方向だけ許容 | 表示error UXが必要なら別TODO |
-| custom protocol URL差 | `convertFileSrc`使用、platform test | engine固有bugはadapter設計 |
+| custom protocol URL差 | Rustのroot-relative segment URL生成、platform test | engine固有bugはadapter設計 |
 | opaque origin JSON fetch差 | exact `null` CORS、credentialなし、platform test | `*`へ緩和せずresource contractを再設計 |
 | large image / font read | async protocol、allowlist | range / streamingが必要な実fixtureで別対応 |
 | shell CSPで既存機能回帰 | production / dev CSP分離、Markdown回帰 | 最小source追加を設計レビューへ戻す |
@@ -573,7 +589,7 @@ macOS / Windows / Linuxで少なくとも次を記録する。
 ## 21. 参照資料
 
 - Tauri custom protocol / `register_uri_scheme_protocol`: <https://docs.rs/tauri/2.11.2/tauri/struct.Builder.html#method.register_uri_scheme_protocol>
-- Tauri `convertFileSrc`: <https://v2.tauri.app/reference/javascript/api/namespacecore/#convertfilesrc>
+- Tauri `convertFileSrc`（HTML URLでは不採用としたAPI契約）: <https://v2.tauri.app/reference/javascript/api/namespacecore/#convertfilesrc>
 - Tauri Capabilities（Linux / Android iframe注意を含む）: <https://v2.tauri.app/security/capabilities/>
 - Tauri CSP: <https://v2.tauri.app/security/csp/>
 - Tauri asset protocol scope: <https://v2.tauri.app/security/asset-protocol/>
