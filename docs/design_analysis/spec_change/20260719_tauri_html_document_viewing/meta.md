@@ -18,7 +18,7 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "not_started"
+completion_status: "in_progress"
 related_commits:
   - "24bcfb5 : Phase 0 define TODO-2026-017 scope"
   - "20d1d82 : Phase 1 initialize Tauri HTML document viewing workflow"
@@ -62,4 +62,4 @@ source_report_path: "docs/design_analysis/research_analysis/20260719_html_docume
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-07-19, `59193e5`) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-19, `5ac20d0`) |
-| Phase 4 Verification and completion | Not started |
+| Phase 4 Verification and completion | In progress (Phase 4-a macOS主要シナリオ確認済み、platform matrix継続) |

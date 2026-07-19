@@ -13,12 +13,27 @@
       <p class="eyebrow">TODO-2026-017 fixture</p>
       <h1>Trusted HTML specification</h1>
       <nav>
+        <a href="#architecture">Architecture image</a>
         <a href="#diagram">Fragment</a>
         <a href="https://example.com/spec" target="_blank">External HTTPS</a>
         <a href="javascript:alert('blocked')">Blocked JavaScript URL</a>
       </nav>
     </header>
     <main>
+      <section id="architecture">
+        <h2>Viewer architecture</h2>
+        <figure>
+          <img
+            class="architecture-image"
+            src="./assets/markdown-viewer-architecture.png"
+            alt="MarkdownViewer architecture showing separate Markdown rendering and sandboxed trusted HTML preview paths"
+          />
+          <figcaption>
+            Markdown renders in the React DOM, while trusted HTML is delivered through the
+            root-scoped Tauri protocol to an isolated sandboxed iframe.
+          </figcaption>
+        </figure>
+      </section>
       <section>
         <h2>Inline SVG and Canvas</h2>
         <svg viewBox="0 0 320 80" role="img" aria-label="Inline flow diagram">

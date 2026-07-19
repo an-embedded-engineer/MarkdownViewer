@@ -37,10 +37,17 @@
 
 ### Manual fixture
 
+- `sample_docs/image_link.md`
+- `sample_docs/images/avalonia-markdown-viewer-architecture.png`
 - `sample_docs/html_fixture/index.html`
 - `sample_docs/html_fixture/malicious.html`
 - `sample_docs/html_fixture/assets/`
+- `sample_docs/html_fixture/assets/markdown-viewer-architecture.png`
 - `sample_docs/html_shared.svg`
+
+`image_link.md`には、Avalonia版のfile tree、ViewModel、Markdown / Mermaid / PlantUML rendering、temporary HTML、NativeWebViewまでの流れを示す生成PNGを標準Markdown画像構文で追加した。両Viewerでroot内相対画像リンクを確認するfixtureとして使う。
+
+`index.html`には、MarkdownのReact DOM描画経路とtrusted HTMLのroot-scoped protocol / sandboxed iframe経路を対比する生成画像を追加した。PNGをroot内相対pathで参照し、HTML protocolのbinary image配信とresponsive表示を手動確認できるfixtureとして使う。
 
 ### 恒久ドキュメント
 
@@ -113,6 +120,12 @@ Phase 3レビュー依頼前の最終実行結果を以下へ記録する。
 - root swapとin-flight protocol request、Markdown regression。
 
 Windows / Linux実機はPhase 3のローカル自動検証では確認できないため、成功と推定せずPhase 4-aのplatform matrixへ残す。
+
+### Phase 4-aユーザー確認
+
+2026-07-19のmacOS実機確認で、既存HTML / inline SVG表示、外部リンクのOS標準ブラウザ委譲、`javascript:` URL拒否を確認した。加えて、HTML custom protocol経由および既存Markdown画像経路で、root内相対参照の生成PNGが表示されることを確認した。詳細は `../verification/phase4a_user_verification.md` を参照する。
+
+設計書 §17.5 のWindows / Linuxを含むplatform matrixは未完了であり、未確認項目を成功と推定せずPhase 4 completion blockerとして継続する。
 
 ## 8. 実装レビュー反映
 

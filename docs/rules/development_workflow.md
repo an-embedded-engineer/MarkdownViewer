@@ -169,6 +169,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - フォルダ選択
 - Explorer から Markdown 選択
 - Markdown プレビュー表示
+- `sample_docs/image_link.md` のroot内相対PNG画像が表示されること
 - Mermaid 描画
 - Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること
 - PlantUML 描画
