@@ -15,7 +15,7 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
   - "docs/tests/README.md"
-status: "implemented"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -34,8 +34,13 @@ related_commits:
   - "5ac20d0 : Phase 3 approve Tauri HTML implementation after review follow-up"
   - "749b288 : Phase 3 complete Tauri HTML implementation review"
   - "a9193cf : Phase 4-a record Tauri HTML viewer verification"
+  - "465fa6e : Phase 4-b complete Tauri HTML viewer workflow artifacts"
+  - "e21a336 : Phase 4-c merge spec-change/tauri-html-document-viewing into main"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-017-tauri-html形式仕様書表示対応"
 source_report_path: "docs/design_analysis/research_analysis/20260719_html_document_viewing_support/report.md"
+merged_branch: "main"
+merged_commit: "e21a3365a6aa0b93a287060f1544319ad59fc28d"
+merged_date: "2026-07-19"
 ---
 
 # TODO-2026-017 Tauri HTML形式仕様書表示対応 meta
@@ -61,4 +66,4 @@ source_report_path: "docs/design_analysis/research_analysis/20260719_html_docume
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-07-19, `59193e5`) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-19, `5ac20d0`) |
-| Phase 4 Verification and completion | Phase 4-b done; awaiting Phase 4-c merge approval |
+| Phase 4 Verification and completion | Done (merged to main 2026-07-19, `e21a336`) |
