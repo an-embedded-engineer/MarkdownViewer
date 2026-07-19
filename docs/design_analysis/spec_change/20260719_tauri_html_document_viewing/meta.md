@@ -16,7 +16,7 @@ components:
   - "docs/rules/development_workflow.md"
   - "docs/tests/README.md"
 status: "in_progress"
-design_status: "not_started"
+design_status: "draft"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits:
@@ -46,6 +46,6 @@ source_report_path: "docs/design_analysis/research_analysis/20260719_html_docume
 | --- | --- |
 | Phase 0 Requirements | Done (`24bcfb5`) |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | Not started |
+| Phase 2 Design review | Draft (review pending) |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4 Verification and completion | Not started |
