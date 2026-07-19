@@ -28,6 +28,7 @@ related_commits:
   - "cd13c37 : Phase 3 address Tauri settings implementation review"
   - "5321270 : Phase 3 approve Tauri settings implementation review"
   - "dc97286 : Phase 4-a record Tauri settings user verification"
+  - "0d12d31 : Phase 4-b complete report, diff archive, TODO archive, and history"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-014-tauri-viewer-設定永続化と設定-ui-導入"
 depends_on:
   - "TODO-2026-005 Tauri Multi-tab core introduction"
