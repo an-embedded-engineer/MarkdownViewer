@@ -6,12 +6,17 @@ components:
   - Avalonia/MarkdownViewer.Avalonia
   - markdown-viewer-tauri
   - docs/components
-status: in_review
+status: merged
 related_commits:
   - 9086486 : Phase 1 meta 初期化
   - c9108ec : Phase 2 初回 report 作成
   - b81c3fd : Phase 2 root内resource・diagram調査反映
   - 0f021b9 : Phase 2 外部URL調査反映
+  - 7473ff4 : Phase 3 Claude review準備
+  - 42d8a7a : Phase 3 Claude初回review
+  - e8441af : Phase 4 review指摘反映
+  - 355ce1f : Phase 4 Claude再review準備
+  - 7747b99 : Phase 4 Claude Round 2承認
 source_design_path: docs/design_analysis/research_analysis/20260719_html_document_viewing_support/report.md
 ---
 
