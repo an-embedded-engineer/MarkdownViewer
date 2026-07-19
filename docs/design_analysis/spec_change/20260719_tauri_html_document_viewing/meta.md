@@ -15,9 +15,9 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
   - "docs/tests/README.md"
-status: "in_progress"
+status: "implemented"
 design_status: "done"
-impl_status: "draft"
+impl_status: "done"
 completion_status: "not_started"
 related_commits:
   - "24bcfb5 : Phase 0 define TODO-2026-017 scope"
@@ -28,6 +28,13 @@ related_commits:
   - "9489c43 : Phase 2 address Tauri HTML design review findings"
   - "0b82b6c : Phase 2 add Tauri HTML design review follow-up prompt"
   - "59193e5 : Phase 2 approve Tauri HTML design after review follow-up"
+  - "1245902 : Phase 2 complete Tauri HTML design review"
+  - "05039bb : Phase 3 implement Tauri HTML document viewing"
+  - "74155b4 : Phase 3 add Tauri HTML implementation review prompt"
+  - "609c70a : Phase 3 review Tauri HTML document viewing implementation"
+  - "4bf5da6 : Phase 3 address Tauri HTML implementation review"
+  - "56512b6 : Phase 3 add Tauri HTML implementation review follow-up prompt"
+  - "5ac20d0 : Phase 3 approve Tauri HTML implementation after review follow-up"
 source_todo_path: "docs/todo/todo.md#todo-2026-017-tauri-html形式仕様書表示対応"
 source_report_path: "docs/design_analysis/research_analysis/20260719_html_document_viewing_support/report.md"
 ---
@@ -54,5 +61,5 @@ source_report_path: "docs/design_analysis/research_analysis/20260719_html_docume
 | Phase 0 Requirements | Done (`24bcfb5`) |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-07-19, `59193e5`) |
-| Phase 3 Implementation and docs review | Draft (implementation and local verification in progress) |
+| Phase 3 Implementation and docs review | Done (approved 2026-07-19, `5ac20d0`) |
 | Phase 4 Verification and completion | Not started |

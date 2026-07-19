@@ -123,4 +123,4 @@ Claude実装レビュー `609c70a` はPhase 3を承認し、非blockerのLow改�
 - protocol security headerとnon-HTML body非変換の直接assertを追加した。
 - malicious fixtureへexternal fetch / WebSocket、asset / unknown protocol、top / self navigation、download、forged message burstを追加した。
 
-追補後にPhase 3必須commandを再実行し、Claude follow-upで未解決指摘ゼロを確認する。
+追補後にPhase 3必須commandを再実行し、Claude follow-up commit `5ac20d0` で未解決指摘ゼロ・Phase 4-a進行可の最終承認を確認した。
