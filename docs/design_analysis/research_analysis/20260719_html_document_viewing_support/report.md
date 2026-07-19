@@ -18,20 +18,24 @@ Markdownのみを閲覧対象としているMarkdownViewerへ、Agentや人間�
 
 - Avalonia版は既にトップレベル文書を`NativeWebView.Navigate(fileUri)`で表示しているため、root配下のHTMLファイルへ直接Navigateする経路を追加できる。影響は小～中規模である。
 - Tauri版はMarkdownから生成したHTML fragmentをReactの`<article>`へ`dangerouslySetInnerHTML`で挿入している。完全なHTML文書の`<head>` / `<style>` / `<script>`をこの経路へ入れる設計は不適切であり、`iframe`等の独立した文書コンテキストが必要になる。影響は中規模である。
-- HTMLは能動的なJavaScriptを含められるため、Markdownの`html: false`より信頼境界が大きく変わる。対象を「信頼できる、self-containedなローカルHTML」に限定し、ホストAPI、親DOM、ローカルファイル、外部ネットワークへのアクセスを原則与えない設計が必要である。
+- HTMLは能動的なJavaScriptを含められるため、Markdownの`html: false`より信頼境界が大きく変わる。対象を「信頼できるローカルHTMLと、選択したプロジェクトroot内の関連resource」に限定し、ホストAPI、親DOM、root外のローカルファイル、外部ネットワークへのアクセスを原則与えない設計が必要である。
 
 ### 2.2 推奨方針
 
 初期対応の仕様を次に限定する。
 
 1. 対応拡張子はまず`.html`のみとする。`.htm`は要求がないため初期対象外とする。
-2. 対象は選択root配下にあるUTF-8の単一HTMLファイルとする。
-3. CSS、JavaScript、データをHTML内に持つself-contained文書を正式な対応範囲とする。
-4. HTML内のJavaScript実行は許可するが、ViewerのホストAPI、親画面DOM、root外のローカルファイル、外部ネットワークへのアクセスは許可しない。
-5. Markdownは既存のMarkdig / markdown-it、Mermaid、PlantUML経路を維持する。HTMLにはMarkdown用テンプレート、Mermaid初期化、PlantUML変換、ViewerテーマCSSを適用しない。
-6. HTML自身がテーマ機能を持つ場合はHTML側を正本とし、ViewerのLight/Dark切替でHTML本文を書き換えない。
+2. 現在のMarkdownと同じく、ユーザがプロジェクトディレクトリをrootとして開き、Explorerに列挙されたroot配下のHTMLを選択して表示する。HTMLだけを別のファイル選択dialogで開く方式ではない。
+3. CSS、JavaScript、データ、画像をHTML内に持つself-contained文書を対応する。
+4. 加えて、HTMLから相対URLで参照されるroot配下の画像、SVG、CSS、JavaScript、font、JSON等の関連resourceを対応範囲に含める。`../`を含む相対URLもcanonicalize後にroot内なら許可する。
+5. HTML内のJavaScript実行は許可するが、ViewerのホストAPI、親画面DOM、root外のローカルファイル、外部ネットワークへのアクセスは許可しない。
+6. HTMLに埋め込まれたinline SVG / Canvas、画像化済みダイアグラム、HTML自身が同梱runtimeで描画するMermaid等は表示対象とする。
+7. Markdownは既存のMarkdig / markdown-it、Mermaid、PlantUML経路を維持する。HTMLにはMarkdown用テンプレートやViewer側の図変換を自動適用しない。
+8. HTML自身がテーマ機能を持つ場合はHTML側を正本とし、ViewerのLight/Dark切替でHTML本文を書き換えない。
 
-この境界なら、提示サンプルの検索、フィルター、ツリー展開、タブ切替、Theme、参照トレース等の動的機能を保ちつつ、一般Webブラウザ機能へスコープが拡大することを避けられる。
+ここでいう「root配下」は、例えば`/Users/shin/Development/VisualStudioCode/AgenticProjectTemplates`をOpen Folderで開いた場合、その配下の`.html`が既存の`.md`と同じExplorerに表示され、選択して開けるという意味である。HTML本体と関連resourceは同じroot内に置く。
+
+この境界なら、提示サンプルの検索、フィルター、ツリー展開、タブ切替、Theme、参照トレース等の動的機能に加え、仕様書で一般的な画像とダイアグラムを扱いつつ、一般Webブラウザ機能へスコープが拡大することを避けられる。
 
 ## 3. 調査対象と非対象
 
@@ -68,7 +72,8 @@ Markdownのみを閲覧対象としているMarkdownViewerへ、Agentや人間�
 - このworkflow内でのアプリ実装。
 - HTML編集、Developer Tools、履歴、一般Webブラウザ機能。
 - CDN、外部API、外部画像等を必要とする一般Webサイトの完全対応。
-- root外へ遷移する複数HTMLファイル構成。
+- root外の画像、CSS、JavaScript、font、HTML等の読み込み。
+- rawのPlantUML / Mermaid sourceをHTMLから独自記法で抽出し、Viewer側rendererへ渡す新しいHTML図変換規約。
 - 信頼できない第三者HTMLを安全に実行する汎用サンドボックスの保証。
 
 ## 4. 根拠ソース
@@ -127,6 +132,30 @@ node tests/test_user_agent_assets_v2_structure_viewer.mjs
 ```
 
 この結果はサンプル自体が通常のブラウザ文書として成立することを示す。ただし、Avalonia NativeWebView / Tauri WebView内のplatform別動作を保証するものではないため、実装workflowでは両アプリでの手動確認が必要である。
+
+### 5.4 画像・UML・ダイアグラムの扱い
+
+仕様書用途では、提示サンプルのような完全self-contained HTMLだけでなく、HTMLと同じプロジェクト内の画像や描画runtimeを参照する構成も必要である。ブラウザが標準的に表示できる次の形式は対応可能である。
+
+| 内容 | HTML側の表現例 | 初期対応 |
+| --- | --- | --- |
+| raster画像 | `<img src="./images/flow.png">`、data URI | root内相対pathまたは埋め込みなら対応 |
+| SVG画像 | `<img src="./images/architecture.svg">` | root内相対pathなら対応 |
+| inline SVG | `<svg>...</svg>` | HTML内でそのまま対応 |
+| Canvas / DOM diagram | inline / root内JavaScriptがDOMやCanvasへ描画 | sandbox内scriptとして対応 |
+| 描画済みUML | PNG / SVGとして出力し`img`で参照 | 対応 |
+| Mermaid等のclient-side描画 | HTML内またはroot内にruntimeとsourceを同梱 | HTML自身のscriptとして対応 |
+| PlantUML sourceのみ | HTML独自markerからViewerがJava CLIを起動 | 初期対象外 |
+
+重要なのは「図の種類」ではなく、「最終的にHTML標準の画像、SVG、Canvas、DOMとして描画でき、必要なresourceが選択root内で完結するか」である。
+
+MarkdownではViewerがMermaid fenceとPlantUML fenceを認識するが、HTMLには対応する標準記法がない。そのため、HTML内にraw Mermaid / PlantUML sourceだけを置けばViewerが自動変換する、という仕様は採らない。HTML生成側が次のいずれかを行う。
+
+- PNG / JPG / SVGへ事前描画してroot内resourceとして参照する。
+- inline SVGとして埋め込む。
+- Mermaid等のbrowser runtimeとsourceをHTML内またはroot内に同梱し、HTML自身のJavaScriptで描画する。
+
+将来、HTMLでもViewer側PlantUML CLIを再利用したい要求が出た場合は、HTML marker、source抽出、結果差し替え、sandboxへの受け渡し契約が必要になるため、別の仕様追加として扱う。
 
 ## 6. 現状実装
 
@@ -190,16 +219,18 @@ DocumentType
 PreviewSource
 - GeneratedHtml(documentHtml, basePath)  # Markdown
 - LocalHtml(path)                         # Avalonia HTML
-- SandboxedHtml(sourceText, path)         # Tauri HTML
+- RootScopedHtml(documentUrl, path)       # Tauri HTML
 ```
 
 共通の受入規則は次とする。
 
 - pathをcanonicalize / full path化し、選択root配下であることを先に検証する。
 - 拡張子をcase-insensitiveに判定する。
+- Open Folderで選択したproject rootをExplorer、文書open、HTML resource解決の共通security boundaryとする。
+- HTMLの相対resourceはHTMLファイルのdirectoryをbaseとして解決し、canonicalize後もroot内にある場合だけ返す。
 - 初期自動選択は既存挙動を守り、`README.md` / `README.markdown`、最初のMarkdown、最初のHTMLの順を推奨する。
 - Explorer上のsortはDirectory、Markdown、HTML、Imageを推奨する。MarkdownとHTMLを同一のDocument rankにする案も可能だが、比較実装間で統一する。
-- HTML内でMermaidやPlantUMLが必要な場合はHTML自身がruntimeまたは描画済み結果を内包する。ViewerのMarkdown pipelineは適用しない。
+- HTML内でMermaidやPlantUMLが必要な場合は、HTML自身がroot内runtimeを読み込むか、描画済み画像 / SVGを参照する。ViewerのMarkdown pipelineは自動適用しない。
 
 ### 8.2 Avalonia版
 
@@ -207,7 +238,9 @@ PreviewSource
 
 root内検証済みのHTML原本を`NativeWebView.Navigate(fileUri)`でトップレベル文書として表示する。
 
-原本をViewerのtemp `preview.html`へコピーする案は提示サンプルでは動くが、将来相対resourceを含むHTMLを許可した際にbase directoryがtempへ変わる。原本file URIへのNavigateなら文書本来のbase URIを維持でき、余分なコピーとsize制約も避けられる。
+原本をViewerのtemp `preview.html`へコピーする案は提示サンプルでは動くが、相対resourceを含むHTMLではbase directoryがtempへ変わり、画像、CSS、JavaScript等が解決できなくなる。原本file URIへのNavigateなら文書本来のbase URIを維持でき、root内の相対resourceを自然に表示できる。また、余分なコピーとsize制約も避けられる。
+
+画像、SVG、CSS、JavaScript等のsubresource requestは、可能なplatformでは`WebResourceRequested`等のNativeWebView eventを使って監視し、canonicalize後にroot外へ出るfile URIを拒否する。Avalonia Controls WebViewのplatform adapter間で同じ粒度のcancel / response制御ができるかは実装設計時にmacOS / Windowsで確認する。完全に統一できない場合は、trusted rootという入力契約とnavigation制御を併用する。
 
 #### 主な変更候補
 
@@ -246,7 +279,20 @@ root内検証済みのHTML原本を`NativeWebView.Navigate(fileUri)`でトップ
 
 #### 推奨表示方式
 
-Rustでroot内・`.html`・UTF-8を検証して文字列を返し、ReactではMarkdownとは別の`HtmlPreview` componentを用意して、sandbox付き`iframe srcDoc`で表示する。
+ReactではMarkdownとは別の`HtmlPreview` componentを用意し、sandbox付き`iframe`で独立文書として表示する。HTML本体と相対resourceは、Rust側に登録するroot-scoped custom URI protocolから配信する方式を推奨する。
+
+```text
+viewer-resource://localhost/<root-relative-path>
+  -> Rust protocol handler
+  -> URL decode / canonicalize
+  -> current root配下か確認
+  -> 許可したresource種別か確認
+  -> Content-Type / CSP付きresponse
+```
+
+Tauri 2.11系には`register_uri_scheme_protocol` / `register_asynchronous_uri_scheme_protocol`があり、macOS、Windows、Linuxの各WebViewへcustom protocol responseを返せる。handlerは要求URLを直接filesystem pathとして信用せず、現在のrootから相対pathを解決し、canonicalize後にroot配下であることを毎回確認する。
+
+HTML本体をcustom protocol URLから開けば、`./images/flow.png`、`./styles/spec.css`、`./scripts/diagram.js`等も同じprotocol上の相対URLとして解決できる。responseでは拡張子に対応した正しい`Content-Type`を返し、少なくともHTML、CSS、JavaScript、JSON、一般画像、SVG、fontにallowlistを設ける。
 
 初期sandboxは少なくとも次を推奨する。
 
@@ -258,17 +304,19 @@ Rustでroot内・`.html`・UTF-8を検証して文字列を返し、ReactではM
 - `allow-same-origin`: 付けない。opaque originにして親DOMや同一origin資産への接近を抑える。
 - `allow-top-navigation` / `allow-popups` / `allow-forms` / `allow-downloads`: 初期対応では付けない。
 
-加えて、HTML preview内ではinline CSS / inline script / data / blob等、self-contained文書に必要なsourceだけを許可し、`connect-src 'none'`等で外部通信を拒否するCSPを適用する。元HTMLへCSP metaを安全に挿入する責務と方法は次workflowの設計で確定する。
+加えて、HTML previewではinline CSS / inline script / data / blobとroot-scoped custom protocolだけを許可し、`http:` / `https:`等の外部通信を拒否するCSPをprotocol response headerで適用する。root内JSONを`fetch`するHTMLまで許可する場合は`connect-src`にcustom protocol originだけを追加し、platform別originとCORS response headerを検証する。
 
-`src={convertFileSrc(path)}`で原本を直接iframe表示する案もあるが、現設定の`assetProtocol.scope: ["**"]`は広く、Rust `read_text_file`のroot検証を表示経路で迂回する。self-contained限定の初期対応では、検証済み本文を`srcDoc`へ渡す方が境界を明確にできる。
+完全self-contained HTMLだけなら、Rustで検証・readした本文を`sandboxed iframe srcDoc`へ渡す方式でも提示サンプルを表示できる。しかし`srcDoc`単独ではHTMLファイルのdirectoryをbaseとする相対resourceを扱えない。画像・diagram runtimeを含む仕様書用途まで正式対応するなら、custom protocol方式を主経路にするのが適切である。
+
+`src={convertFileSrc(path)}`で原本を直接iframe表示する案も相対resourceを扱えるが、現設定の`assetProtocol.scope: ["**"]`は広く、Rust commandのroot検証を表示経路で迂回する。HTML表示にはroot-scoped custom protocolを使い、既存asset protocolはMarkdown画像用の別境界として扱う。
 
 #### 主な変更候補
 
 - `src-tauri/src/lib.rs`
   - `FileNodeType::Html`、`is_html_path`、tree列挙・sortを追加する。
-  - `read_text_file`をdocument一般のcommandへ置換するか、HTML専用commandを追加する。
-  - 戻り値を`DocumentContent { document_type, text }`のtyped modelにする案を推奨する。
-  - root配下、通常file、許可拡張子、UTF-8の検証をRust側へ集約する。
+  - `read_text_file`をdocument一般のcommandへ置換するか、HTML preview URLを返すcommandを追加する。
+  - current rootをRust stateへ保持し、custom URI protocol handlerと`scan_directory` / document openが同じroot境界を参照する。
+  - protocol handlerでroot配下、通常file、許可resource拡張子、MIME type、CSP response headerを扱う。
 - `src/App.tsx`
   - TS `FileNodeType`と`OpenDocumentTab`へdocument typeを追加する。
   - `markdown` fieldを`sourceText`等へ一般化する。
@@ -279,8 +327,8 @@ Rustでroot内・`.html`・UTF-8を検証して文字列を返し、ReactではM
 - `src/App.css`
   - preview pane全体を使うiframe layout、border、loading/error状態を追加する。
 - `src-tauri/tauri.conf.json`
-  - CSPを`null`のままにしない方針を検討する。
-  - `assetProtocol.scope: ["**"]`は既存Markdown画像表示も含む横断課題として、選択root相当へ狭める方法を設計する。
+  - Viewer shellのCSPを`null`のままにしない方針を検討する。
+  - `assetProtocol.scope: ["**"]`は既存Markdown画像表示も含む横断課題として別途縮小する。HTML resourceはcustom protocolでroot制限する。
 - `src-tauri/capabilities/default.json`
   - HTML previewがTauri capabilityを得ないことを確認する。
 
@@ -294,7 +342,7 @@ Tauri公式資料は、LinuxとAndroidでは埋め込みiframeからのrequest�
 - JavaScriptを無効化し、sanitizeした静的HTMLだけを表示する。
 - HTML実行自体をOSの既定ブラウザへ委譲する。
 
-今回の「Agentが生成した信頼できるself-contained仕様書」という境界ならsandboxed iframe案を推奨できるが、信頼モデルは仕様書へ明記する必要がある。
+今回の「Agentが生成した信頼できるHTMLと、選択project root内の関連resource」という境界なら、root-scoped custom protocolとsandboxed iframeの組み合わせを推奨できるが、信頼モデルは仕様書へ明記する必要がある。
 
 ## 9. 選択肢比較
 
@@ -305,8 +353,9 @@ Tauri公式資料は、LinuxとAndroidでは埋め込みiframeからのrequest�
 | Markdown rendererへHTMLを通す | 不適 | 弱い | renderer依存 | Markdown設定と矛盾 | 不採用 |
 | React DOMへ直接挿入 | script初期化不可 | なし | 不安定 | shellと同context | Tauriでは不採用 |
 | 原本file URIへ直接Navigate | 対応 | top-level文書 | 良い | active contentがhost WebView内 | Avaloniaで推奨（trusted限定） |
-| `iframe src=assetUri` | 対応 | 良い | 良い | asset scopeとcapability注意 | 外部resource対応時の候補 |
-| sandboxed `iframe srcDoc` | 対応 | 良い | self-contained限定 | opaque origin + CSPを設計可能 | Tauri初期対応で推奨 |
+| `iframe src=assetUri` | 対応 | 良い | 良い | 現状のasset scopeが広い | 不採用 |
+| sandboxed `iframe srcDoc` | 対応 | 良い | self-contained限定 | opaque origin + CSPを設計可能 | self-contained専用の簡易案 |
+| sandboxed iframe + root-scoped custom protocol | 対応 | 良い | root内resource対応 | Rustでpath / MIME / CSPを制御 | Tauriで推奨 |
 | OS既定ブラウザ | 対応 | アプリ外 | 良い | Viewer hostから分離 | fallback候補、要求UXには弱い |
 
 ### 9.2 信頼モデル
@@ -330,18 +379,32 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 - Explorerへ表示されたpathでも、open時に毎回canonicalize / full pathとroot配下を再検証する。
 - symlink経由のroot外参照を許可しない。
 - Tauriではfrontendだけの検証にせずRust commandを正本とする。
-- HTML内相対linkは初期self-contained仕様では正式サポートしない。将来対応する場合も、navigation先を再度root内・許可拡張子で検証する。
+- HTML内の相対画像 / CSS / JavaScript / font / JSONは、HTML fileのdirectoryをbaseとして解決し、各requestをroot内・許可resource種別で再検証する。
+- HTMLから別のHTML / Markdownへ移動するnavigationは、resource読込とは分けて扱う。初期版ではtop-level / parent navigationをsandboxで拒否し、将来アプリ内tab遷移を追加する場合にroot内・許可文書拡張子を再検証する。
 
 ### 10.3 network / local resource
 
 提示サンプルにはnetwork依存がない。初期版ではnetworkを必要とするHTMLを「一部表示できる可能性がある」状態にせず、非対応として明示的にblockする方が仕様とセキュリティが一致する。
 
-同様に、Tauriのasset protocol全filesystem scopeをHTMLへ継承させない。Avaloniaでもfile originからroot外resourceを読み得るplatform差があるため、self-contained契約を優先し、root外resourceは非対応とする。
+一方、選択root内のlocal resourceは仕様書の一部として対応する。許可候補は次の通りである。
 
-### 10.4 platform差
+- image: PNG、JPG / JPEG、GIF、WebP、BMP、ICO、AVIF、SVG。
+- style / script / data: CSS、JavaScript、JSON。
+- font: WOFF / WOFF2を基本とし、必要性を確認して追加する。
+- inline: data URI、inline SVG、Canvas、HTML内style / script。
+
+Tauriのasset protocol全filesystem scopeをHTMLへ継承せず、root-scoped custom protocolで配信する。Avaloniaでは原本file URIが相対resourceを自然に解決するため、subresource requestのroot外脱出を監視・拒否する。root外resourceと外部network resourceは非対応とする。
+
+### 10.4 ダイアグラム
+
+Viewerが対応するのはHTML標準で描画済み、またはHTML自身のJavaScriptで描画される図である。これにより、architecture diagram、sequence diagram、class diagram等の意味種別に依存せず、PNG / SVG / Canvas / DOMとして表示できる。
+
+既存のMarkdown用Mermaid / PlantUML pipelineはHTMLへ暗黙適用しない。HTML仕様書generatorが描画済みSVGを出すか、root内にMermaid runtimeを同梱する方式が最も移植性が高い。PlantUML CLIの再利用は追加契約が必要なため別仕様とする。
+
+### 10.5 platform差
 
 - Avalonia NativeWebViewはplatform native engineを使うため、macOS WebKitとWindows WebView2でfile URI、CSP、navigation eventの挙動差を確認する。
-- TauriもmacOS / Windows / LinuxでWebView engineが異なる。sandbox、srcDoc、CSP、Tauri IPC非公開を各platformで確認する。
+- TauriもmacOS / Windows / LinuxでWebView engineが異なる。sandbox、custom protocol URL、relative resource、MIME、CSP、Tauri IPC非公開を各platformで確認する。
 - Linux上のTauri iframe capability境界には公式の注意があるため、trusted限定を解除しない。
 
 ## 11. テスト・検証観点
@@ -354,6 +417,8 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 - `.htm`、root外path、未対応拡張子を拒否する。
 - sort順とHTML icon / previewable判定。
 - MarkdownはGeneratedHtml、HTMLはLocalHtml preview requestになる。
+- HTMLと同じdirectory / subdirectory / `../`にある画像を、canonicalize後root内なら表示する。
+- root外を指す画像、script、CSS requestを拒否する。
 - HTML表示中のTheme切替でMarkdown templateを適用しない。
 - HTML表示中のhost messageを無視する。
 
@@ -362,7 +427,9 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 - `is_html_path`のcase-insensitive判定。
 - treeへHTMLを含め、node typeとsortが期待通りになる。
 - document read commandがroot外、directory、未対応拡張子、非UTF-8を拒否する。
-- typed responseがMarkdown / HTMLを正しく返す。
+- custom protocolがroot内resourceへ正しいMIMEとCSPを返す。
+- URL encode、`..`、symlink、root外absolute path、未許可拡張子を拒否する。
+- custom protocolのplatform別URLから相対resourceを解決できる。
 
 #### Tauri / Frontend
 
@@ -371,6 +438,8 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 - iframeへ`allow-scripts`以外の不要なsandbox権限が付かない。
 - HTMLのglobal CSSがViewer shellへ漏れない。
 - HTML scriptから`window.parent`、Tauri API、top navigation、popup、networkへ到達できない。
+- root内のPNG / JPG / SVG、CSS、JavaScriptをiframe内で読み込める。
+- inline SVG / Canvasと、同梱runtimeによるclient-side diagramを描画できる。
 
 ### 11.2 手動UI確認
 
@@ -383,6 +452,9 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 - 詳細ペインとforward / reverse reference trace。
 - Tree / Graph切替。
 - HTML内部Theme切替。
+- root内相対pathのPNG / JPG / SVG表示。
+- inline SVG / Canvas diagram表示。
+- root内に同梱したJavaScript runtimeによるdiagram表示。
 - keyboard navigationとfocus表示。
 - Reload後も初期化される。
 - Markdown tabとHTML tabの切替で表示・scroll・error状態が混線しない。
@@ -432,11 +504,13 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 | リスク | 影響 | 対応方針 |
 | --- | --- | --- |
 | HTMLからホストAPI / Tauri IPCを呼ばれる | local system操作・情報露出 | bridge無効化、sandbox、capability分離 |
-| Tauriの広いasset scope | root外file露出 | srcDoc優先、scope縮小を設計 |
-| 外部通信を許す | tracking・情報送信・remote code | self-contained契約、CSPでblock |
+| Tauriの広いasset scope | root外file露出 | HTMLはroot-scoped custom protocolを使用し、既存scope縮小も設計 |
+| custom protocolのpath検証漏れ | root外file露出 | URL decode後canonicalize、root内判定、拡張子allowlist |
+| 外部通信を許す | tracking・情報送信・remote code | project-contained契約、CSPでblock |
 | CSS / ID衝突 | Viewer UI破損 | 独立iframe document |
 | HTMLとViewer themeの競合 | 意図しない色・再初期化 | HTML themeを独立扱い |
-| relative resourceのplatform差 | 片方だけ表示できる | 初期はself-contained限定 |
+| relative resource / MIMEのplatform差 | 片方だけ表示できる | custom protocol responseと実機testを統一 |
+| active SVG / diagram script | sandbox escape、network access | iframe sandboxとCSPをHTML全体へ適用 |
 | iframe sandboxのplatform差 | security前提崩れ | macOS / Windows / Linux実機確認 |
 | 文書stateのMarkdown固定名 | branch漏れ・誤処理 | typed DocumentTypeへ一般化 |
 | 既存Markdown回帰 | Mermaid / PlantUML / link破損 | rendererを分岐の内側で維持し回帰試験 |
@@ -447,12 +521,14 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 
 1. HTMLを「信頼できるローカル文書のみ」と明記するか、初回警告 / opt-inを設けるか。
 2. `.htm`も同時対応するか。現要求に合わせるなら`.html`のみを推奨する。
-3. self-containedの定義を「networkなし」だけにするか、相対local resourceも禁止するか。初期は両方禁止を推奨する。
+3. root内resourceの許可拡張子をどこまで含めるか。初期は一般画像、SVG、CSS、JavaScript、JSON、WOFF / WOFF2を推奨する。
 4. HTML内の外部URL clickを完全blockするか、確認後に既定ブラウザで開くか。
-5. TauriのCSPをHTML preview専用にどう適用するか。srcDocへのmeta挿入、別WebView、custom protocol response header等を比較する必要がある。
+5. Tauri custom protocol responseのCSPとCORSをplatform別にどう構成するか。root内JSON `fetch`を許可するかも確定する必要がある。
 6. Tauriの`assetProtocol.scope: ["**"]`縮小を本対応に含めるか、既存画像表示を含む先行security作業へ分離するか。
 7. Avaloniaのactive HTMLをtop-level NativeWebViewへ置くtrust境界を許容するか、iframe wrapper等を追加するか。
 8. Tauri LinuxをHTML active content対応platformに含めるか。含める場合、iframe capability注意への実機検証とsecurity reviewを必須とする。
+9. HTMLから別HTML / Markdownへの相対linkをアプリ内tab遷移として初期対応するか。画像等のsubresource表示とは分離して判断する。
+10. HTML内のraw Mermaid / PlantUML sourceをViewer側で自動描画する追加規約が必要か。現時点では描画済みSVGまたは同梱browser runtimeを推奨する。
 
 ## 15. 次workflowへの推奨入力
 
@@ -462,8 +538,9 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 
 - 共通: `DocumentType`を導入し、Markdown / HTMLの入力・状態・表示経路を明示分岐する。
 - Avalonia: root内HTML原本のfile URIへ直接Navigateし、HTML時はhost messageを処理しない。
-- Tauri: Rustで検証・readしたHTMLを、CSP付きsandboxed `iframe srcDoc`へ表示する。
-- 対応境界: trusted、UTF-8、self-contained、単一`.html`、network / root外resourceなし。
-- 検証: 提示サンプルの全主要interaction、悪性fixture、既存Markdown / Mermaid / PlantUML回帰を両実装で確認する。
+- Tauri: root-scoped custom URI protocolでHTMLと関連resourceを配信し、CSP付きsandboxed iframeへ表示する。
+- 対応境界: trusted、UTF-8の`.html`、self-containedまたは選択project root内resourceで完結、network / root外resourceなし。
+- 画像・diagram: root内PNG / JPG / SVG、inline SVG / Canvas、描画済みUML、同梱browser runtimeによるdiagramを対応する。HTML raw sourceへのViewer側図変換は別仕様とする。
+- 検証: 提示サンプルの全主要interaction、相対画像 / SVG / diagram fixture、悪性fixture、既存Markdown / Mermaid / PlantUML回帰を両実装で確認する。
 
 AvaloniaとTauriで実装方式は異なるが、共通の文書契約と受入条件を先に確定すれば、根本的な作り直しやMarkdown rendererの変更は不要である。
