@@ -11,9 +11,9 @@ components:
   - "markdown-viewer-tauri/src-tauri/capabilities"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
-status: "active"
+status: "implemented"
 design_status: "done"
-impl_status: "in_progress"
+impl_status: "done"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -23,6 +23,10 @@ related_commits:
   - "eb13890 : Phase 2 design review (conditional approval)"
   - "628373d : Phase 2 address Tauri viewer settings design review"
   - "0d7342e : Phase 2 approve Tauri viewer settings design"
+  - "0923219 : Phase 3 implement and verify Tauri viewer settings"
+  - "46f505f : Phase 3 implementation review (conditional approval)"
+  - "cd13c37 : Phase 3 address Tauri settings implementation review"
+  - "5321270 : Phase 3 approve Tauri settings implementation review"
 source_todo_path: "docs/todo/todo.md#todo-2026-014-tauri-viewer-設定永続化と設定-ui-導入"
 depends_on:
   - "TODO-2026-005 Tauri Multi-tab core introduction"
@@ -61,5 +65,5 @@ follow_up:
 | Phase 0 Requirements | Done (`4b50af2`) |
 | Phase 1 Branch and meta | Done (Phase 1 initialization commit) |
 | Phase 2 Design review | Done (approved 2026-07-19) |
-| Phase 3 Implementation and docs review | Implementation review findings being addressed |
+| Phase 3 Implementation and docs review | Done (approved 2026-07-19, unresolved 0) |
 | Phase 4 Verification and completion | Not started |
