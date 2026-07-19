@@ -34,7 +34,7 @@ Markdownのみを閲覧対象としているMarkdownViewerへ、Agentや人間�
 8. HTML自身がテーマ機能を持つ場合はHTML側を正本とし、ViewerのLight/Dark切替でHTML本文を書き換えない。
 9. HTML内の`http:` / `https:`リンクは埋め込みWebView内へ遷移させず、ユーザのclick時にOSの標準ブラウザで開く。`file:`、`javascript:`、Tauri custom protocol等を外部openへ渡さない。
 
-ここでいう「root配下」は、例えば`/Users/shin/Development/VisualStudioCode/AgenticProjectTemplates`をOpen Folderで開いた場合、その配下の`.html`が既存の`.md`と同じExplorerに表示され、選択して開けるという意味である。HTML本体と関連resourceは同じroot内に置く。
+ここでいう「root配下」は、例えば本 repo プロジェクトディレクトリをOpen Folderで開いた場合、その配下の`.html`が既存の`.md`と同じExplorerに表示され、選択して開けるという意味である。HTML本体と関連resourceは同じroot内に置く。
 
 この境界なら、提示サンプルの検索、フィルター、ツリー展開、タブ切替、Theme、参照トレース等の動的機能に加え、仕様書で一般的な画像とダイアグラムを扱いつつ、一般Webブラウザ機能へスコープが拡大することを避けられる。
 
@@ -65,8 +65,8 @@ Markdownのみを閲覧対象としているMarkdownViewerへ、Agentや人間�
   - `docs/rules/*.md`
   - `docs/tests/README.md`
 - 表示対象サンプル
-  - `/Users/shin/Development/VisualStudioCode/AgenticProjectTemplates/docs/architecture/user_agent_assets_v2_structure.html`
-  - `/Users/shin/Development/VisualStudioCode/AgenticProjectTemplates/tests/test_user_agent_assets_v2_structure_viewer.mjs`
+  - `AgenticProjectTemplates/docs/architecture/user_agent_assets_v2_structure.html`
+  - `AgenticProjectTemplates/tests/test_user_agent_assets_v2_structure_viewer.mjs`
 
 ### 3.2 非対象
 

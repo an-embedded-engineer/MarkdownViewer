@@ -22,7 +22,7 @@ review target commit: 8cd0e16
 
 - docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md
 - docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/ui_ux_multi_tab_menu_status_recent_dirs_report_review.md
-- /Users/shin/.agents/skills/wbs-planning-workflow/SKILL.md
+- ~/.agents/skills/wbs-planning-workflow/SKILL.md
 
 レビュー結果は以下のファイルに作成してください。
 
