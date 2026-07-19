@@ -1,12 +1,14 @@
 # TODO-2026-017 Tauri HTML形式仕様書表示対応 設計レビュー
 
 **レビュー日**: 2026-07-19
+**再確認日**: 2026-07-19
 **対象ドキュメント**: `docs/design_analysis/spec_change/20260719_tauri_html_document_viewing/design/tauri_html_document_viewing_design.md`
 **対象 meta**: `docs/design_analysis/spec_change/20260719_tauri_html_document_viewing/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-017
 **source report**: `docs/design_analysis/research_analysis/20260719_html_document_viewing_support/report.md`
 **初回レビュー対象コミット**: `88aae68 Phase 2 draft Tauri HTML document viewing design`
-**判定**: **指摘対応済み・再レビュー待ち**。初回判定はChanges Requested。実装担当が全指摘を設計書へ反映済みで、Claude follow-up承認までPhase 3進行不可。
+**再確認対象コミット**: `9489c43 Phase 2 address Tauri HTML design review findings`
+**判定**: **承認 (Approved)**。Phase 3 進行可。初回判定は要修正 (Changes Requested) だったが、全指摘 (High 1 / Medium 2 / Low 3) の設計反映を再確認で解決済みと判定した。
 
 ---
 
@@ -50,7 +52,7 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 2（設計書修正・再レビュー）
 
-**status**: 対応済み（再レビュー待ち）
+**status**: 解決済み（2026-07-19 再確認、commit `9489c43`）
 
 **対応**: 案Aと案Bを組み合わせ、`open_document`がcurrent-root-relative path segmentsを個別encodeした完全`previewUrl`をRustで生成する契約へ変更した。HTML URLでは`convertFileSrc`を使わない。protocol pathは`/document/<segments>`とし、query / fragment除外、segment単位decode、decode後separator / dot segment / drive / UNC拒否、root join後canonicalizeを明記した。URL往復と攻撃segmentのRust test、risk / referenceも同期した。
 
@@ -66,7 +68,7 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 2（設計書修正）
 
-**status**: 対応済み（再レビュー待ち）
+**status**: 解決済み（2026-07-19 再確認、commit `9489c43`）
 
 **対応**: success HTMLへbridge初期化直後の`ready` handshakeを追加し、frontendはsource / origin / tab revisionを検証したhandshakeだけをreadyの正本とする方式へ変更した。mount後5秒timeout、revision / unmount時clear、iframe load / error eventをprotocol判定へ使わない契約とtestを追記した。
 
@@ -82,7 +84,7 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 2（設計書修正）
 
-**status**: 対応済み（再レビュー待ち）
+**status**: 解決済み（2026-07-19 再確認、commit `9489c43`）
 
 **対応**: `Origin`不在requestはno-cors subresourceとして許可し、headerが存在する場合だけ厳密な`null`を要求する契約へ修正した。request種別を`Sec-Fetch-*`で推定せず、全success responseへ`Access-Control-Allow-Origin: null`を付与する。unit testと3 platform matrixへOrigin header有無を追加した。
 
@@ -98,7 +100,7 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 2（設計書修正）
 
-**status**: 対応済み（再レビュー待ち）
+**status**: 解決済み（2026-07-19 再確認、commit `9489c43`）
 
 **対応**: root内JSONはpreflight不要のsimple GETだけを対応範囲とし、custom header、credential、OPTIONS preflightは非対応、OPTIONSは405と明記した。エラー表とRust testを同期した。
 
@@ -114,7 +116,7 @@ value: function (filePath, protocol = 'asset') {
 
 **工程**: Phase 3（実装時確定で可）
 
-**status**: 対応済み（再レビュー待ち）
+**status**: 解決済み（2026-07-19 再確認、commit `9489c43`）
 
 **対応**: existing `node_sort_rank`をsort順の唯一の正本として維持し、`FileNodeType`から`PartialOrd` / `Ord` deriveを外した。rankをDirectory=0、Markdown=1、Html=2、Image=3と設計へ明記した。
 
@@ -134,7 +136,7 @@ value: function (filePath, protocol = 'asset') {
 
 **severity**: Low
 
-**status**: 対応済み（再レビュー待ち）
+**status**: 解決済み（2026-07-19 再確認、commit `9489c43`）
 
 **対応**: shell originがplatformで異なり、messageが非機密の固定type / URLだけで、受信側が全面再検証するためtarget origin `"*"`を選ぶことをlink bridge設計へ明記した。
 
@@ -191,10 +193,10 @@ success_metrics の必須 command は §17.3 が網羅する (`npm test -- --run
 
 ## 7. 残リスク / Phase 3 での注意点
 
-- 指摘 1.1 の対応で URL 契約を変更した場合、§8.2 の decode 手順、§17.1 の unit test 項目、§19 の「custom protocol URL 差」「opaque origin JSON fetch 差」行の記載を同時に更新し、設計書内の相互参照が旧 `convertFileSrc` 前提のまま残らないようにする。
-- `navigator.userActivation` (§11.3 条件 7) は WebKitGTK の版次第で利用できない可能性がある。設計は「利用不能なら当該 platform の external link を未対応として設計へ戻す」と縮退方針を明記済みだが、Phase 4-a の platform matrix に external link 行として確実に記録する。
+- `navigator.userActivation` (§11.3 条件 8) は WebKitGTK の版次第で利用できない可能性がある。設計は「利用不能なら当該 platform の external link を未対応として設計へ戻す」と縮退方針を明記済みだが、Phase 4-a の platform matrix に external link 行として確実に記録する。
 - shell CSP 導入 (§10.3) は Mermaid の inline style、PlantUML inline SVG、asset protocol 画像、Tauri IPC script の全てに影響するため、§10.3 記載どおり実 bundle を確認して最小化し、Markdown 回帰 fixture (§17.4 fixture 6) を CSP 導入コミットと同時に確認する。
-- 指摘 1.2 で handshake 方式を採る場合、message 種別が増えるため §11.3 の検証条件と §17.2 の拒否 test へ同じ検証を適用する。
+- `ready` handshake の 5 秒 timeout (§11.1) は、bridge が head 先頭で parse 早期に実行されるため通常は十分だが、低速 disk や巨大 HTML で false error になっていないかを Phase 4-a の実機確認で観察する。閾値変更が必要なら設計書の値を更新する。
+- root-relative URL 化 (指摘 1.1 対応) により、root swap 直後に stale iframe request が新 root に対して解決される理論上の窓がある。両 root とも user 選択の trusted root で、swap 成功時に tab / iframe は破棄され (§14)、protocol read は read lock で root と原子的に整合する (§8.1) ため、境界違反にはならないことを再確認で確認済み。Phase 3 で root swap と in-flight request の test (§17.1 root 切替) に含める。
 
 ---
 
@@ -204,4 +206,15 @@ success_metrics の必須 command は §17.3 が網羅する (`npm test -- --run
 
 初回レビューでは、相対 resource解決という本変更の中核要求に対し、採用手段である`convertFileSrc`がpath全体を単一percent-encoded segmentとして生成するため相対URL解決が成立しない齟齬（指摘1.1, High）を確認し、**要修正 (Changes Requested)** とした。
 
-実装担当は指摘1.1から1.5および改善提案3.1をすべて設計書へ反映した。現在はClaude follow-upによる再レビュー待ちであり、明示承認までPhase 3へ進まない。
+### 再確認結果 (2026-07-19, commit `9489c43`)
+
+実装担当による指摘 1.1〜1.5 および改善提案 3.1 の設計書反映を、commit `9489c43` の差分と更新後設計書の全体整合で再確認した。
+
+- **1.1 (High) — 解決済み**: URL 契約が「Rust が current-root-relative path segments を個別 percent-encode した `/document/<segments>` 形式の完全 `previewUrl` を生成して返す」方式 (推奨案 A + B の複合) へ変更された (§4.1.3, §4.2, §7.1-7.3, §8.2-8.3, §9.2, §11.1)。segment 構造が保持されるため、`./images/flow.png` は `mvhtml://localhost/document/<dir>/images/flow.png` へ自然に解決され、handler は prefix 確認 → segment 単位 decode → 攻撃 segment (`.` / `..` / 空 / decode 後 separator / drive / UNC) 拒否 → root join → canonicalize → `starts_with` の順で検証できる。root 内 `../` は WebView 側の URL 正規化で `/document/` 配下に収まり、root 逸脱は prefix / canonicalize で拒否される。query (`revision`) / fragment の除外も §8.2 手順 1 と §9.2 に明記された。§17.1 の URL 往復 test (space / Unicode / `%2F` / `%5C` / drive / UNC)、§19 risk 行、§21 参照注記まで同期されており、旧 `convertFileSrc` 前提の残存記述はない (grep で「不採用」文脈の 3 箇所のみ確認)。副次効果として absolute path が WebView へ露出しなくなる点も妥当。
+- **1.2 (Medium) — 解決済み**: bridge 初期化直後の固定 type `ready` handshake を ready 判定の唯一の正本とし、iframe `load` / `error` event を protocol 成功判定に使わない契約へ変更された (§9.1 責務 1, §11.1, §13)。mount 後 5 秒 timeout、revision 変更 / unmount 時の timeout 解除、error body が iframe 内に表示され得る旨も明記され、handshake は §11.3 の message union (source / origin / stale revision / duplicate 検証、`ready` は未 ready 状態から 1 回だけ受理) と §17.2 test へ一貫して反映された。user activation 条件 (§11.3 条件 8) が `openExternal` のみに正しくスコープされていることも確認した。
+- **1.3 (Medium) — 解決済み**: 「`Origin` header 不在の request は no-cors subresource として許可、存在時は厳密に `null` のみ許可、`Access-Control-Allow-Origin: null` は全 success response へ常時付与、`Sec-Fetch-*` による request 種別推定はしない」へ明確化された (§8.4)。§17.1 の unit test と §17.5 platform matrix (「no-cors subresource の `Origin` header 有無」行) も追加済み。
+- **1.4 (Low) — 解決済み**: root 内 JSON fetch を preflight 不要の simple GET に限定し、custom header / credential / `OPTIONS` preflight 非対応、`OPTIONS` は 405 と §8.4 / §13 / §17.1 へ明記された。
+- **1.5 (Low) — 解決済み**: `FileNodeType` から `PartialOrd` / `Ord` derive を外し、既存 `node_sort_rank` を sort 順の唯一の正本として rank 値 (Directory=0, Markdown=1, Html=2, Image=3) を §12 へ明記した。§17.1 の sort test 記載とも整合する。
+- **3.1 (Low) — 解決済み**: targetOrigin `"*"` の根拠 (platform により shell origin が異なる、message は非機密の固定 type / URL のみ、受信側が全面再検証) が §9.1 へ追記された。
+
+対応による新たな齟齬・セキュリティ上の欠落・実装不能な契約は検出しなかった。受け入れ条件トレース (第 4 節) の相対 resource 行は本再確認で ✓ へ更新済みである。以上より本設計を**承認 (Approved)** とし、Phase 3 (実装) への進行を可とする。Phase 3 では第 7 節の残リスク 4 点 (user activation の platform 差、shell CSP 回帰、handshake timeout の実機観察、root swap と in-flight request の test) に留意すること。
