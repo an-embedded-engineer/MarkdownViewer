@@ -31,8 +31,11 @@ java -version
 
 配置方法は以下のいずれかを使う。
 
+- Tauri版の`File > Settings...`で`plantuml.jar`を選択する。
 - runtime directory に `plantuml.jar` を置く。
 - runtime directory に `plantuml.config.json` を置き、`plantUmlJarPath` にjar pathを記載する。
+
+Tauri版の探索優先順位は、app config JSONの明示path、runtime directoryの`plantuml.config.json`、同directoryの`plantuml.jar`の順。明示pathが無効な場合は他のjarへfallbackせずerrorにする。Settingsで`Clear`した場合だけruntime directory探索へ戻る。Theme、logical window size、明示jar path、Recent FoldersはTauri app config directoryの`settings.json`へ保存する。
 
 ```json
 {
@@ -155,6 +158,9 @@ npm run build
 # Tauri Rust check
 cd markdown-viewer-tauri/src-tauri
 cargo check
+
+# Tauri Rust unit tests
+cargo test
 ```
 
 UI 動作を変更した場合は、少なくとも以下を手動確認する。
@@ -167,6 +173,9 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - PlantUML 描画
 - PlantUML 描画中に読み込み中表示が出ること
 - Light / Dark 切替
+- Settings dialogでTheme / window size / PlantUML jar pathを確認・保存できること
+- resizeと再起動後にlogical window sizeが復元され、最大化中のsizeを保存しないこと
+- 既存Recent Foldersを保持し、明示jar pathの設定 / invalid path / Clearが仕様どおり動くこと
 - Reload 後の再描画
 
 ## 静的解析・整形

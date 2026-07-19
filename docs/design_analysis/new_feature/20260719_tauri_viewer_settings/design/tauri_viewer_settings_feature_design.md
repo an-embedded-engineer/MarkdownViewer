@@ -1,0 +1,365 @@
+# Tauri Viewer 設定永続化・設定 UI 設計
+
+## 1. 背景
+
+Tauri 版は Recent Folders を Tauri の app config directory にある `settings.json` へ保存している一方、Theme は React state のみ、ウィンドウサイズは `tauri.conf.json` の固定値、PlantUML の明示 path は runtime directory の `plantuml.config.json` で管理している。そのため、利用者は再起動後に表示環境を復元できず、PlantUML path の確認・変更には JSON の手編集が必要である。
+
+`TODO-2026-014` では Tauri 版を先行実装し、`TODO-2026-007` の UX 評価後に確定仕様を `TODO-2026-015` で Avalonia 版へ水平展開する。
+
+## 2. 要求と完了条件
+
+### 2.1 対象ユーザーとユーザ価値
+
+- Tauri 版を継続利用し、起動のたびに表示環境を調整したくない利用者。
+- `plantuml.config.json` を直接編集せず、アプリ内から PlantUML runtime を設定したい利用者。
+- 前回のウィンドウサイズと Theme が復元され、設定値を MenuBar から確認・変更できることを価値とする。
+
+### 2.2 ユースケース
+
+1. 利用者が通常状態のウィンドウを resize し、操作停止後にサイズが保存される。再起動時に同じ論理サイズへ復元される。
+2. 利用者が `View > Theme` で Theme を切り替えると、表示へ反映され app config JSON に保存される。
+3. 利用者が `File > Settings...` を開き、現在の Theme、ウィンドウサイズ、PlantUML jar path を確認する。
+4. 利用者が Settings dialog で Theme を選び、jar path を入力または `Browse...` で選択して保存する。
+5. 利用者が jar path を `Clear` すると、明示設定を解除して既存の runtime directory 自動探索へ戻す。
+6. 既存利用者が Recent Folders だけを含む `settings.json` で起動しても、履歴を失わず新しい既定設定を利用できる。
+
+### 2.3 受け入れ条件
+
+- window width / height、Theme、`plantuml.jar` path が既存 app config JSON に保存され、再起動後に復元される。
+- MenuBar から Settings dialog を開き、現在値を確認し、Theme / jar path を変更・保存できる。
+- 無効な jar path は Settings dialog または PlantUML error として表示され、Markdown / Mermaid 閲覧を妨げない。
+- 既存 Recent Folders と、追加設定を持たない既存 JSON を保持したまま読み書きできる。
+- `npm run build`、`cargo check`、Rust unit test と手動 UI 確認が成功する。
+
+## 3. 対象範囲と非対象
+
+### 3.1 最小提供範囲
+
+- app config schema と Store 更新 API の拡張。
+- 起動時のウィンドウサイズ／Theme 復元。
+- 通常ウィンドウ resize の debounce 保存。
+- 既存 Theme menu 操作の永続化。
+- `File > Settings...` と modal dialog。
+- jar path の入力、file picker、clear、検証、PlantUML runtime への反映。
+- 既存 Recent Folders、Markdown、Mermaid、PlantUML、Multi-tab、Split view の回帰確認。
+
+### 3.2 非対象
+
+- Avalonia 実装。`TODO-2026-015` で扱う。
+- ウィンドウ位置、最大化／最小化／fullscreen 状態。
+- open folder、open tab、tab 順、split pane、scroll 位置。
+- Java の導入、jar download、PlantUML version 管理。
+- OS native settings window、設定の import/export、複数 profile、クラウド同期。
+
+## 4. 採用案・不採用案
+
+### 4.1 採用案: 既存 app config JSON の型付き拡張
+
+Recent Folders と同じ `settings.json` に `viewerSettings` を追加する。
+
+```json
+{
+  "recentFolders": [],
+  "viewerSettings": {
+    "theme": "light",
+    "windowSize": {
+      "width": 800,
+      "height": 600
+    },
+    "plantUmlJarPath": null
+  }
+}
+```
+
+Rust では `AppConfig`、`ViewerSettings`、`WindowSize`、`AppTheme` を型として定義する。`AppConfig` と nested settings に `Default` と `#[serde(default)]` を設定し、既存 JSON の「フィールド欠落」だけを migration 対象として既定値で補う。malformed JSON、未知 Theme、型不一致は黙って補正せず明示エラーにする。
+
+採用理由:
+
+- 既存 Store lock と app config path を再利用でき、Recent Folders と設定の競合更新を一か所で防げる。
+- browser localStorage と Rust JSON の二重正本を作らない。
+- Avalonia 水平展開でも同等の型付き user config を設計しやすい。
+
+### 4.2 不採用案
+
+| 案 | 不採用理由 |
+| --- | --- |
+| `localStorage` に Theme / window size を保存 | Rust の Recent Folders / PlantUML path と正本が分散し、バックアップ・障害時の挙動も分かれる。 |
+| `tauri.conf.json` を実行時に更新 | bundle resource はユーザー設定の保存先ではなく、配布後に安全に変更できない。 |
+| `plantuml.config.json` だけを Settings UI から編集 | app config と runtime directory config の書き込み責務が分散し、bundle directory が書き込み不可の場合もある。 |
+| resize ごとに app config 全体を frontend から保存 | 高頻度 I/O に加え、古い Recent Folders / Theme snapshot で新しい値を上書きする lost update が起こり得る。 |
+| Avalonia と同時実装 | Tauri 先行 UX 評価後に stack 固有の責務へ水平展開する既存方針に反する。 |
+
+## 5. Before / After
+
+| 項目 | Before | After |
+| --- | --- | --- |
+| Theme | React state、起動時 Light | app config から復元。View menu と Settings dialog の変更を同じ保存処理へ集約 |
+| Window size | `tauri.conf.json` の 800 x 600 | 通常状態の論理 width / height を保存し、起動時に復元 |
+| PlantUML path | runtime directory の jar / `plantuml.config.json` | app config の明示 path を最優先。未指定時だけ既存自動探索 |
+| 設定確認 | UI なし | `File > Settings...` modal で確認 |
+| Recent Folders | `settings.json` に保存 | 同じ schema 内で保持し、設定更新と lock を共有 |
+
+## 6. データ設計
+
+### 6.1 Rust model
+
+```text
+AppTheme = Light | Dark
+
+WindowSize
+  width: u32
+  height: u32
+
+ViewerSettings
+  theme: AppTheme
+  window_size: WindowSize
+  plant_uml_jar_path: Option<String>
+
+AppConfig
+  recent_folders: Vec<RecentFolderEntry>
+  viewer_settings: ViewerSettings
+```
+
+- serde の `rename_all = "camelCase"` で TypeScript と JSON を一致させる。
+- default は Theme `light`、width `800`、height `600`、jar path `None`。
+- 保存サイズは physical pixel ではなく logical size とする。HiDPI 環境では frontend が `innerSize / scaleFactor` で変換する。
+- 有効範囲は width `640..=10000`、height `480..=10000` とする。保存 command では範囲外をエラーにする。load 時は JSON 自体を壊れた扱いにせず、window size だけを 800 x 600 へ正規化し、有効な Theme / jar path / Recent Folders を維持する。
+- load command は `ViewerSettingsLoadResult { settings, warnings }` を返す。範囲外 size の warning を frontend error strip へ通知し、起動時に適用した既定 size の resize 保存成功によって JSON も正常値へ修復する。
+- jar path は空白だけなら `None`、値がある場合は absolute path、通常ファイル、拡張子を ASCII case-insensitive で `.jar` と一致させ、canonical path を保存する。`.jar` と `.JAR` は有効、`.zip` は無効とする。
+
+### 6.2 互換性と migration
+
+- `recentFolders` だけの既存 JSON は `viewerSettings = default` として読み込む。次回の成功した設定保存または resize 保存で新 schema を書き出す。
+- `viewerSettings` 内の将来追加フィールドも `#[serde(default)]` で補える構造にする。
+- malformed JSON、既知フィールドの型不一致、未知 Theme は自動修復や上書きをしない。ロードエラーを表示し、アプリ本体はコンパイル時既定値で閲覧可能にする。以後の保存も parse error を返し、Recent Folders を失う上書きを防ぐ。
+- 型として deserialize できるが window size だけが範囲外の場合は config 全体の parse error と区別する。`ViewerSettingsLoadResult` の `settings.windowSize` だけを既定値へ正規化し、`warnings` に原因を含める。Theme / jar path / Recent Folders は保持し、最初の正常な `save_window_size` が正規化 size を永続化する。
+- schema version は追加しない。現時点の migration は欠落フィールドの default 補完だけであり、変換手順を分岐する versioned migration は不要である。
+
+## 7. Rust backend 設計
+
+### 7.1 `AppConfigStore` の責務
+
+既存の module-level `read_app_config` / `write_app_config` と command ごとの lock 操作を増やさず、`AppConfigStore` の method へ集約する。
+
+```text
+AppConfigStore
+  load(app) -> Result<AppConfig, String>
+  update(app, updater) -> Result<AppConfig, String>
+  viewer_settings(app) -> Result<ViewerSettingsLoadResult, String>
+  update_viewer_preferences(app, input) -> Result<ViewerSettingsLoadResult, String>
+  update_window_size(app, input) -> Result<WindowSize, String>
+  effective_plantuml_runtime(app) -> Result<PlantUmlRuntimeOptions, String>
+```
+
+- `update` が lock 内で read-modify-write を完了させる。
+- Recent Folders command も同じ `update` を使うよう整理し、設定追加で重複する lock / serialization 処理を作らない。
+- 設定 UI の保存と resize 保存は別の部分更新 method とし、古い frontend snapshot で他フィールドを上書きしない。
+- JSON I/O 失敗は `Result<T, String>` で command 境界へ返し、握りつぶさない。
+- `write` は config directory と同じ filesystem 上の一意な sibling temporary file へ serialize 済み bytes を全量書き込み、file を `sync_all` してから destination を置換する。serialize / create / write / sync 失敗時は既存 `settings.json` に触れず temporary file を削除する。
+- Unix は同一 directory 内の `rename` で既存 destination を atomic replace し、可能な環境では parent directory も sync する。Windows は `MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)` 相当を `windows-sys` の限定 feature で呼び、既存 destination を置換する。replace 成功を logical commit point とし、それ以前の失敗では既存ファイルを維持して temporary file を削除し、エラーを返す。replace 後の parent directory sync 失敗は保存済み値と command 結果を食い違わせないため logical save failure にせず、durability warning を stderr へ記録する。
+- temporary file の自動復旧や `.bak` fallback は追加しない。名前は target、process id、単調 counter を含め、同一 process の Store lock 内で生成する。複数 app instance 間の transaction は本 feature の対象外とする。
+
+### 7.2 Tauri command
+
+| command | 入力 | 出力 | 責務 |
+| --- | --- | --- | --- |
+| `load_viewer_settings` | なし | `ViewerSettingsLoadResult` | app config を読み、window size の意味的 validation と warning を返す |
+| `save_viewer_preferences` | `theme`, `plantUmlJarPath` | `ViewerSettingsLoadResult` | Theme と jar path を検証・部分更新し、正規化済み設定を返す |
+| `save_window_size` | `width`, `height` | `WindowSize` | logical size を検証し、window size だけを部分更新する |
+
+Rust の `ViewerSettingsLoadResult` は `settings: ViewerSettings` と `warnings: Vec<String>` を持ち、TypeScript では `warnings: string[]` と対応させる。warnings は現時点では範囲外 window size の部分復旧に使い、malformed JSON のように安全な typed config を得られない場合は従来どおり command 全体を `Err` とする。
+
+既存の `load_recent_folders` / `record_recent_folder` / `remove_recent_folder` は API を維持し、内部だけ Store method へ寄せる。
+
+### 7.3 起動時 window restore
+
+- `Builder::setup` で main window を取得し、Store から保存済み `WindowSize` を読む。
+- 有効値なら `tauri::LogicalSize` で `set_size` する。未設定なら `tauri.conf.json` の 800 x 600 を維持する。
+- malformed JSON では起動を失敗させず既定サイズを維持し、原因を stderr に記録する。frontend の `load_viewer_settings` は `Err` を error strip へ通知する。
+- deserialize 可能だが size が範囲外の場合、Store の load normalization が返す 800 x 600 を適用して warning を stderr に記録する。frontend は同じ `ViewerSettingsLoadResult.warnings` を error strip へ通知し、有効な Theme / jar path はそのまま反映する。
+- monitor work area に応じた位置補正は行わない。位置を保存しないため、window placement は OS / Tauri に委ねる。
+
+### 7.4 PlantUML runtime 解決
+
+`render_plantuml_diagrams` は command 開始時に Store から明示 jar path を 1 回だけ取得し、blocking task へ `PlantUmlRuntimeOptions` を渡す。各 diagram ごとに JSON を読み直さない。
+
+解決優先順位:
+
+1. `viewerSettings.plantUmlJarPath` の canonical absolute path。
+2. path が `None` の場合だけ、現在の runtime directory 内 `plantuml.config.json`。
+3. 同じく `None` の場合だけ、runtime directory 内 `plantuml.jar`。
+4. いずれもなければ既存同様の PlantUML error。
+
+明示 path が保存されているのに実行時に削除された場合、2 / 3 へ fallback しない。設定不整合を明示エラーにして Settings dialog で修正させる。`Clear` した場合だけ自動探索へ戻る。Theme 変更だけでは既存 tab の PlantUML SVG を再生成しない。
+
+runtime / app config の解決失敗は、blocking task を開始できないため `render_plantuml_diagrams` command 全体の `Err` とする。runtime 解決後に発生する構文 error、Java process error、timeout は図ごとの `PlantUmlDiagramResult` で返す。frontend は command 全体の `Err` でも各 PlantUML placeholder を error 表示へ変換し、Markdown / Mermaid 表示を維持する。
+
+## 8. Frontend / UI 設計
+
+### 8.1 状態
+
+```text
+viewerSettings: ViewerSettings | null
+settingsDraft: ViewerPreferencesDraft | null
+currentWindowSize: WindowSize
+isStartupConfigLoading: boolean
+foregroundConfigOperationCount: number
+settingsError: string | null
+```
+
+- `theme` は既存の描画 state として維持するが、ロード／保存成功時に `viewerSettings.theme` と同時更新する。別の永続化経路は作らない。
+- `isAppConfigBusy` は `isStartupConfigLoading || foregroundConfigOperationCount > 0` から導出する。foreground wrapper が functional state update で count を増減し、並行 command の一方だけが完了しても busy を誤って解除しない。
+- foreground 対象は Settings 保存、View menu Theme 保存、Recent Folders 更新である。background resize 保存は MenuBar / StatusBar の busy 表示へ含めず、backend Store lock と field-specific update を競合制御の正本とする。Markdown tab 操作は従来どおり妨げない。
+- Settings dialog は保存済み値の copy を `settingsDraft` として持つ。入力途中に app 全体の Theme や PlantUML runtime を変えない。
+
+### 8.2 起動フロー
+
+1. `load_viewer_settings` と `load_recent_folders` を起動 effect から `Promise.allSettled` 相当で並行実行し、全体を 1 つの `isStartupConfigLoading` scope とする。
+2. 設定ロード成功時に Theme と settings state を反映し、`warnings` があれば error strip に表示する。片方の command failure で他方の成功結果を捨てない。
+3. ロード完了までは軽量な `Loading settings...` 表示を使い、Light theme の app shell を一瞬描画してから Dark へ切り替わる flash を避ける。
+4. settings load が失敗した場合は既定 Theme で app shell を表示し、error strip に原因を出す。Recent Folders load の成否は個別に扱う。
+5. `getCurrentWindow().innerSize()` と `scaleFactor()` から Settings dialog 表示用の現在 logical size を取得する。
+
+### 8.3 MenuBar と Settings dialog
+
+- `File` dropdown の `Reload` 後へ separator と `Settings...` を追加する。PlantUML path を含む application-wide 操作であり、`View` dropdown には置かない。
+- 既存 `View > Theme` は残し、クリック時に `save_viewer_preferences` を通して永続化する。保存失敗時は Theme を変更せず error strip へ出す。
+- dialog は `role="dialog"`、`aria-modal="true"`、見出しとの `aria-labelledby` を持つ。
+- 項目:
+  - `Theme`: Light / Dark select。
+  - `Window size`: 現在の logical `width x height` を read-only 表示し、「resize で自動保存」と説明する。
+  - `PlantUML jar`: path text input、`Browse...`、`Clear`。file picker は単一 file と `.jar` filter を使う。
+- `Save` は draft を検証・保存し、成功後に Theme と保存済み state を反映して閉じる。
+- `Cancel`、Escape、close button は draft を破棄する。保存中は二重操作を無効化する。
+- validation / save error は dialog 内 `role="alert"` に表示し、dialog を閉じない。
+- open 時に Theme select へ focus、close 時に `Settings...` menu item 相当の trigger へ focus を戻す。背景 content は dialog 表示中操作不可にする。
+
+### 8.4 Window resize 保存
+
+- `getCurrentWindow().onResized` を 1 回 subscribe し、unmount 時に unlisten する。
+- 連続 event は 500 ms debounce し、最後の physical size を `scaleFactor` で logical size に変換して `save_window_size` へ渡す。
+- `isMaximized()` / `isMinimized()` / `isFullscreen()` のいずれかが true の間は保存しない。最大化解除後の通常サイズ event だけを保存する。
+- command 失敗は error strip に表示する。同じ error の resize event 連打を避けるため、失敗後も debounce 単位で通知する。
+- Settings / Theme / Recent Folders の foreground command 実行中に debounce timer が発火しても破棄しない。最新の通常サイズを `save_window_size` へ渡し、backend lock の後で field-specific update するため foreground 更新を上書きしない。
+- 新しい resize event は未発火 timer の size を置き換える。command 発行後にさらに resize された場合は次の debounce save を許可し、最後に完了した resize command が最新 event でない可能性を避けるため、frontend は monotonically increasing revision を付けて完了順を追跡する。旧 revision の成功結果は UI state へ反映しないが、backend 書き込み順が逆転しないよう resize command は 1 本ずつ直列化し、pending があれば直後に最新 size を再保存する。
+
+## 9. 操作フロー
+
+### 9.1 Settings 保存
+
+```text
+User -> File > Settings...
+App -> saved ViewerSettings を draft へ copy
+User -> Theme / jar path を編集
+User -> Save
+App -> invoke(save_viewer_preferences)
+Rust -> AppConfigStore.update(read -> validate -> partial update -> write)
+Rust --> App: normalized ViewerSettings
+App -> theme / viewerSettings 更新
+App -> dialog close
+```
+
+### 9.2 PlantUML render
+
+```text
+App -> invoke(render_plantuml_diagrams)
+Rust -> AppConfigStore.viewer_settings
+alt explicit jar path
+  Rust -> configured jar を検証
+else path is null
+  Rust -> legacy config / colocated jar を自動探索
+end
+Rust -> spawn_blocking(render sources, resolved runtime)
+```
+
+## 10. 影響範囲
+
+### 10.1 Source
+
+- `markdown-viewer-tauri/src/App.tsx`
+  - typed settings state、startup load、persistent Theme action、resize listener、Settings dialog。
+- `markdown-viewer-tauri/src/App.css`
+  - modal backdrop、dialog、form、validation、responsive layout。
+- `markdown-viewer-tauri/src-tauri/src/lib.rs`
+  - config model / Store methods / commands、window restore、PlantUML resolver integration、unit tests。
+- `markdown-viewer-tauri/src-tauri/capabilities/default.json`
+  - window API のうち default capability に含まれない権限が必要な場合だけ明示追加する。dialog plugin は既存 permission を再利用する。
+- manifest / lock files
+  - frontend は新規 package を追加せず、既存 Tauri API と dialog plugin で実装する。
+  - Windows の既存ファイル atomic replace に必要な場合だけ、target-specific `windows-sys` と `Win32_Storage_FileSystem` feature を明示 dependency に追加する。Unix build へ Windows API を混入させない。
+
+### 10.2 Existing behavior
+
+- Recent Folders の最大件数、重複 promotion、削除、missing path error は変更しない。
+- `View > Theme` の見える操作は維持し、保存処理だけ追加する。
+- 明示 jar path 未設定時の既存 runtime directory 探索を維持する。
+- Markdown / Mermaid は PlantUML 設定失敗から独立して表示する。
+- Multi-tab の tab cache と Theme による Mermaid 再描画を維持する。
+- Viewer settings（TODO-2026-014）と Split view（TODO-2026-006）は、いずれも Multi-tab core（TODO-2026-005）完了後の独立 work package とする。両方が完了してから TODO-2026-007 の Tauri 先行 UX 評価で Settings modal、Theme、resize、両 pane の Markdown / Mermaid / PlantUML / loading / error を統合確認する。
+
+## 11. 恒久ドキュメント更新予定
+
+- `docs/components/tauri_viewer/README.md`: 機能一覧、主要 command、設定保存先。
+- `docs/components/tauri_viewer/basic_design.md`: AppConfig / settings model と責務境界。
+- `docs/components/tauri_viewer/detail_design.md`: startup、resize、Settings、PlantUML runtime 解決フロー。
+- `docs/components/tauri_viewer/interface_spec.md`: MenuBar / dialog UI、command / TypeScript 型、validation。
+- `docs/rules/development_workflow.md`: app config の利用方法と `plantuml.config.json` / colocated jar との優先順位。
+- `docs/architecture/overview.md`, `code_patterns.md`, `common_pitfalls.md`: 横断的に再利用すべき Store 部分更新、logical size、明示 path の優先順位が生じた場合に必要箇所だけ更新する。
+- `README.md`, `markdown-viewer-tauri/README.md`: 利用者導線に Settings の説明が必要な場合だけ追加する。
+
+ADR は Phase 2 時点で追加しない。app config JSON は既存採用方式の拡張であり、Tauri 固有の案件設計として恒久 component docs へ反映できる。Avalonia 水平展開後に両実装共通の判断となった場合、`TODO-2026-012` で ADR 起票要否を再評価する。
+
+## 12. テスト・ユーザー確認
+
+### 12.1 Automated verification
+
+- `npm run build`
+- `cargo check`
+- `cargo test`
+- `cargo fmt -- --check`
+
+Rust unit test:
+
+- Recent Folders だけの旧 JSON が default `viewerSettings` で deserialize される。
+- 新 schema の serialize / deserialize で Recent Folders と settings が保持される。
+- width / height の最小値・最大値境界と範囲外が区別される。
+- 型は正しいが範囲外 size と有効な Theme / jar path が同居する JSON で、size だけが default、warning が返り、resize 保存後に正常値へ修復される。
+- Theme enum と jar path validation が typed error になり、`.jar` / `.JAR` を許可して他拡張子を拒否する。
+- 明示 jar path がある場合は自動探索へ fallback せず、`None` の場合だけ既存探索を使う。
+- pre-commit の temporary create / write / sync / replace 失敗では既存 config が維持され、replace 成功時だけ新 config 全体へ置換される。replace 後の directory sync 失敗は durability warning となり、logical save は成功する。
+
+### 12.2 Manual verification
+
+1. 設定ファイルなしで 800 x 600 / Light / automatic PlantUML として起動する。
+2. 通常 window を resize し 500 ms 以上待って終了後、再起動で logical size が復元される。
+3. 最大化／fullscreen 中の size が保存されず、通常状態の最終サイズが復元される。
+4. `View > Theme` と Settings dialog の両方で Theme を変更し、再起動後に復元される。
+5. valid jar を Browse / text input で設定し、`sample_docs/plantuml.md` の Mermaid / PlantUML が描画される。
+6. invalid path の Save が dialog 内 error になり、保存済み設定と Markdown / Mermaid 表示が維持される。
+7. 保存後に jar を削除した場合、PlantUML は明示エラーになり自動探索へ逃げない。Settings で Clear 後は自動探索へ戻る。
+8. Recent Folders を含む旧 `settings.json` で起動し、履歴を保持したまま設定を保存できる。
+9. malformed JSON では error strip を表示し、既定 Theme で Markdown / Mermaid を閲覧できるが設定保存で既存ファイルを上書きしない。
+10. Settings dialog の keyboard focus、Escape / Cancel、validation alert、狭い window での dialog scroll を確認する。
+11. Open Folder、Recent Folders、Reload、tab activate / close、相対画像、内部／外部 link、Mermaid、PlantUML loading / error を回帰確認する。Split view 完了後の両 pane 統合確認は TODO-2026-007 の UX 評価で行う。
+12. Settings 保存中の resize、resize 保存中の Theme / Recent Folders 更新を近接して行い、busy 表示が早期解除されず、各 field の最終値が保持されることを確認する。
+
+## 13. リスクと対策
+
+| リスク | 対策 |
+| --- | --- |
+| resize event が app config を高頻度更新する | 500 ms debounce と通常状態だけの保存を行う。 |
+| resize / settings / Recent Folders が互いの値を上書きする | Store lock 内の read-modify-write と field-specific command を使う。 |
+| 書き込み中断で単一 config 全体が破損する | sibling temporary file の全量 write / sync 後に platform-specific atomic replace する。replace 前の失敗では既存 destination を維持し、replace 後の directory sync 失敗は logical success + durability warning とする。 |
+| HiDPI で保存／復元サイズがずれる | physical size を scale factor で logical size に変換し、JSON は logical size に統一する。 |
+| 最大化サイズを通常サイズとして保存する | maximized / minimized / fullscreen 中は保存しない。 |
+| malformed JSON の保存で Recent Folders を失う | parse error 時は update / write を中止し、自動初期化しない。 |
+| 明示 jar path の削除が別 jar へ黙って切り替わる | explicit path がある場合は fallback せずエラーにする。 |
+| Dark theme の startup flash | settings load 完了まで軽量 loading state を表示する。 |
+| Settings dialog が `App.tsx` を肥大化させる | 初期実装は同 file の typed component とし、設計／実装レビューで責務が独立・再利用可能と判断した場合は `SettingsDialog.tsx` へ分離する。永続化ロジックは App / Rust Store に置き、dialog に I/O を持たせない。 |
+| foreground と background config 操作の busy / completion 順が崩れる | foreground operation count と background resize queue を分離し、backend lock と部分更新で直列化する。 |
+
+## 14. Follow-up
+
+- `TODO-2026-007`: Tauri の Settings 導線、window size 自動保存、Theme／jar path 操作を UX 評価へ含める。
+- `TODO-2026-015`: 評価済み仕様を Avalonia の ViewModel / Service / user config JSON へ水平展開する。
+- window position、maximized state、session / tab restore が必要になった場合は個別 TODO とし、本 schema へ安易に混在させない。

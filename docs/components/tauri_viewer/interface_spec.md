@@ -10,16 +10,26 @@
 - Tab close: 非active tabではselectionを維持する。active tabでは右隣、なければ左隣へ移り、最後のtab close後は未選択表示になる。
 - Reload: MenuBar の File dropdown から root treeとactive tabだけを再読み込みする。
 - Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
+- Settings: MenuBar の File dropdown からSettings dialogを開き、Theme / current window size / PlantUML jar pathを確認する。Themeとjar pathを変更してSave、またはCancelできる。
 
 ## MenuBar 表示
 
 MenuBar は window top に `File` / `View` を表示する React UI で、menu name click により dropdown item を展開する。
 
-- `File`: `Open Folder...`、`Recent Folders`、`Reload`
+- `File`: `Open Folder...`、`Recent Folders`、`Reload`、`Settings...`
 - `Recent Folders`: 最大 10 件。主表示は保存時点の folder name、補助表示は absolute path。
 - `View`: `Theme: Light` または `Theme: Dark`
 
 Recent Folders entry click で保存済み path が存在しない場合は error strip に表示し、entry は自動削除しない。削除は delete button による明示操作だけで行う。
+
+## Settings dialog
+
+- `Theme`: Light / Dark select。
+- `Window size`: 現在のlogical width x heightをread-only表示し、resizeで自動保存する。
+- `PlantUML jar`: path input、`.jar` file picker、`Clear`。空欄はruntime directory自動探索を表す。
+- `Save`: pathを検証してpreferencesを保存し、成功後にThemeへ反映して閉じる。
+- `Cancel` / Escape / close / backdrop click: draftを破棄する。
+- `role="dialog"` / `aria-modal="true"`、初期focus、Tab focus loop、dialog内validation alertを持つ。backgroundは`inert`とし、保存中に全controlがdisabledでもdialog containerへfocusを保持する。file picker失敗はdialog内alertへ表示し、Cancelはerrorにしない。
 
 ## Root Path Strip 表示
 
@@ -44,7 +54,7 @@ StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術�
 ## StatusBar 表示
 
 - `File`: 表示中 Markdown file name。未選択時は `No file selected`。
-- `State`: `Loading folder...`、`Updating recent folders...`、`Loading Markdown...`、`Rendering PlantUML diagrams...`、`Ready` のいずれか。左から順に優先する。
+- `State`: `Loading folder...`、`Updating app settings...`、`Loading Markdown...`、`Rendering PlantUML diagrams...`、`Ready` のいずれか。左から順に優先する。
 
 `State` の値だけを `aria-live="polite"` とし、`File` は live region に含めない。
 
@@ -70,7 +80,7 @@ root配下のMarkdownファイルをUTF-8テキストとして読み込む。
 
 ### `render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRenderResponse, String>`
 
-PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。Java processを起動できないなどcommand全体の失敗は `Err(String)` とする。jar未設定、PlantUML構文エラー、timeoutなど図ごとの失敗は `PlantUmlDiagramResult` の `ok: false` として返す。
+PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。app config読込、明示jar missing、automatic discovery失敗などblocking task開始前のruntime解決失敗はcommand全体の`Err(String)`とする。runtime解決後のPlantUML構文エラー、Java process error、timeoutなどは図ごとの`PlantUmlDiagramResult`の`ok: false`として返す。frontendはcommand全体の`Err`でも全PlantUML placeholderをerror表示へ変換し、Markdown / Mermaid表示を維持する。
 
 `PlantUmlRenderResponse`:
 
@@ -95,6 +105,18 @@ app config JSON から Recent Folders を読み込み、保存順の配列で返
 
 指定 `path` と一致する entry を Recent Folders から削除し、更新後の配列を返す。`path` の存在確認は行わない。
 
+### `load_viewer_settings() -> Result<ViewerSettingsLoadResult, String>`
+
+Viewer settingsを読む。範囲外window sizeは既定値へ部分正規化し、`warnings`へ理由を返す。malformed JSONは`Err`。
+
+### `save_viewer_preferences(theme, plant_uml_jar_path) -> Result<ViewerSettingsLoadResult, String>`
+
+ThemeとPlantUML jar pathだけをStore lock内で部分更新する。pathは空欄を`null`、それ以外はabsolute regular fileかつASCII case-insensitiveな`.jar`としてcanonicalizeする。
+
+### `save_window_size(width, height) -> Result<WindowSize, String>`
+
+logical sizeを検証し、window sizeだけを部分更新する。有効範囲はwidth 640..10000、height 480..10000。
+
 ## Frontend Types
 
 `FileTreeNode`:
@@ -114,6 +136,17 @@ PlantUML frontend typesはTauri commandの `PlantUmlRenderResponse` / `PlantUmlD
 - `lastOpenedAt: string`
 
 `name` は Rust 側で保存時に確定した値を表示上の正本とする。frontend は `name` が空の場合だけ `path` 全体を fallback 表示する。
+
+`ViewerSettings`:
+
+- `theme: "light" | "dark"`
+- `windowSize: { width: number, height: number }`
+- `plantUmlJarPath: string | null`
+
+`ViewerSettingsLoadResult`:
+
+- `settings: ViewerSettings`
+- `warnings: string[]`
 
 `OpenDocumentTab`:
 

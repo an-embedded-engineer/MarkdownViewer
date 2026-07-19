@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import MarkdownIt from "markdown-it";
@@ -53,10 +54,33 @@ type RecentFolderEntry = {
   lastOpenedAt: string;
 };
 
+type WindowSize = {
+  width: number;
+  height: number;
+};
+
+type ViewerSettings = {
+  theme: Theme;
+  windowSize: WindowSize;
+  plantUmlJarPath: string | null;
+};
+
+type ViewerSettingsLoadResult = {
+  settings: ViewerSettings;
+  warnings: string[];
+};
+
+type ViewerPreferencesDraft = {
+  theme: Theme;
+  plantUmlJarPath: string;
+};
+
 type ActiveMenu = "file" | "view" | null;
 
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
+const defaultWindowSize: WindowSize = { width: 800, height: 600 };
+const windowResizeSaveDelay = 500;
 
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
@@ -65,23 +89,31 @@ function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
+  const [viewerSettings, setViewerSettings] = useState<ViewerSettings | null>(null);
+  const [currentWindowSize, setCurrentWindowSize] = useState<WindowSize>(defaultWindowSize);
+  const [settingsDraft, setSettingsDraft] = useState<ViewerPreferencesDraft | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [appConfigError, setAppConfigError] = useState<string | null>(null);
   const [rootOperationError, setRootOperationError] = useState<string | null>(null);
   const [isRootLoading, setIsRootLoading] = useState(false);
-  const [isRecentFoldersBusy, setIsRecentFoldersBusy] = useState(false);
+  const [isStartupConfigLoading, setIsStartupConfigLoading] = useState(true);
+  const [foregroundConfigOperationCount, setForegroundConfigOperationCount] = useState(0);
   const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([]);
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const menuBarRef = useRef<HTMLElement>(null);
+  const fileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const tabsRef = useRef<OpenDocumentTab[]>([]);
   const nextTabIdRef = useRef(1);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
-  const isGlobalBusy = isRootLoading || isRecentFoldersBusy;
-  const errorMessage = rootOperationError ?? activeTab?.errorMessage ?? null;
+  const isAppConfigBusy = isStartupConfigLoading || foregroundConfigOperationCount > 0;
+  const isGlobalBusy = isRootLoading || isAppConfigBusy;
+  const errorMessage = appConfigError ?? rootOperationError ?? activeTab?.errorMessage ?? null;
   const loadingMessage = isRootLoading
     ? "Loading folder..."
-    : isRecentFoldersBusy
-      ? "Updating recent folders..."
+    : isAppConfigBusy
+      ? "Updating app settings..."
       : activeTab?.loadState === "loading"
         ? "Loading Markdown..."
         : activeTab?.loadState === "rendering"
@@ -102,6 +134,15 @@ function App() {
     updateTabs((current) =>
       current.map((tab) => (tab.id === tabId && tab.revision === revision ? updater(tab) : tab)),
     );
+  }
+
+  async function runForegroundConfigOperation<T>(operation: () => Promise<T>) {
+    setForegroundConfigOperationCount((count) => count + 1);
+    try {
+      return await operation();
+    } finally {
+      setForegroundConfigOperationCount((count) => Math.max(0, count - 1));
+    }
   }
 
   async function openFolder() {
@@ -158,15 +199,14 @@ function App() {
   }
 
   async function recordRecentFolder(path: string) {
-    setIsRecentFoldersBusy(true);
     try {
-      const entries = await invoke<RecentFolderEntry[]>("record_recent_folder", { path });
+      const entries = await runForegroundConfigOperation(() =>
+        invoke<RecentFolderEntry[]>("record_recent_folder", { path }),
+      );
       setRecentFolders(entries);
       return null;
     } catch (error) {
       return toErrorMessage(error);
-    } finally {
-      setIsRecentFoldersBusy(false);
     }
   }
 
@@ -184,15 +224,106 @@ function App() {
       return;
     }
 
-    setIsRecentFoldersBusy(true);
     try {
-      const entries = await invoke<RecentFolderEntry[]>("remove_recent_folder", { path });
+      const entries = await runForegroundConfigOperation(() =>
+        invoke<RecentFolderEntry[]>("remove_recent_folder", { path }),
+      );
       setRecentFolders(entries);
       setRootOperationError(null);
     } catch (error) {
       setRootOperationError(toErrorMessage(error));
-    } finally {
-      setIsRecentFoldersBusy(false);
+    }
+  }
+
+  async function saveTheme(nextTheme: Theme) {
+    if (isGlobalBusy || !viewerSettings) {
+      return;
+    }
+
+    setActiveMenu(null);
+    setAppConfigError(null);
+    try {
+      const result = await runForegroundConfigOperation(() =>
+        invoke<ViewerSettingsLoadResult>("save_viewer_preferences", {
+          theme: nextTheme,
+          plantUmlJarPath: viewerSettings.plantUmlJarPath,
+        }),
+      );
+      setViewerSettings(result.settings);
+      setTheme(result.settings.theme);
+      setAppConfigError(result.warnings[0] ?? null);
+    } catch (error) {
+      setAppConfigError(toErrorMessage(error));
+    }
+  }
+
+  async function openSettings() {
+    if (isGlobalBusy || !viewerSettings) {
+      return;
+    }
+
+    setActiveMenu(null);
+    setSettingsError(null);
+    try {
+      const appWindow = getCurrentWindow();
+      const [physicalSize, scaleFactor] = await Promise.all([
+        appWindow.innerSize(),
+        appWindow.scaleFactor(),
+      ]);
+      setCurrentWindowSize(toLogicalWindowSize(physicalSize, scaleFactor));
+    } catch (error) {
+      setAppConfigError(`Failed to read current window size: ${toErrorMessage(error)}`);
+    }
+    setSettingsDraft({
+      theme: viewerSettings.theme,
+      plantUmlJarPath: viewerSettings.plantUmlJarPath ?? "",
+    });
+  }
+
+  function closeSettings() {
+    setSettingsDraft(null);
+    setSettingsError(null);
+    window.setTimeout(() => fileMenuButtonRef.current?.focus(), 0);
+  }
+
+  async function saveSettings() {
+    if (!settingsDraft || isAppConfigBusy) {
+      return;
+    }
+
+    setSettingsError(null);
+    try {
+      const result = await runForegroundConfigOperation(() =>
+        invoke<ViewerSettingsLoadResult>("save_viewer_preferences", {
+          theme: settingsDraft.theme,
+          plantUmlJarPath: settingsDraft.plantUmlJarPath,
+        }),
+      );
+      setViewerSettings(result.settings);
+      setTheme(result.settings.theme);
+      setAppConfigError(result.warnings[0] ?? null);
+      closeSettings();
+    } catch (error) {
+      setSettingsError(toErrorMessage(error));
+    }
+  }
+
+  async function browsePlantUmlJar() {
+    setSettingsError(null);
+    try {
+      const selected = await openDialog({
+        directory: false,
+        multiple: false,
+        title: "Choose PlantUML jar",
+        filters: [{ name: "Java archives", extensions: ["jar"] }],
+      });
+      if (typeof selected === "string") {
+        setSettingsDraft((draft) =>
+          draft ? { ...draft, plantUmlJarPath: selected } : draft,
+        );
+      }
+    } catch (error) {
+      setSettingsError(`Failed to open PlantUML jar picker: ${toErrorMessage(error)}`);
     }
   }
 
@@ -372,27 +503,165 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsRecentFoldersBusy(true);
 
-    invoke<RecentFolderEntry[]>("load_recent_folders")
-      .then((entries) => {
-        if (!cancelled) {
-          setRecentFolders(entries);
+    async function loadAppConfig() {
+      const [settingsResult, recentFoldersResult] = await Promise.allSettled([
+        invoke<ViewerSettingsLoadResult>("load_viewer_settings"),
+        invoke<RecentFolderEntry[]>("load_recent_folders"),
+      ]);
+      if (cancelled) {
+        return;
+      }
+
+      const errors: string[] = [];
+      if (settingsResult.status === "fulfilled") {
+        const loaded = settingsResult.value;
+        document.documentElement.dataset.theme = loaded.settings.theme;
+        setViewerSettings(loaded.settings);
+        setTheme(loaded.settings.theme);
+        setCurrentWindowSize(loaded.settings.windowSize);
+        errors.push(...loaded.warnings);
+        if (loaded.warnings.length > 0) {
+          try {
+            await invoke<WindowSize>("save_window_size", loaded.settings.windowSize);
+          } catch (error) {
+            errors.push(`Failed to repair saved window size: ${toErrorMessage(error)}`);
+          }
+        }
+      } else {
+        errors.push(toErrorMessage(settingsResult.reason));
+        document.documentElement.dataset.theme = "light";
+        setViewerSettings({
+          theme: "light",
+          windowSize: defaultWindowSize,
+          plantUmlJarPath: null,
+        });
+      }
+
+      if (recentFoldersResult.status === "fulfilled") {
+        setRecentFolders(recentFoldersResult.value);
+      } else {
+        errors.push(toErrorMessage(recentFoldersResult.reason));
+      }
+
+      if (!cancelled) {
+        setAppConfigError(errors.length > 0 ? errors.join(" ") : null);
+        setIsStartupConfigLoading(false);
+      }
+    }
+
+    void loadAppConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const appWindow = getCurrentWindow();
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    let timer: number | undefined;
+    let inFlight = false;
+    let pendingSize: WindowSize | null = null;
+    let resizeRevision = 0;
+
+    async function persistPendingSize() {
+      if (!active || inFlight || !pendingSize) {
+        return;
+      }
+      const size = pendingSize;
+      pendingSize = null;
+      inFlight = true;
+      try {
+        const saved = await invoke<WindowSize>("save_window_size", size);
+        if (active) {
+          setCurrentWindowSize(saved);
+        }
+      } catch (error) {
+        if (active) {
+          setAppConfigError(`Failed to save window size: ${toErrorMessage(error)}`);
+        }
+      } finally {
+        inFlight = false;
+        if (active && pendingSize && timer === undefined) {
+          void persistPendingSize();
+        }
+      }
+    }
+
+    function scheduleSizeSave(size: WindowSize) {
+      pendingSize = size;
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        void persistPendingSize();
+      }, windowResizeSaveDelay);
+    }
+
+    async function handleResize(physicalSize: { width: number; height: number }) {
+      const revision = ++resizeRevision;
+      try {
+        const [isMaximized, isMinimized, isFullscreen, scaleFactor] = await Promise.all([
+          appWindow.isMaximized(),
+          appWindow.isMinimized(),
+          appWindow.isFullscreen(),
+          appWindow.scaleFactor(),
+        ]);
+        if (
+          !active ||
+          revision !== resizeRevision ||
+          isMaximized ||
+          isMinimized ||
+          isFullscreen
+        ) {
+          return;
+        }
+        const logicalSize = toLogicalWindowSize(physicalSize, scaleFactor);
+        setCurrentWindowSize(logicalSize);
+        scheduleSizeSave(logicalSize);
+      } catch (error) {
+        if (active) {
+          setAppConfigError(`Failed to observe window size: ${toErrorMessage(error)}`);
+        }
+      }
+    }
+
+    void Promise.all([appWindow.innerSize(), appWindow.scaleFactor()])
+      .then(([physicalSize, scaleFactor]) => {
+        if (active) {
+          setCurrentWindowSize(toLogicalWindowSize(physicalSize, scaleFactor));
         }
       })
       .catch((error) => {
-        if (!cancelled) {
-          setRootOperationError(toErrorMessage(error));
+        if (active) {
+          setAppConfigError(`Failed to read window size: ${toErrorMessage(error)}`);
+        }
+      });
+
+    void appWindow
+      .onResized(({ payload }) => void handleResize(payload))
+      .then((dispose) => {
+        if (active) {
+          unlisten = dispose;
+        } else {
+          dispose();
         }
       })
-      .finally(() => {
-        if (!cancelled) {
-          setIsRecentFoldersBusy(false);
+      .catch((error) => {
+        if (active) {
+          setAppConfigError(`Failed to subscribe to window resize: ${toErrorMessage(error)}`);
         }
       });
 
     return () => {
-      cancelled = true;
+      active = false;
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
+      unlisten?.();
     };
   }, []);
 
@@ -481,28 +750,42 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [pendingNavigation, activeTab?.id, activeTab?.revision, activeTab?.loadState]);
 
-  return (
-    <main className="app-shell">
-      <MenuBar
-        menuBarRef={menuBarRef}
-        rootPath={rootPath}
-        theme={theme}
-        isBusy={isGlobalBusy}
-        activeMenu={activeMenu}
-        recentFolders={recentFolders}
-        onOpenFolder={openFolder}
-        onReload={reload}
-        onToggleTheme={() => {
-          setActiveMenu(null);
-          setTheme((value) => (value === "light" ? "dark" : "light"));
-        }}
-        onMenuToggle={(menu) => setActiveMenu((value) => (value === menu ? null : menu))}
-        onCloseMenu={() => setActiveMenu(null)}
-        onOpenRecentFolder={openRecentFolder}
-        onRemoveRecentFolder={removeRecentFolder}
-      />
+  if (isStartupConfigLoading) {
+    return (
+      <main className="app-shell startup-shell">
+        <div className="startup-loading" role="status">
+          Loading settings...
+        </div>
+      </main>
+    );
+  }
 
-      <RootPathBar rootPath={rootPath} />
+  return (
+    <>
+      <main
+        className="app-shell"
+        aria-hidden={settingsDraft ? true : undefined}
+        inert={settingsDraft ? true : undefined}
+      >
+        <MenuBar
+          menuBarRef={menuBarRef}
+          fileMenuButtonRef={fileMenuButtonRef}
+          rootPath={rootPath}
+          theme={theme}
+          isBusy={isGlobalBusy}
+          activeMenu={activeMenu}
+          recentFolders={recentFolders}
+          onOpenFolder={openFolder}
+          onReload={reload}
+          onToggleTheme={() => void saveTheme(theme === "light" ? "dark" : "light")}
+          onOpenSettings={() => void openSettings()}
+          onMenuToggle={(menu) => setActiveMenu((value) => (value === menu ? null : menu))}
+          onCloseMenu={() => setActiveMenu(null)}
+          onOpenRecentFolder={openRecentFolder}
+          onRemoveRecentFolder={removeRecentFolder}
+        />
+
+        <RootPathBar rootPath={rootPath} />
 
       <section className="workspace">
         <aside className="explorer-pane" aria-label="Explorer">
@@ -548,18 +831,33 @@ function App() {
         </section>
       </section>
 
-      {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
+        {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
 
-      <StatusBar
-        selectedFileName={activeTab?.displayName ?? ""}
-        loadingMessage={loadingMessage}
-      />
-    </main>
+        <StatusBar
+          selectedFileName={activeTab?.displayName ?? ""}
+          loadingMessage={loadingMessage}
+        />
+      </main>
+
+      {settingsDraft ? (
+        <SettingsDialog
+          draft={settingsDraft}
+          currentWindowSize={currentWindowSize}
+          error={settingsError}
+          isSaving={isAppConfigBusy}
+          onDraftChange={setSettingsDraft}
+          onBrowsePlantUmlJar={() => void browsePlantUmlJar()}
+          onCancel={closeSettings}
+          onSave={() => void saveSettings()}
+        />
+      ) : null}
+    </>
   );
 }
 
 type MenuBarProps = {
   menuBarRef: React.RefObject<HTMLElement | null>;
+  fileMenuButtonRef: React.RefObject<HTMLButtonElement | null>;
   rootPath: string | null;
   theme: Theme;
   isBusy: boolean;
@@ -568,6 +866,7 @@ type MenuBarProps = {
   onOpenFolder: () => void;
   onReload: () => void;
   onToggleTheme: () => void;
+  onOpenSettings: () => void;
   onMenuToggle: (menu: Exclude<ActiveMenu, null>) => void;
   onCloseMenu: () => void;
   onOpenRecentFolder: (path: string) => void;
@@ -576,6 +875,7 @@ type MenuBarProps = {
 
 function MenuBar({
   menuBarRef,
+  fileMenuButtonRef,
   rootPath,
   theme,
   isBusy,
@@ -584,6 +884,7 @@ function MenuBar({
   onOpenFolder,
   onReload,
   onToggleTheme,
+  onOpenSettings,
   onMenuToggle,
   onCloseMenu,
   onOpenRecentFolder,
@@ -593,6 +894,7 @@ function MenuBar({
     <header ref={menuBarRef} className="menu-bar" aria-label="Application menu">
       <div className="menu-group">
         <button
+          ref={fileMenuButtonRef}
           type="button"
           className="menu-trigger"
           aria-haspopup="menu"
@@ -665,6 +967,18 @@ function MenuBar({
             >
               Reload
             </button>
+            <div className="menu-separator" role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              disabled={isBusy}
+              onClick={() => {
+                onCloseMenu();
+                onOpenSettings();
+              }}
+            >
+              Settings...
+            </button>
           </div>
         ) : null}
       </div>
@@ -687,6 +1001,182 @@ function MenuBar({
         ) : null}
       </div>
     </header>
+  );
+}
+
+type SettingsDialogProps = {
+  draft: ViewerPreferencesDraft;
+  currentWindowSize: WindowSize;
+  error: string | null;
+  isSaving: boolean;
+  onDraftChange: (draft: ViewerPreferencesDraft) => void;
+  onBrowsePlantUmlJar: () => void;
+  onCancel: () => void;
+  onSave: () => void;
+};
+
+function SettingsDialog({
+  draft,
+  currentWindowSize,
+  error,
+  isSaving,
+  onDraftChange,
+  onBrowsePlantUmlJar,
+  onCancel,
+  onSave,
+}: SettingsDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const themeSelectRef = useRef<HTMLSelectElement>(null);
+
+  useEffect(() => {
+    if (isSaving) {
+      dialogRef.current?.focus();
+    } else {
+      themeSelectRef.current?.focus();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !isSaving) {
+        event.preventDefault();
+        onCancel();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) {
+        return;
+      }
+
+      const controls = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (controls.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isSaving]);
+
+  return (
+    <div
+      className="settings-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSaving) {
+          onCancel();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="settings-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        aria-busy={isSaving}
+        tabIndex={-1}
+      >
+        <div className="settings-header">
+          <h2 id="settings-title">Viewer Settings</h2>
+          <button
+            type="button"
+            className="settings-close"
+            aria-label="Close settings"
+            disabled={isSaving}
+            onClick={onCancel}
+          >
+            x
+          </button>
+        </div>
+
+        <form
+          className="settings-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave();
+          }}
+        >
+          <label className="settings-field">
+            <span>Theme</span>
+            <select
+              ref={themeSelectRef}
+              value={draft.theme}
+              disabled={isSaving}
+              onChange={(event) =>
+                onDraftChange({ ...draft, theme: event.target.value as Theme })
+              }
+            >
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+
+          <div className="settings-field">
+            <span>Window size</span>
+            <output className="settings-window-size">
+              {currentWindowSize.width} x {currentWindowSize.height}
+            </output>
+            <small>Resize the window to save this value automatically.</small>
+          </div>
+
+          <label className="settings-field" htmlFor="plantuml-jar-path">
+            <span>PlantUML jar</span>
+          </label>
+          <div className="settings-path-row">
+            <input
+              id="plantuml-jar-path"
+              type="text"
+              value={draft.plantUmlJarPath}
+              placeholder="Automatic runtime discovery"
+              disabled={isSaving}
+              onChange={(event) =>
+                onDraftChange({ ...draft, plantUmlJarPath: event.target.value })
+              }
+            />
+            <button type="button" disabled={isSaving} onClick={onBrowsePlantUmlJar}>
+              Browse...
+            </button>
+            <button
+              type="button"
+              disabled={isSaving || draft.plantUmlJarPath.length === 0}
+              onClick={() => onDraftChange({ ...draft, plantUmlJarPath: "" })}
+            >
+              Clear
+            </button>
+          </div>
+          <small>
+            Clear the path to use plantuml.config.json or plantuml.jar from the runtime directory.
+          </small>
+
+          {error ? (
+            <div className="settings-error" role="alert">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="settings-actions">
+            <button type="button" disabled={isSaving} onClick={onCancel}>
+              Cancel
+            </button>
+            <button type="submit" className="settings-save" disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -1156,6 +1646,17 @@ function safeDecode(value: string) {
   } catch {
     return value;
   }
+}
+
+function toLogicalWindowSize(
+  physicalSize: { width: number; height: number },
+  scaleFactor: number,
+): WindowSize {
+  const safeScaleFactor = scaleFactor > 0 ? scaleFactor : 1;
+  return {
+    width: Math.round(physicalSize.width / safeScaleFactor),
+    height: Math.round(physicalSize.height / safeScaleFactor),
+  };
 }
 
 function toErrorMessage(error: unknown) {

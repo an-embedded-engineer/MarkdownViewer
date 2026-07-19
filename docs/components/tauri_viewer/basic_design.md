@@ -6,9 +6,9 @@ OS 連携とファイルシステム境界は Rust command へ寄せ、画面状
 
 ## 責務
 
-- React: MenuBar dropdown、Recent Folders、root path strip、Explorer、TabStrip、Preview、error strip、StatusBar、テーマ、tab単位のエラー / loading、Markdown → HTML 変換、リンク処理。
+- React: MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、TabStrip、Preview、error strip、StatusBar、永続 Theme / window resize queue、tab単位のエラー / loading、Markdown → HTML 変換、リンク処理。
 - TypeScript renderer (`renderMarkdown`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。
-- Rust: root 配下の安全なファイル走査、Markdown 本文の UTF-8 読み込み、PlantUML レンダリング (Java プロセス起動)、Recent Folders の app config JSON 永続化。
+- Rust: root 配下の安全なファイル走査、Markdown 本文の UTF-8 読み込み、PlantUML レンダリング (Java プロセス起動)、Recent Folders / Viewer settings の app config JSON 永続化。
 - Tauri config: dialog / opener / asset protocol の権限管理。capability で plugin 利用を許可する。
 
 ## データモデル
@@ -46,6 +46,16 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 | `errorMessage` | `string \| null` | tab単位代表error |
 | `plantUmlDiagrams` | `PlantUmlDiagramResult[]` | tab単位のpending / SVG / error cache |
 
+`ViewerSettings` は Rust / TypeScript / app config JSON で camelCase 対応する。
+
+| field | 型 | 補足 |
+|---|---|---|
+| `theme` | `"light" \| "dark"` | 起動時復元し、View menu / Settings dialog の保存成功後に反映 |
+| `windowSize` | `{ width: number, height: number }` | logical size。既定 800 x 600、有効範囲 width 640..10000 / height 480..10000 |
+| `plantUmlJarPath` | `string \| null` | canonical absolute jar path。`null` はruntime directory自動探索 |
+
+`ViewerSettingsLoadResult` は`settings`と`warnings`を返す。型として読める範囲外window sizeは既定値へ部分正規化し、Theme / jar path / Recent Foldersを維持する。malformed JSONは`Err`として保存で上書きしない。
+
 ## 依存方向
 
 ```text
@@ -65,7 +75,7 @@ skinparam componentStyle rectangle
 
 package "Frontend (React + Vite)" as F {
   [main.tsx]
-  [App / MenuBar / RootPathBar / FileTree / TabStrip / MarkdownPreview / ErrorBanner / StatusBar]
+  [App / MenuBar / SettingsDialog / RootPathBar / FileTree / TabStrip / MarkdownPreview / ErrorBanner / StatusBar]
   [renderMarkdown\n(markdown-it custom rules)]
   [mermaid (client)]
   [App.css (theme / layout)]
@@ -90,6 +100,10 @@ package "Rust backend (lib.rs)" as R {
   [load_recent_folders]
   [record_recent_folder]
   [remove_recent_folder]
+  [load_viewer_settings]
+  [save_viewer_preferences]
+  [save_window_size]
+  [AppConfigStore]
 }
 
 package "External" as E {
@@ -169,7 +183,7 @@ skinparam shadowing false
 state NoRoot : rootPath = null
 state HasRoot : rootPath set\ntabs は0件以上
 state TabLoading : active tab loadState = loading
-state RecentFoldersUpdating : isRecentFoldersBusy = true
+state AppConfigUpdating : foregroundConfigOperationCount > 0
 state PlantUmlPending : active tab loadState = rendering
 state Error : error strip に errorMessage 表示
 
@@ -177,9 +191,9 @@ NoRoot --> HasRoot : Open Folder / loadRoot scan成功
 HasRoot --> TabLoading : Explorer 選択 / Reload
 TabLoading --> HasRoot : read_text_file 成功
 TabLoading --> Error : Tauri command 失敗
-HasRoot --> RecentFoldersUpdating : record / remove recent folder
-RecentFoldersUpdating --> HasRoot : app config JSON 更新完了
-RecentFoldersUpdating --> Error : recent folder command 失敗
+HasRoot --> AppConfigUpdating : recent / theme / settings 保存
+AppConfigUpdating --> HasRoot : app config JSON 更新完了
+AppConfigUpdating --> Error : config command 失敗
 HasRoot --> PlantUmlPending : PlantUML fence 検出
 PlantUmlPending --> HasRoot : render_plantuml_diagrams 完了
 PlantUmlPending --> Error : render 失敗 / firstError
@@ -192,4 +206,5 @@ Error --> HasRoot : 次の操作で復帰
 - `assetProtocol.enable = true` + `scope = ["**"]` で `convertFileSrc` を介した相対画像参照を許可する。
 - `csp = null` (MVP)。本番化時は要見直し。
 - capability `default` は window `main` に対し `core:default` / `dialog:default` / `opener:default` のみを許可する。
-- Recent Folders は Tauri の app config directory 配下 `settings.json` に保存する。browser `localStorage` は使用しない。
+- Recent Folders と Viewer settings は Tauri の app config directory 配下 `settings.json` に保存する。browser `localStorage` は使用しない。
+- `settings.json` は sibling temporary file へ全量write / sync後にatomic replaceする。replace 成功をlogical commit pointとし、それ以前の失敗では既存fileを維持する。replace後のdirectory sync失敗はlogical saveを失敗に戻せないためdurability warningとして記録する。

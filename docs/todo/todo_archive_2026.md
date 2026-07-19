@@ -185,3 +185,35 @@
   - `git diff --check`.
   - `diff.zip` generated from `19e2226..785dff8`.
   - Completion artifacts are ready for Phase 4-c merge approval.
+
+## TODO-2026-014 Tauri Viewer 設定永続化と設定 UI 導入
+
+- Status: `done`
+- Category: `new-feature`
+- Created: `2026-07-19`
+- Completed: `2026-07-19`
+- Branch: `new-feature/tauri-viewer-settings`
+- Depends on: `TODO-2026-005 Tauri Multi-tab core 導入`
+- Design analysis:
+  - `docs/design_analysis/new_feature/20260719_tauri_viewer_settings/`
+- Change report:
+  - `docs/design_analysis/new_feature/20260719_tauri_viewer_settings/change_report.md`
+- Review records:
+  - `docs/design_analysis/new_feature/20260719_tauri_viewer_settings/review/tauri_viewer_settings_design_review.md`
+  - `docs/design_analysis/new_feature/20260719_tauri_viewer_settings/review/tauri_viewer_settings_impl_review.md`
+- Summary:
+  - Persisted logical window size、Theme、canonical `plantuml.jar` path in the existing typed Tauri app config JSON while preserving Recent Folders.
+  - Added `File > Settings...` for reviewing current values and changing Theme / jar path.
+  - Restored saved window size and Theme at startup and used the app config jar path as the highest-priority PlantUML runtime setting.
+  - Added field-specific Store updates、atomic replace、resize debounce / queue、modal focus containment、picker error handling.
+  - Kept Viewer settings and Split view as independent post-Multi-tab work packages that converge in `TODO-2026-007`.
+- Verification:
+  - User confirmed Settings display、Theme changes from Settings and View、window size display、explicit / automatic PlantUML runtime、restart restoration.
+  - `npm run build` in `markdown-viewer-tauri/` succeeded with the existing chunk size warning only.
+  - `cargo check`、`cargo test` (10 tests)、`cargo fmt -- --check` succeeded in `markdown-viewer-tauri/src-tauri/`.
+  - Design and implementation reviews were approved with no Phase 3 unresolved findings.
+  - `diff.zip` generated from `4b50af2..dc97286` and verified with `unzip -t`.
+- Follow-up:
+  - `TODO-2026-007` evaluates Settings and Split view together before Avalonia rollout.
+  - `TODO-2026-015` rolls the evaluated UX out to Avalonia.
+  - `TODO-2026-016` tracks Windows target / `MoveFileExW` / Unicode and verbatim path verification.
