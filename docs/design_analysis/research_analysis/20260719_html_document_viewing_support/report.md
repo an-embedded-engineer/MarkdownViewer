@@ -18,7 +18,7 @@ Markdownのみを閲覧対象としているMarkdownViewerへ、Agentや人間�
 
 - Avalonia版は既にトップレベル文書を`NativeWebView.Navigate(fileUri)`で表示しているため、root配下のHTMLファイルへ直接Navigateする経路を追加できる。影響は小～中規模である。
 - Tauri版はMarkdownから生成したHTML fragmentをReactの`<article>`へ`dangerouslySetInnerHTML`で挿入している。完全なHTML文書の`<head>` / `<style>` / `<script>`をこの経路へ入れる設計は不適切であり、`iframe`等の独立した文書コンテキストが必要になる。影響は中規模である。
-- HTMLは能動的なJavaScriptを含められるため、Markdownの`html: false`より信頼境界が大きく変わる。対象を「信頼できるローカルHTMLと、選択したプロジェクトroot内の関連resource」に限定し、ホストAPI、親DOM、root外のローカルファイル、外部ネットワークへのアクセスを原則与えない設計が必要である。
+- TauriはMarkdownの`html: false`から能動的なJavaScriptを許可するHTMLへ広がるため、信頼境界が大きく変わる。AvaloniaのMarkdig経路は現状でもraw HTML / scriptを通すためactive content自体は既に受け入れているが、完全HTML文書、関連resource、navigationまで対象が広がる。両実装とも対象を「信頼できるローカルHTMLと、選択したプロジェクトroot内の関連resource」に限定し、ホストAPI、親DOM、root外のローカルファイル、外部ネットワークへのアクセスを原則与えない設計が必要である。
 
 ### 2.2 推奨方針
 
@@ -88,7 +88,8 @@ Markdownのみを閲覧対象としているMarkdownViewerへ、Agentや人間�
 - `Avalonia/MarkdownViewer.Avalonia/ViewModels/MainWindowViewModel.cs`: `OpenMarkdownAsync`は拡張子とroot内判定後、Markdown変換、HTMLテンプレート構築を行う。
 - `Avalonia/MarkdownViewer.Avalonia/Views/MainWindow.axaml.cs`: `PreviewRequested`で受けたHTMLをtempの`preview.html`へ書き、`NativeWebView.Navigate`を呼ぶ。
 - `Avalonia/MarkdownViewer.Avalonia/Services/HtmlTemplateService.cs`: Markdown用CSS、Mermaid runtime、`invokeCSharpAction`を使うリンク処理を生成HTMLへ追加する。
-- `markdown-viewer-tauri/src-tauri/src/lib.rs`: `scan_directory`と`read_text_file`はMarkdown拡張子のみ受け付け、canonicalize後にroot配下を検証する。
+- `Avalonia/MarkdownViewer.Avalonia/Services/MarkdownRenderService.cs`: Markdig pipelineは`UseAdvancedExtensions()`を使い、`DisableHtml()`を設定していないため、AvaloniaのMarkdown内raw HTMLは通過する。
+- `markdown-viewer-tauri/src-tauri/src/lib.rs`: `scan_directory`はMarkdownと画像を列挙し、`read_text_file`はMarkdown拡張子のみ受け付ける。read時はcanonicalize後にroot配下を検証する。
 - `markdown-viewer-tauri/src/App.tsx`: `OpenDocumentTab`は`markdown`文字列を保持し、`MarkdownPreview`は`<article>`へ`dangerouslySetInnerHTML`でfragmentを挿入する。
 - `markdown-viewer-tauri/src-tauri/tauri.conf.json`: CSPは`null`で、asset protocolは`scope: ["**"]`と広い。
 
@@ -241,7 +242,9 @@ root内検証済みのHTML原本を`NativeWebView.Navigate(fileUri)`でトップ
 
 原本をViewerのtemp `preview.html`へコピーする案は提示サンプルでは動くが、相対resourceを含むHTMLではbase directoryがtempへ変わり、画像、CSS、JavaScript等が解決できなくなる。原本file URIへのNavigateなら文書本来のbase URIを維持でき、root内の相対resourceを自然に表示できる。また、余分なコピーとsize制約も避けられる。
 
-画像、SVG、CSS、JavaScript等のsubresource requestは、可能なplatformでは`WebResourceRequested`等のNativeWebView eventを使って監視し、canonicalize後にroot外へ出るfile URIを拒否する。Avalonia Controls WebViewのplatform adapter間で同じ粒度のcancel / response制御ができるかは実装設計時にmacOS / Windowsで確認する。完全に統一できない場合は、trusted rootという入力契約とnavigation制御を併用する。
+Avalonia.Controls.WebView 12.0.1のcross-platform managed公開APIでは、subresource単位の`WebResourceRequested`を共通利用できることを確認できなかった。そのためAvaloniaの主たる境界は、trusted project rootという入力契約、`NavigationStarted`によるtop-level navigation制御、host bridgeのscheme / message制限とする。
+
+subresource requestをadapter固有APIで監視できるplatformでは、canonicalize後にroot外へ出るfile URIを拒否する追加防御を検討する。ただし初期設計の必須前提にはしない。macOS WebKitのfile read access scopeによっては、root内であってもHTML directoryから`../`を使うresourceが読めない可能性もあるため、許可・拒否の両方向を実機で確認する。
 
 #### 主な変更候補
 
@@ -257,6 +260,7 @@ root内検証済みのHTML原本を`NativeWebView.Navigate(fileUri)`でトップ
   - HTML branchは変換せず、検証済みpathをtyped preview requestとしてViewへ渡す。
   - current document typeを保持し、Theme変更時はMarkdownだけHTML templateを再構築する。
   - Reloadもcurrent typeを維持する。
+  - 既存Markdownと新規HTMLの両経路で、`HandleWebMessageAsync`の`openExternal`を`http:` / `https:` allowlistへ制限する。
 - `Views/MainWindow.axaml.cs`
   - preview requestがGeneratedHtmlなら既存temp file方式、LocalHtmlなら原本file URIへNavigateする。
   - Tree選択条件とhandlerをdocument一般へ変更する。
@@ -269,7 +273,9 @@ root内検証済みのHTML原本を`NativeWebView.Navigate(fileUri)`でトップ
 
 HTML表示完了後にtrusted click bridgeを`InvokeScript`等で設定し、`a[href]`のclickを捕捉する。fragment linkはHTML内部へ残し、`http:` / `https:`は`preventDefault`後にhostへ通知して、既存の`Process.Start(..., UseShellExecute = true)`経路でOSの標準ブラウザへ渡す。`target="_blank"`も同じ経路へ正規化する。
 
-host側はactive previewがHTMLであっても、`openExternal` messageだけを受理可能とする。ただしURIを再parseし、schemeが`http` / `https`の場合だけ処理する。他のhost message、`file:`、`javascript:`、custom schemeは拒否する。HTMLによる直接navigationや新規window requestは`NavigationStarted` / `NewWindowRequested`で拒否し、埋め込みWebView内に外部siteを表示しない。
+host側はactive previewがHTMLであっても、`openExternal` messageだけを受理可能とする。ただしURIを再parseし、schemeが`http` / `https`の場合だけ処理する。他のhost message、`file:`、`javascript:`、custom schemeは拒否する。このallowlistは新規HTML経路だけでなく、現行Markdown内raw HTMLからも呼べる既存`HandleWebMessageAsync`へ共通適用する。
+
+HTMLによる直接navigationは`NavigationStarted`で拒否し、埋め込みWebView内に外部siteを表示しない。`target="_blank"`等の新規window制御はcross-platform managed公開APIだけで完結できない可能性があるため、injected click bridgeでの`preventDefault`を主経路とし、adapter固有hookを利用できる場合だけ追加防御とする。
 
 任意HTML scriptがhost messageを自動送信する可能性は残るため、信頼できないHTMLまで対象を広げる場合は、外部ブラウザを開く前の確認UIまたはuser gestureを証明できる別channelが必要になる。今回のtrusted document境界では、既存Markdownと同様にclick時の直接openを推奨する。
 
@@ -327,7 +333,7 @@ React側は次をすべて満たすmessageだけを受理し、既存の`@tauri-
 
 HTML側scriptが`location.href`を直接変更する経路や、通常clickの取りこぼしで外部siteをiframe内へ読み込まないよう、Tauriのnavigation handler / plugin `on_navigation`でもViewer本体のapp originとHTML custom protocol以外へのnavigationを拒否する。外部ブラウザopenはclick bridgeだけが担当する。
 
-`mailto:`、`tel:`等もOS handlerへ委譲可能だが、初期allowlistは要求が明確な`http:` / `https:`に限定する。必要ならscheme単位で追加する。
+`mailto:`、`tel:`等もOS handlerへ委譲可能だが、初期allowlistは要求が明確な`http:` / `https:`に限定する。なお、現行Tauri Markdown経路は既に`mailto:`を`openUrl`へ委譲しているため、このままではHTMLとMarkdownに挙動差が生じる。HTMLでも許可して統一するか、両方を`http(s)`へ狭めるかをspec-changeで確定する。
 
 #### 主な変更候補
 
@@ -389,7 +395,9 @@ Tauri公式資料は、LinuxとAndroidでは埋め込みiframeからのrequest�
 
 ### 10.1 active content
 
-MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う。一方、HTML対応はscript、inline event、form、navigation、network request等を含むactive contentを許し得る。拡張子追加は入力形式追加だけでなく、実行コードの受入れである。
+Tauriは`html: false`でMarkdown内HTMLを拒否しているため、HTML対応はscript、inline event、form、navigation、network request等を含むactive contentの新規受入れになる。
+
+一方、AvaloniaのMarkdig pipelineは`DisableHtml()`を設定しておらず、Markdown内raw HTML / scriptを既に通す。Avaloniaではactive content自体が新規なのではなく、完全HTML文書とroot内resource、独立したnavigation経路まで実行範囲が広がる変更である。既存Markdown内raw HTMLを維持するか無効化するかも、host bridge境界と合わせてspec-changeで判断する。
 
 初回起動時の警告や「HTML内JavaScriptを許可する」設定を設けるかは未解決だが、少なくともREADMEとUI上でtrusted local HTMLのみを開く前提を示す必要がある。
 
@@ -398,7 +406,8 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 - Explorerへ表示されたpathでも、open時に毎回canonicalize / full pathとroot配下を再検証する。
 - symlink経由のroot外参照を許可しない。
 - Tauriではfrontendだけの検証にせずRust commandを正本とする。
-- HTML内の相対画像 / CSS / JavaScript / font / JSONは、HTML fileのdirectoryをbaseとして解決し、各requestをroot内・許可resource種別で再検証する。
+- TauriのHTML内相対画像 / CSS / JavaScript / font / JSONは、HTML fileのdirectoryをbaseとして解決し、custom protocolの各requestをroot内・許可resource種別で再検証する。
+- Avaloniaはfile URIの標準解決を使うため、root内resource限定はtrusted input契約を主境界とする。adapter固有APIでsubresourceを監視できるplatformだけ追加検証する。
 - HTMLから別のHTML / Markdownへ移動するnavigationは、resource読込とは分けて扱う。初期版ではtop-level / parent navigationをsandboxで拒否し、将来アプリ内tab遷移を追加する場合にroot内・許可文書拡張子を再検証する。
 
 ### 10.3 network / local resource
@@ -412,7 +421,7 @@ MarkdownはTauriで`html: false`、AvaloniaでもViewer生成templateを使う�
 - font: WOFF / WOFF2を基本とし、必要性を確認して追加する。
 - inline: data URI、inline SVG、Canvas、HTML内style / script。
 
-Tauriのasset protocol全filesystem scopeをHTMLへ継承せず、root-scoped custom protocolで配信する。Avaloniaでは原本file URIが相対resourceを自然に解決するため、subresource requestのroot外脱出を監視・拒否する。root外resourceと外部network resourceは非対応とする。
+Tauriのasset protocol全filesystem scopeをHTMLへ継承せず、root-scoped custom protocolで配信する。Avaloniaでは原本file URIが相対resourceを自然に解決する一方、cross-platform managed APIだけではsubresource単位のroot外拒否を保証できない。この制約をtrusted document契約へ明記し、厳密な強制が必要ならadapter固有hookまたは別表示方式を追加する。仕様上、root外resourceと外部network resourceは非対応とする。
 
 ### 10.4 ダイアグラム
 
@@ -432,7 +441,7 @@ Viewerが対応するのはHTML標準で描画済み、またはHTML自身のJav
 | relative image / CSS / JS / font / JSON | root-scoped resourceとして読み込む |
 | relative `.html` / `.md` | 初期仕様では自動遷移せず、将来のアプリ内tab遷移候補 |
 | `file:` / `javascript:` / `data:` navigation | 外部openとして拒否 |
-| `mailto:` / `tel:` | 初期対象外。必要時にallowlist追加 |
+| `mailto:` / `tel:` | 初期対象外候補。ただしTauri Markdownは`mailto:`対応済みのため統一方針を要決定 |
 
 Viewer側でURLを表示前に書き換える必要はなく、click interception、scheme validation、OS opener委譲で実現できる。外部siteをembedded WebViewへ読み込まないため、remote contentへTauri capabilityやAvalonia bridgeが露出することも避けられる。
 
@@ -453,9 +462,10 @@ Viewer側でURLを表示前に書き換える必要はなく、click interceptio
 - sort順とHTML icon / previewable判定。
 - MarkdownはGeneratedHtml、HTMLはLocalHtml preview requestになる。
 - HTMLと同じdirectory / subdirectory / `../`にある画像を、canonicalize後root内なら表示する。
-- root外を指す画像、script、CSS requestを拒否する。
+- adapter固有APIでsubresource監視が可能なplatformでは、root外を指す画像、script、CSS requestを拒否する。
+- macOS / Windowsで、同directory、subdirectory、root内`../`、root外`../`のfile resource挙動を実機確認する。
 - HTML内`http(s)` clickを埋め込みWebViewへ遷移させず、標準ブラウザへ1回だけ渡す。
-- `file:` / `javascript:` / unsupported schemeの外部open messageを拒否する。
+- Markdown / HTMLの両経路で`file:` / `javascript:` / unsupported schemeの`openExternal` messageを拒否する。
 - HTML表示中のTheme切替でMarkdown templateを適用しない。
 - HTML表示中はscheme検証済み`openExternal`以外のhost messageを無視する。
 
@@ -479,6 +489,7 @@ Viewer側でURLを表示前に書き換える必要はなく、click interceptio
 - scriptによる直接外部navigationをnavigation policyが拒否する。
 - root内のPNG / JPG / SVG、CSS、JavaScriptをiframe内で読み込める。
 - inline SVG / Canvasと、同梱runtimeによるclient-side diagramを描画できる。
+- sandboxed iframeのopaque origin（`Origin: null`）からroot内resourceとJSON `fetch`を行い、macOS / Windows / Linuxで許可または拒否が設計どおり一致する。
 
 ### 11.2 手動UI確認
 
@@ -556,6 +567,8 @@ Viewer側でURLを表示前に書き換える必要はなく、click interceptio
 | active SVG / diagram script | sandbox escape、network access | iframe sandboxとCSPをHTML全体へ適用 |
 | 外部linkをWebView内で開く | remote contentへhost bridge / capabilityが露出 | navigationをcancelし、scheme検証後OS openerへ委譲 |
 | HTML scriptが外部openを乱用 | popup / browser起動のDoS | trusted文書限定。未信頼対応時は確認UIを追加 |
+| Avalonia Markdownの既存raw HTMLから任意host message | `file:`等をOS shellへ渡す | 既存・新規両経路の`openExternal`へscheme allowlistを共通適用 |
+| Avaloniaでsubresource root境界を強制できないplatform | root外local resourceを参照し得る | trusted root契約を主境界とし、adapter hookは追加防御として検証 |
 | iframe sandboxのplatform差 | security前提崩れ | macOS / Windows / Linux実機確認 |
 | 文書stateのMarkdown固定名 | branch漏れ・誤処理 | typed DocumentTypeへ一般化 |
 | 既存Markdown回帰 | Mermaid / PlantUML / link破損 | rendererを分岐の内側で維持し回帰試験 |
@@ -567,13 +580,15 @@ Viewer側でURLを表示前に書き換える必要はなく、click interceptio
 1. HTMLを「信頼できるローカル文書のみ」と明記するか、初回警告 / opt-inを設けるか。
 2. `.htm`も同時対応するか。現要求に合わせるなら`.html`のみを推奨する。
 3. root内resourceの許可拡張子をどこまで含めるか。初期は一般画像、SVG、CSS、JavaScript、JSON、WOFF / WOFF2を推奨する。
-4. `mailto:` / `tel:`等を外部open allowlistへ追加するか。初期は`http:` / `https:`のみを推奨する。
+4. `mailto:` / `tel:`等を外部open allowlistへ追加するか。現行Tauri Markdownは`mailto:`対応済みであるため、HTMLも許可するか、全経路を`http:` / `https:`へ統一するかを決める。
 5. Tauri custom protocol responseのCSPとCORSをplatform別にどう構成するか。root内JSON `fetch`を許可するかも確定する必要がある。
 6. Tauriの`assetProtocol.scope: ["**"]`縮小を本対応に含めるか、既存画像表示を含む先行security作業へ分離するか。
 7. Avaloniaのactive HTMLをtop-level NativeWebViewへ置くtrust境界を許容するか、iframe wrapper等を追加するか。
 8. Tauri LinuxをHTML active content対応platformに含めるか。含める場合、iframe capability注意への実機検証とsecurity reviewを必須とする。
 9. HTMLから別HTML / Markdownへの相対linkをアプリ内tab遷移として初期対応するか。画像等のsubresource表示とは分離して判断する。
 10. HTML内のraw Mermaid / PlantUML sourceをViewer側で自動描画する追加規約が必要か。現時点では描画済みSVGまたは同梱browser runtimeを推奨する。
+11. AvaloniaのMarkdig pipelineでMarkdown内raw HTMLを許可し続けるか、`DisableHtml()`へ変更するか。HTML対応後のtrusted document / host bridge境界と合わせて決定する。
+12. Avalonia Controls WebViewのcross-platform公開APIでsubresource単位のroot境界を強制できない場合、trusted root契約 + top-level navigation制御で初期リリース可能とするか、adapter固有実装または別表示方式を必須にするか。
 
 ## 15. 次workflowへの推奨入力
 
@@ -582,7 +597,7 @@ Viewer側でURLを表示前に書き換える必要はなく、click interceptio
 設計時の採用案は次とする。
 
 - 共通: `DocumentType`を導入し、Markdown / HTMLの入力・状態・表示経路を明示分岐する。
-- Avalonia: root内HTML原本のfile URIへ直接Navigateし、HTML時はhost messageを処理しない。
+- Avalonia: root内HTML原本のfile URIへ直接Navigateする。HTML時はscheme検証済み`openExternal`だけを処理し、既存Markdownを含む共通host handlerで他scheme / messageを拒否する。subresource root制御はtrusted contractを主境界とする。
 - Tauri: root-scoped custom URI protocolでHTMLと関連resourceを配信し、CSP付きsandboxed iframeへ表示する。
 - 対応境界: trusted、UTF-8の`.html`、self-containedまたは選択project root内resourceで完結、network / root外resourceなし。
 - 画像・diagram: root内PNG / JPG / SVG、inline SVG / Canvas、描画済みUML、同梱browser runtimeによるdiagramを対応する。HTML raw sourceへのViewer側図変換は別仕様とする。
