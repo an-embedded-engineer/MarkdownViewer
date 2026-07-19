@@ -5,8 +5,8 @@
 - Open Folder: MenuBar の File dropdown からフォルダ選択ダイアログを開く。
 - Recent Folders: MenuBar の File dropdown から最近開いた root folder を開く。
 - Remove Recent Folder: Recent Folders entry の delete button から該当 entry を削除する。
-- Explorer item click: 未openのMarkdownは新規tabを開き、同一pathがopen済みならactivateする。
-- Tab activate: TabStripから表示するMarkdownを切り替える。ArrowLeft / ArrowRight / Home / Endでもfocusとselectionを移動できる。
+- Explorer item click: 未openのMarkdown / HTMLは新規tabを開き、同一pathがopen済みならactivateする。
+- Tab activate: TabStripから表示するdocumentを切り替える。ArrowLeft / ArrowRight / Home / Endでもfocusとselectionを移動できる。
 - Tab close: 非active tabではselectionを維持する。active tabでは右隣、なければ左隣へ移り、最後のtab close後は未選択表示になる。
 - Reload: MenuBar の File dropdown から root treeとactive tabだけを再読み込みする。
 - Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
@@ -39,7 +39,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 
 ## TabStrip 表示
 
-- 同一root内でopenしたMarkdownをopen順に表示する。同一pathのtabは重複作成しない。
+- 同一root内でopenしたMarkdown / HTMLをopen順に表示する。同一pathのtabは重複作成しない。
 - active / Loading / Rendering / Errorを表示し、長いfile nameはellipsis、absolute pathは`title`で確認できる。
 - 多数tabは横scrollで到達可能にする。`role="tablist"` / `role="tab"` とroving tabindexを使う。
 - activate buttonとactive tabのclose buttonだけをTabキーのfocus順に含める。非active tabをcloseする場合は、先に矢印キーでactivateしてからclose buttonへ移動する。
@@ -53,8 +53,8 @@ StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術�
 
 ## StatusBar 表示
 
-- `File`: 表示中 Markdown file name。未選択時は `No file selected`。
-- `State`: `Loading folder...`、`Updating app settings...`、`Loading Markdown...`、`Rendering PlantUML diagrams...`、`Ready` のいずれか。左から順に優先する。
+- `File`: 表示中 document file name。未選択時は `No file selected`。
+- `State`: `Loading folder...`、`Updating app settings...`、`Loading Markdown...`、`Loading HTML...`、`Rendering PlantUML diagrams...`、`Ready` のいずれか。左から順に優先する。
 
 `State` の値だけを `aria-live="polite"` とし、`File` は live region に含めない。
 
@@ -63,6 +63,8 @@ StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術�
 ### `scan_directory(root_path: String) -> Result<FileTreeNode, String>`
 
 root配下を走査し、Explorer表示用のツリーを返す。
+
+成功したtree構築後だけ`DocumentStore.current_root`をcanonical rootへ切り替える。失敗時は旧rootを維持する。case-insensitiveな`.html`を列挙し、`.htm`は除外する。
 
 除外ディレクトリ:
 
@@ -74,9 +76,23 @@ root配下を走査し、Explorer表示用のツリーを返す。
 - `.venv`
 - `__pycache__`
 
-### `read_text_file(root_path: String, path: String) -> Result<String, String>`
+### `open_document(path: String) -> Result<OpenDocumentResponse, String>`
 
-root配下のMarkdownファイルをUTF-8テキストとして読み込む。
+`DocumentStore.current_root`配下のUTF-8 documentを開く。Markdownは`sourceText`、HTMLはRust生成のroot-relative`previewUrl`だけを返す。root未設定、root外、directory、unsupported extension、非UTF-8は`Err(String)`とする。旧`read_text_file` commandは提供しない。
+
+`OpenDocumentResponse`:
+
+- Markdown: `{ documentType: "markdown", sourceText: string, previewUrl: null }`
+- HTML: `{ documentType: "html", sourceText: null, previewUrl: string }`
+
+### `mvhtml` custom protocol
+
+- URL: macOS / Linuxは`mvhtml://localhost/document/<segments>`、Windowsは`http://mvhtml.localhost/document/<segments>`。
+- method: `GET` / `HEAD`。`OPTIONS`を含むその他は405。
+- path: segment単位で一度だけpercent-decodeし、空、`.`、`..`、NUL、decode後separator、drive / UNC注入を拒否する。root join後にcanonicalizeし、root外symlinkを403で拒否する。
+- resource: HTML、CSS、JS/MJS、JSON、SVG、PNG、JPEG、GIF、WebP、BMP、ICO、AVIF、WOFF/WOFF2だけを固定MIMEで配信する。
+- CORS: Origin不在または厳密な`Origin: null`だけを許可し、success responseへ`Access-Control-Allow-Origin: null`を返す。JSONはsimple GETだけを対象とする。
+- HTML: response CSPとViewer bridgeを注入し、`ready` / user-clicked `openExternal` messageだけをparentへ送る。
 
 ### `render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRenderResponse, String>`
 
@@ -124,7 +140,7 @@ logical sizeを検証し、window sizeだけを部分更新する。有効範囲
 - `name: string`
 - `path: string`
 - `relativePath: string`
-- `nodeType: "directory" | "markdown" | "image"`
+- `nodeType: "directory" | "markdown" | "html" | "image"`
 - `children: FileTreeNode[]`
 
 PlantUML frontend typesはTauri commandの `PlantUmlRenderResponse` / `PlantUmlDiagramResult` とcamelCaseで対応する。
@@ -153,10 +169,20 @@ PlantUML frontend typesはTauri commandの `PlantUmlRenderResponse` / `PlantUmlD
 - `id: string`
 - `path: string`
 - `displayName: string`
-- `markdown: string`
+- `documentType: "markdown" | "html"`
+- `sourceText: string | null`
+- `previewUrl: string | null`
 - `revision: number`
 - `loadState: "loading" | "rendering" | "ready" | "error"`
 - `errorMessage: string | null`
 - `plantUmlDiagrams: PlantUmlDiagramResult[]`
 
-Markdown / PlantUML responseは`tabId + revision`が現在値と一致する場合だけ適用する。close済み、Reload前、旧rootのresponseは無視する。
+Markdown / HTML / PlantUML responseは`tabId + revision`が現在値と一致する場合だけ適用する。close済み、Reload前、旧rootのresponseは無視する。
+
+## HTML Preview / Message interface
+
+- iframeは`sandbox="allow-scripts"`だけを持ち、`allow-same-origin`、forms、popup、top navigation、downloadを許可しない。
+- HTML sourceはfrontendへ返さず、Theme変更だけではiframe URL / keyを変更しない。
+- `ready`は`event.source === iframe.contentWindow`、`event.origin === "null"`、active tab revision、exact message shapeを満たす最初の1回だけ受理する。5秒以内に届かなければtab errorにする。
+- `openExternal`は上記に加え、absolute `http:` / `https:`、transient user activation、duplicate guardを満たす場合だけ`openUrl`へ渡す。`file:`、`javascript:`、`data:`、`mailto:`、custom schemeは拒否する。
+- reject理由はdevelopment consoleへ残し、messageを信頼境界とはみなさない。HTMLは利用者が信頼するactive documentに限定する。

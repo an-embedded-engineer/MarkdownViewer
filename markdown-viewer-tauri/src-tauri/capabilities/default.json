@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Local-only capability for the main Viewer window; HTML preview origins are intentionally excluded",
   "windows": ["main"],
   "permissions": [
     "core:default",

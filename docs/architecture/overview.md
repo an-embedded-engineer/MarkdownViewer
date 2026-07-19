@@ -17,23 +17,26 @@ Avalonia UI と C# による Markdown Viewer 実装。
 
 Tauri v2、React、TypeScript、Rust による Markdown Viewer 実装。
 
-- Frontend: `src/App.tsx`, `src/App.css`
+- Frontend: `src/App.tsx`, `src/App.css`, `src/documentPolicy.ts`
 - Rust command: `src-tauri/src/lib.rs`
 - Tauri config: `src-tauri/tauri.conf.json`, `src-tauri/capabilities/default.json`
 - Markdown 表示: `markdown-it` でHTML化し、React側で表示する。
 - Mermaid 表示: `mermaid` をReactのプレビュー更新タイミングで実行する。
 - PlantUML 表示: Rust command がローカル Java / `plantuml.jar` を使ってSVG化し、React側でHTMLへ差し替える。
+- HTML 表示: Rust `DocumentStore` が current root と `open_document` / `mvhtml` protocol を管理し、React は `sandbox="allow-scripts"` の iframe へ preview URL を渡す。HTML source は frontend state へ返さない。
+- HTML 境界: canonical root 検証、resource allowlist、response CSP/CORS、shell CSP、opaque-origin iframe、typed message policy を重ねる。HTML protocol originへ Tauri capability を付与しない。
 
 ## 基本フロー
 
 1. ユーザーがアプリを起動する。
-2. フォルダ選択ダイアログでMarkdownルートを選ぶ。
+2. フォルダ選択ダイアログでdocumentルートを選ぶ。
 3. ファイルツリーを構築し、Explorerに表示する。
-4. `.md` / `.markdown` ファイル選択時にMarkdown本文を読み込む。
-5. MarkdownをHTMLへ変換し、右ペインに表示する。
+4. `.md` / `.markdown` は本文を読み込み、`.html` はroot-relative preview URLを生成する。
+5. MarkdownはReact DOM、trusted HTMLはsandboxed iframeで右ペインに表示する。
 6. Mermaidコードブロックを図として描画する。
 7. PlantUMLコードブロックをローカルPlantUML CLIでSVGとして描画する。
 8. 相対Markdownリンクはアプリ内遷移し、外部URLは既定ブラウザで開く。
+9. HTML の user-clicked `http(s)` link は iframe bridge と frontend policy の検証後に既定ブラウザで開く。
 
 ## 主要ファイルリファレンス
 

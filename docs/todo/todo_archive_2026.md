@@ -217,3 +217,37 @@
   - `TODO-2026-007` evaluates Settings and Split view together before Avalonia rollout.
   - `TODO-2026-015` rolls the evaluated UX out to Avalonia.
   - `TODO-2026-016` tracks Windows target / `MoveFileExW` / Unicode and verbatim path verification.
+
+## TODO-2026-017 Tauri HTML形式仕様書表示対応
+
+- Status: `done`
+- Category: `spec-change`
+- Created: `2026-07-19`
+- Completed: `2026-07-19`
+- Branch: `spec-change/tauri-html-document-viewing`
+- Depends on: `TODO-2026-005 Tauri Multi-tab core 導入`
+- Source report:
+  - `docs/design_analysis/research_analysis/20260719_html_document_viewing_support/report.md`
+- Design analysis:
+  - `docs/design_analysis/spec_change/20260719_tauri_html_document_viewing/`
+- Change report:
+  - `docs/design_analysis/spec_change/20260719_tauri_html_document_viewing/change_report.md`
+- Review records:
+  - `docs/design_analysis/spec_change/20260719_tauri_html_document_viewing/review/tauri_html_document_viewing_design_review.md`
+  - `docs/design_analysis/spec_change/20260719_tauri_html_document_viewing/review/tauri_html_document_viewing_impl_review.md`
+- Summary:
+  - Generalized the Tauri Explorer, open command, tab state, and preview into a typed Markdown / HTML document model.
+  - Added a root-scoped custom URI protocol for trusted UTF-8 HTML and allowlisted relative resources.
+  - Rendered HTML in a CSP-protected sandboxed iframe without parent DOM, Tauri IPC, external network, popup, or top-level navigation access.
+  - Delegated user-clicked `http:` / `https:` links to the OS browser after source, activation, and scheme validation.
+  - Preserved existing Markdown, relative image / link, Mermaid, PlantUML, and Multi-tab behavior.
+- Verification:
+  - User confirmed HTML / inline SVG display, external browser delegation, and `javascript:` URL rejection on macOS.
+  - User confirmed relative PNG display from both HTML and Markdown fixtures.
+  - `npm run build` and 20 frontend tests passed.
+  - `cargo fmt -- --check`, `cargo check`, and 22 Rust tests passed.
+  - Design and implementation follow-up reviews were approved with no unresolved findings.
+  - `diff.zip` generated from `24bcfb5..a9193cf` and verified with `unzip -t`.
+- Follow-up:
+  - Windows / Linux and remaining platform-specific security matrix checks will be performed separately.
+  - A platform-specific problem found later will be filed under `docs/issues/` and handled through the issue-resolution or bugfix workflow.

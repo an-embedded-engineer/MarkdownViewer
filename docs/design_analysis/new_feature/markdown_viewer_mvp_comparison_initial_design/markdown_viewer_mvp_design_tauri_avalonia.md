@@ -162,6 +162,8 @@ public sealed class FileTreeNode
 
 # 案1: Tauri v2 + React + TypeScript
 
+> 2026-07-19仕様更新: Tauri版はMarkdownに加え、選択root内のtrusted UTF-8 `.html`仕様書をdocumentとして扱う。HTML sourceはfrontendへ返さず、Rust `DocumentStore`が生成するroot-relative `mvhtml` URLを`sandbox="allow-scripts"`のiframeへ渡す。custom protocolはcanonical root、resource allowlist、CSP/CORSを強制し、HTML protocol originへTauri capabilityを付与しない。外部linkはiframe bridgeとfrontend policyで検証したuser-clicked `http:` / `https:`だけをOS browserへ渡す。`.htm`、untrusted / 非UTF-8 HTML、root外・external network resourceは対象外である。詳細は`docs/components/tauri_viewer/`を正とする。
+
 ## 採用目的
 
 Tauri 版は、軽量なクロスプラットフォーム Markdown Viewer としての適性を確認するために実装する。

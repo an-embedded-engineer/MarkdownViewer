@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `rootPath` | 選択中フォルダ | `string \| null` |
 | `fileTree` | Explorer 用 root ノード | `FileTreeNode \| null` |
-| `tabs` | open中Markdownと描画cache | `OpenDocumentTab[]`。pathはcollection内で一意 |
+| `tabs` | open中Markdown / HTMLと描画cache | `OpenDocumentTab[]`。pathはcollection内で一意 |
 | `activeTabId` | 単一preview paneが参照するtab | `string \| null` |
 | `pendingNavigation` | link先anchor | `{ tabId, anchor } \| null`。将来はpane単位へ移行 |
 | `theme` | `"light" \| "dark"` | `<html data-theme>` に反映 |
@@ -20,7 +20,7 @@
 | `isGlobalBusy` | `isRootLoading OR isRecentFoldersBusy` | root競合操作だけを抑止。tab activate / closeは許可 |
 | `nextTabIdRef` | tab ID採番 | close後も再利用しない単調増加counter |
 
-各tabの`revision`はMarkdown本文が同一でもReload時に増加し、Mermaid / PlantUML再描画とstale async response排除に使う。active tab、error、loading表示は`tabs`と`activeTabId`から導出し、旧単一文書stateを並存させない。
+各tabの`revision`はReload時に増加し、MarkdownのMermaid / PlantUML再描画、HTML iframe remount、stale async response排除に使う。active tab、error、loading表示は`tabs`と`activeTabId`から導出し、旧単一文書stateを並存させない。
 
 ## クラス / モジュール図
 
@@ -46,8 +46,8 @@ package "Frontend (src/App.tsx)" {
     +openRecentFolder(path)
     +removeRecentFolder(path)
     +reload()
-    +openOrActivateTab(root, file, anchor?)
-    +loadTab(tabId, root, file, revision)
+    +openOrActivateTab(file, anchor?)
+    +loadTab(tabId, file, revision)
     +activateTab(tabId)
     +closeTab(tabId)
     +handlePreviewClick(event)
@@ -58,6 +58,7 @@ package "Frontend (src/App.tsx)" {
   class TreeNode
   class TabStrip
   class MarkdownPreview
+  class HtmlPreview
   class ErrorBanner
   class StatusBar
   class renderMarkdown <<function>> {
@@ -78,7 +79,8 @@ package "Tauri JS API" {
 
 package "Rust backend (src-tauri/src/lib.rs)" {
   class "scan_directory" as Scan <<command>>
-  class "read_text_file" as Read <<command>>
+  class "open_document" as Read <<command>>
+  class DocumentStore
   class "render_plantuml_diagrams" as Render <<command>>
   class "load_recent_folders" as LoadRecent <<command>>
   class "record_recent_folder" as RecordRecent <<command>>
@@ -107,7 +109,7 @@ App --> convertFileSrc
 App --> openDialog
 App --> openUrl
 invoke ..> Scan : "scan_directory"
-invoke ..> Read : "read_text_file"
+invoke ..> Read : "open_document"
 invoke ..> Render : "render_plantuml_diagrams"
 invoke ..> LoadRecent : "load_recent_folders"
 invoke ..> RecordRecent : "record_recent_folder"
@@ -127,9 +129,9 @@ render_plantuml_diagram --> sanitize_svg
 
 1. `@tauri-apps/plugin-dialog` の `open({ directory: true })` でフォルダを選択する。
 2. `scan_directory` command で Explorer 用ツリーを取得する。
-3. `record_recent_folder` command で選択 root を Recent Folders へ保存する。Markdown file が 1 つもない root でも、`scan_directory` が成功した directory であれば保存対象にする。
-4. `findReadme` → `findFirstMarkdown` の順で初期表示ファイルを決める。
-5. 初期Markdownをloading tabとして作成し、`read_text_file` commandで本文を取得する。Explorer選択も同じ`openOrActivateTab`を使い、同一pathなら既存tabをactivateする。
+3. `record_recent_folder` command で選択 root を Recent Folders へ保存する。document file が 1 つもない root でも、`scan_directory` が成功した directory であれば保存対象にする。
+4. `findReadme` → `findFirstMarkdown` → `findFirstHtml` の順で初期表示ファイルを決める。
+5. 初期documentをloading tabとして作成し、`open_document` commandのdiscriminated responseで分岐する。Markdownは本文を保持し、HTMLはpreview URLだけを保持する。Explorer選択も同じ`openOrActivateTab`を使い、同一pathなら既存tabをactivateする。
 6. `renderMarkdown` (`markdown-it`) で HTML 化する。fence rule で:
    - `mermaid` → `<div class="mermaid">`
    - `plantuml` / `puml` → `plantUmlDiagrams[i].html` (pending / 成功 / エラー)
@@ -147,7 +149,7 @@ participant "App (React)" as App
 participant "plugin-dialog" as Dlg
 participant "invoke" as Inv
 participant "Rust\nscan_directory" as Scan
-participant "Rust\nread_text_file" as Read
+participant "Rust\nopen_document" as Read
 participant "renderMarkdown\n(markdown-it)" as MD
 participant "WebView DOM" as DOM
 participant "mermaid" as Mer
@@ -161,11 +163,11 @@ Scan --> Inv : FileTreeNode
 Inv --> App : FileTreeNode
 App -> Inv : invoke("record_recent_folder", { path })
 Inv --> App : RecentFolderEntry[]
-App -> App : findReadme / findFirstMarkdown
-App -> Inv : invoke("read_text_file", { rootPath, path })
+App -> App : findReadme / findFirstMarkdown / findFirstHtml
+App -> Inv : invoke("open_document", { path })
 Inv -> Read : command
-Read --> Inv : markdown text
-Inv --> App : markdown text
+Read --> Inv : OpenDocumentResponse
+Inv --> App : typed document response
 App -> App : create tab / revision = 1
 App -> MD : renderMarkdown(markdown, path, plantUmlDiagrams)
 MD --> App : HTML
@@ -275,11 +277,11 @@ stop
 
 ## Multi-tab処理
 
-- `OpenDocumentTab`は本文、revision、loadState、error、PlantUML結果を保持する。
+- `OpenDocumentTab`はdocumentType、Markdown sourceまたはHTML preview URL、revision、loadState、error、PlantUML結果を保持する。
 - 新規openは末尾へtabを追加してactivateする。同一pathは重複せず既存tabをactivateする。
 - active tab closeは右隣、なければ左隣へ移る。非active tab closeはselectionを変えない。
 - TabStripは横overflow、roving tabindex、ArrowLeft / ArrowRight / Home / Endを提供する。
-- Reloadはtree scan成功後、active tabの同じIDでrevisionを増やす。読込失敗時は直前contentを保持してerrorにする。
+- Reloadはtree scan成功後、active tabの同じIDでrevisionを増やし、旧content / URLをclearして再openする。失敗時はtab errorを明示する。
 - root scan成功をcommit pointとし、成功後に旧tabsを破棄する。scan失敗時は旧root / tabsを維持する。
 - async responseは`tabId + revision`でguardし、close済み、Reload前、旧rootの結果を無視する。
 
@@ -288,6 +290,15 @@ stop
 - `http(s)://` / `mailto:`: `@tauri-apps/plugin-opener` の `openUrl` で OS 既定ブラウザを開く。
 - `#anchor`: `previewRef` 内で `scrollIntoView`。
 - 相対 `.md` / `.markdown`: `resolveSiblingPath` でパス解決し、`openOrActivateTab`で既存tabを再利用または新規openする。`#anchor`はApp/pane-levelの`pendingNavigation`から読み込み後80msでscrollする。
+
+## trusted HTML preview
+
+- `DocumentStore`は成功した`scan_directory`のcanonical rootを`RwLock<Option<PathBuf>>`へ保持し、`open_document`と`mvhtml` protocolが共有する。protocol read中はread lockを保持する。
+- HTML URLはRustがroot-relative segmentを個別percent-encodeして生成し、absolute filesystem pathをWebViewへ公開しない。`convertFileSrc`はMarkdown asset imageだけに使う。
+- protocolは`/document/` prefix、segment decode、separator / dot / drive注入、canonical root、symlink、regular file、固定MIME allowlistを検証する。GET / HEAD以外は405、root未設定409、invalid 400、root外403、missing 404とする。
+- HTML responseへCSPとbridgeを注入する。iframeは`sandbox="allow-scripts"`だけを持ち、bridgeの`ready`が5秒以内にsource / opaque origin / revision policyを通った場合だけreadyにする。
+- `openExternal`はactive iframe source、`Origin: null`、exact shape、ready済み、transient user activation、duplicate guard、`http(s)` URLを満たす場合だけOS browserへ渡す。
+- HTML branchではMarkdown変換、Mermaid effect、PlantUML commandを実行しない。Theme変更だけではiframeをremountしない。
 
 ## ファイル走査 (`scan_directory`)
 
@@ -303,14 +314,14 @@ endif
 :build_tree(root, root);
 note right
   ディレクトリは再帰
-  ファイルは markdown / image 拡張子のみ採用
+  ファイルは markdown / html / image 拡張子のみ採用
   SKIPPED_DIRS:
   .git node_modules bin obj target
   .venv __pycache__
 end note
 :children.sort_by(compare_nodes);
 note right
-  Directory(0) → Markdown(1) → Image(2)
+  Directory(0) → Markdown(1) → Html(2) → Image(3)
   同種は name の lowercase 昇順
 end note
 :return FileTreeNode;
@@ -318,7 +329,7 @@ stop
 @enduml
 ```
 
-- `read_text_file` は root 配下チェック (`file_path.starts_with(&root)`) + Markdown 拡張子チェックの後、UTF-8 で読み込む。
+- `open_document` はcurrent root配下のregular Markdown / HTMLだけをUTF-8で検証し、排他的な`sourceText` / `previewUrl` responseを返す。
 
 ## Recent Folders
 
@@ -334,7 +345,7 @@ Recent Folders は React の MenuBar dropdown から操作し、永続化と pat
 | `name` | Rust 側で保存時に確定した basename snapshot。frontend は通常 `getFileName(entry.path)` で再導出しない |
 | `lastOpenedAt` | Unix seconds 文字列 |
 
-Rust は `AppConfigStore` を Tauri state として管理し、Recent Folders、Viewer settings、PlantUML runtime設定のreadとapp config JSON更新を同一 lockで直列化する。lock範囲は短いsettings read/writeに限定し、`scan_directory`、Markdown読み込み、Java processによるPlantUML rendering本体は対象外とする。
+Rust は `AppConfigStore` を Tauri state として管理し、Recent Folders、Viewer settings、PlantUML runtime設定のreadとapp config JSON更新を同一 lockで直列化する。document rootは別の`DocumentStore`が管理し、`scan_directory`、document open / protocol read、Java processによるPlantUML rendering本体をconfig lockへ含めない。
 
 設定ファイルは Tauri app config directory 配下の `settings.json` で、Recent Folders部分は次の通り。完全schemaは後述のViewer Settingsを参照する。
 
@@ -391,7 +402,9 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
 | 失敗箇所 | 表示 |
 | --- | --- |
 | Tauri command 失敗 | `errorMessage` を StatusBar 直上の error strip に表示 |
-| Markdown 読み込み失敗 | 同上 + 直前の選択ファイルは維持 |
+| Markdown / HTML open失敗 | 同上。active tabをerrorにする |
+| HTML ready timeout | 5秒でactive tabをerrorにし、iframe eventを成功判定に使わない |
+| HTML resource / CSP failure | iframe内resource failureとして分離し、shellは維持する |
 | Recent Folders 読み書き失敗 | error strip に表示。missing path は自動削除しない |
 | Settings validation / 保存失敗 | Settings dialog内の`role="alert"`へ表示し、draftを維持 |
 | startup / background window size保存失敗 | error stripに表示。malformed configは自動上書きしない |
@@ -411,12 +424,12 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
   <RootPathBar/>       ← root path。未選択時は No folder selected
   <section.workspace>
     <aside.explorer-pane>
-      <FileTree/>      ← 再帰 TreeNode、Markdown / Image / Directory アイコン
+      <FileTree/>      ← 再帰 TreeNode、Markdown / HTML / Image / Directory アイコン
     </aside>
     <section.preview-workspace>
       <TabStrip/>        ← horizontal overflow / activate / close / roving focus
-      <div#markdown-preview.preview-pane role="tabpanel">
-        <MarkdownPreview/> dangerouslySetInnerHTML
+      <div#document-preview.preview-pane role="tabpanel">
+        <MarkdownPreview/> | <HtmlPreview/>
       </div>
     </section>
   </section>
@@ -428,7 +441,7 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
 
 `MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload`、separator、`Settings...`を持ち、`View` dropdown は theme 切替を持つ。Settingsはapplication-wideな操作であり、dialog close後はFile triggerへfocusを戻す。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
 
-`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`TabStrip` は PreviewWorkspace 上段でopen中Markdownを表示し、下段の単一`tabpanel`がactive tabを描画する。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
+`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`TabStrip` は PreviewWorkspace 上段でopen中documentを表示し、下段の単一`tabpanel`がactive tabを描画する。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
 
 `html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠には縦スクロールバーを出さない。スクロールは `.explorer-pane` と `.preview-pane` の `overflow: auto` に限定し、MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。`ErrorBanner` は条件付き描画のため、chrome 要素は CSS grid の自動配置に依存せず、`grid-row` で MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の行を明示する。
 

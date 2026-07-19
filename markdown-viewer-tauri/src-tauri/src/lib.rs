@@ -1,3 +1,4 @@
+use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::fs::File;
@@ -10,9 +11,10 @@ use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tauri::http::{header, HeaderValue, Method, Request, Response, StatusCode};
 use tauri::{Manager, State};
 
 #[derive(Serialize)]
@@ -161,12 +163,46 @@ impl AppConfigStore {
     }
 }
 
-#[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 enum FileNodeType {
     Directory,
     Markdown,
+    Html,
     Image,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+enum DocumentType {
+    Markdown,
+    Html,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct OpenDocumentResponse {
+    document_type: DocumentType,
+    source_text: Option<String>,
+    preview_url: Option<String>,
+}
+
+#[derive(Clone, Default)]
+struct DocumentStore {
+    current_root: Arc<RwLock<Option<PathBuf>>>,
+}
+
+#[derive(Clone, Copy)]
+struct ResourceDescriptor {
+    content_type: &'static str,
+    text_utf8: bool,
+    inject_bridge: bool,
+}
+
+#[derive(Debug)]
+struct ProtocolFailure {
+    status: StatusCode,
+    message: String,
 }
 
 const SKIPPED_DIRS: &[&str] = &[
@@ -191,31 +227,227 @@ const DEFAULT_WINDOW_HEIGHT: u32 = 600;
 const MIN_WINDOW_WIDTH: u32 = 640;
 const MIN_WINDOW_HEIGHT: u32 = 480;
 const MAX_WINDOW_DIMENSION: u32 = 10_000;
+const HTML_PROTOCOL_PREFIX: &str = "/document/";
+const HTML_RESPONSE_CSP: &str = "default-src 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; child-src 'none'; form-action 'none'; script-src 'unsafe-inline' mvhtml: http://mvhtml.localhost; style-src 'unsafe-inline' mvhtml: http://mvhtml.localhost; img-src mvhtml: http://mvhtml.localhost data:; font-src mvhtml: http://mvhtml.localhost data:; connect-src mvhtml: http://mvhtml.localhost; media-src mvhtml: http://mvhtml.localhost data:; worker-src 'none'";
+const HTML_BRIDGE: &str = r##"<script data-markdown-viewer-bridge>
+(() => {
+  "use strict";
+  const channel = "markdown-viewer-html";
+  const post = (message) => parent.postMessage({ channel, ...message }, "*");
+  post({ type: "ready" });
 
-#[tauri::command]
-fn scan_directory(root_path: String) -> Result<FileTreeNode, String> {
-    let root = normalize_path(PathBuf::from(root_path))?;
-    if !root.is_dir() {
-        return Err("Selected path is not a directory.".into());
+  document.addEventListener("click", (event) => {
+    if (!event.isTrusted || !(event.target instanceof Element)) return;
+    const anchor = event.target.closest("a[href]");
+    if (!anchor) return;
+    const rawHref = anchor.getAttribute("href");
+    if (!rawHref) return;
+    if (rawHref.startsWith("#")) return;
+
+    let target;
+    try {
+      target = new URL(anchor.href);
+    } catch {
+      event.preventDefault();
+      return;
     }
 
-    build_tree(&root, &root)
+    const currentWithoutHash = `${location.protocol}//${location.host}${location.pathname}${location.search}`;
+    const targetWithoutHash = `${target.protocol}//${target.host}${target.pathname}${target.search}`;
+    if (target.hash && currentWithoutHash === targetWithoutHash) return;
+
+    event.preventDefault();
+    if (target.protocol === "http:" || target.protocol === "https:") {
+      post({ type: "openExternal", href: target.href });
+    }
+  }, true);
+
+  const prevent = (event) => event.preventDefault();
+  document.addEventListener("submit", prevent, true);
+  document.addEventListener("auxclick", prevent, true);
+  document.addEventListener("dragstart", prevent, true);
+  document.addEventListener("drop", prevent, true);
+})();
+</script>"##;
+
+#[tauri::command]
+fn scan_directory(
+    store: State<'_, DocumentStore>,
+    root_path: String,
+) -> Result<FileTreeNode, String> {
+    store.scan_root(root_path)
 }
 
 #[tauri::command]
-fn read_text_file(root_path: String, path: String) -> Result<String, String> {
-    let root = normalize_path(PathBuf::from(root_path))?;
-    let file_path = normalize_path(PathBuf::from(path))?;
+fn open_document(
+    store: State<'_, DocumentStore>,
+    path: String,
+) -> Result<OpenDocumentResponse, String> {
+    store.open_document(path)
+}
 
-    if !file_path.starts_with(&root) {
-        return Err("File is outside the selected root directory.".into());
+impl DocumentStore {
+    fn scan_root(&self, root_path: String) -> Result<FileTreeNode, String> {
+        let root = normalize_path(PathBuf::from(root_path))?;
+        if !root.is_dir() {
+            return Err("Selected path is not a directory.".into());
+        }
+
+        let tree = build_tree(&root, &root)?;
+        let mut current_root = self
+            .current_root
+            .write()
+            .map_err(|_| "Failed to lock document root for update.".to_string())?;
+        *current_root = Some(root);
+        Ok(tree)
     }
 
-    if !is_markdown_path(&file_path) {
-        return Err("Selected file is not a Markdown file.".into());
+    fn open_document(&self, path: String) -> Result<OpenDocumentResponse, String> {
+        let current_root = self
+            .current_root
+            .read()
+            .map_err(|_| "Failed to lock document root for reading.".to_string())?;
+        let root = current_root
+            .as_ref()
+            .ok_or_else(|| "Open a document folder before opening a file.".to_string())?;
+        let file_path = normalize_path(PathBuf::from(path))?;
+
+        if !file_path.starts_with(root) {
+            return Err("File is outside the selected root directory.".into());
+        }
+        if !file_path.is_file() {
+            return Err("Selected path is not a regular file.".into());
+        }
+
+        match document_type(&file_path) {
+            Some(DocumentType::Markdown) => {
+                let source_text = fs::read_to_string(&file_path)
+                    .map_err(|error| format!("Failed to read UTF-8 Markdown file: {error}"))?;
+                Ok(OpenDocumentResponse {
+                    document_type: DocumentType::Markdown,
+                    source_text: Some(source_text),
+                    preview_url: None,
+                })
+            }
+            Some(DocumentType::Html) => {
+                fs::read_to_string(&file_path)
+                    .map_err(|error| format!("Failed to read UTF-8 HTML file: {error}"))?;
+                Ok(OpenDocumentResponse {
+                    document_type: DocumentType::Html,
+                    source_text: None,
+                    preview_url: Some(preview_url(root, &file_path)?),
+                })
+            }
+            None => Err("Selected file is not a supported document.".into()),
+        }
     }
 
-    fs::read_to_string(&file_path).map_err(|error| format!("Failed to read file: {error}"))
+    fn serve_protocol_request(&self, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
+        match self.try_serve_protocol_request(request) {
+            Ok(response) => response,
+            Err(error) => protocol_error_response(error.status, &error.message),
+        }
+    }
+
+    fn try_serve_protocol_request(
+        &self,
+        request: &Request<Vec<u8>>,
+    ) -> Result<Response<Vec<u8>>, ProtocolFailure> {
+        if request.method() != Method::GET && request.method() != Method::HEAD {
+            return Err(protocol_failure(
+                StatusCode::METHOD_NOT_ALLOWED,
+                "Only GET and HEAD are supported.",
+            ));
+        }
+
+        if let Some(origin) = request.headers().get(header::ORIGIN) {
+            if origin != HeaderValue::from_static("null") {
+                return Err(protocol_failure(
+                    StatusCode::FORBIDDEN,
+                    "The request origin is not allowed.",
+                ));
+            }
+        }
+
+        let current_root = self.current_root.read().map_err(|_| {
+            protocol_failure(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to lock the document root.",
+            )
+        })?;
+        let root = current_root.as_ref().ok_or_else(|| {
+            protocol_failure(
+                StatusCode::CONFLICT,
+                "No document root is currently selected.",
+            )
+        })?;
+        let file_path = resolve_protocol_path(root, request.uri().path())?;
+        let descriptor = resource_descriptor(&file_path).ok_or_else(|| {
+            protocol_failure(
+                StatusCode::BAD_REQUEST,
+                "The requested resource type is not allowed.",
+            )
+        })?;
+        let mut body = fs::read(&file_path).map_err(|error| {
+            protocol_failure(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to read the requested resource: {error}"),
+            )
+        })?;
+
+        if descriptor.text_utf8 {
+            let text = String::from_utf8(body).map_err(|_| {
+                protocol_failure(
+                    StatusCode::BAD_REQUEST,
+                    "The requested text resource is not valid UTF-8.",
+                )
+            })?;
+            body = if descriptor.inject_bridge {
+                inject_html_bridge(&text).into_bytes()
+            } else {
+                text.into_bytes()
+            };
+        }
+
+        if request.method() == Method::HEAD {
+            body.clear();
+        }
+
+        let mut builder = Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, descriptor.content_type)
+            .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+            .header(header::CACHE_CONTROL, "no-store")
+            .header(header::REFERRER_POLICY, "no-referrer")
+            .header("Cross-Origin-Resource-Policy", "cross-origin")
+            .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "null");
+        if descriptor.inject_bridge {
+            builder = builder.header(header::CONTENT_SECURITY_POLICY, HTML_RESPONSE_CSP);
+        }
+        builder.body(body).map_err(|error| {
+            protocol_failure(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to build the protocol response: {error}"),
+            )
+        })
+    }
+}
+
+fn protocol_failure(status: StatusCode, message: &str) -> ProtocolFailure {
+    ProtocolFailure {
+        status,
+        message: message.to_string(),
+    }
+}
+
+fn protocol_error_response(status: StatusCode, message: &str) -> Response<Vec<u8>> {
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+        .header(header::CACHE_CONTROL, "no-store")
+        .body(message.as_bytes().to_vec())
+        .unwrap_or_else(|_| Response::new(Vec::new()))
 }
 
 #[tauri::command]
@@ -588,13 +820,17 @@ fn build_tree(path: &Path, root: &Path) -> Result<FileTreeNode, String> {
                 entry.map_err(|error| format!("Failed to read directory entry: {error}"))?;
             let child_path = entry.path();
             let child_name = entry.file_name().to_string_lossy().to_string();
+            let canonical_child = normalize_path(child_path.clone())?;
+            if !canonical_child.starts_with(root) {
+                continue;
+            }
 
             if child_path.is_dir() {
                 if SKIPPED_DIRS.contains(&child_name.as_str()) {
                     continue;
                 }
                 children.push(build_tree(&child_path, root)?);
-            } else if is_markdown_path(&child_path) || is_image_path(&child_path) {
+            } else if is_document_path(&child_path) || is_image_path(&child_path) {
                 children.push(build_tree(&child_path, root)?);
             }
         }
@@ -612,6 +848,8 @@ fn build_tree(path: &Path, root: &Path) -> Result<FileTreeNode, String> {
 
     let node_type = if is_markdown_path(path) {
         FileNodeType::Markdown
+    } else if is_html_path(path) {
+        FileNodeType::Html
     } else {
         FileNodeType::Image
     };
@@ -635,7 +873,8 @@ fn node_sort_rank(node_type: &FileNodeType) -> u8 {
     match node_type {
         FileNodeType::Directory => 0,
         FileNodeType::Markdown => 1,
-        FileNodeType::Image => 2,
+        FileNodeType::Html => 2,
+        FileNodeType::Image => 3,
     }
 }
 
@@ -646,6 +885,24 @@ fn normalize_path(path: PathBuf) -> Result<PathBuf, String> {
 
 fn is_markdown_path(path: &Path) -> bool {
     extension(path).is_some_and(|ext| ext == "md" || ext == "markdown")
+}
+
+fn is_html_path(path: &Path) -> bool {
+    extension(path).is_some_and(|ext| ext == "html")
+}
+
+fn is_document_path(path: &Path) -> bool {
+    is_markdown_path(path) || is_html_path(path)
+}
+
+fn document_type(path: &Path) -> Option<DocumentType> {
+    if is_markdown_path(path) {
+        Some(DocumentType::Markdown)
+    } else if is_html_path(path) {
+        Some(DocumentType::Html)
+    } else {
+        None
+    }
 }
 
 fn is_image_path(path: &Path) -> bool {
@@ -661,6 +918,184 @@ fn extension(path: &Path) -> Option<String> {
     path.extension()
         .and_then(|value| value.to_str())
         .map(|value| value.to_ascii_lowercase())
+}
+
+fn preview_url(root: &Path, file_path: &Path) -> Result<String, String> {
+    let relative = file_path
+        .strip_prefix(root)
+        .map_err(|_| "Failed to create a root-relative HTML preview URL.".to_string())?;
+    let mut segments = Vec::new();
+    for component in relative.components() {
+        match component {
+            std::path::Component::Normal(value) => {
+                let value = value
+                    .to_str()
+                    .ok_or_else(|| "HTML preview paths must be valid UTF-8.".to_string())?;
+                segments.push(utf8_percent_encode(value, NON_ALPHANUMERIC).to_string());
+            }
+            _ => return Err("HTML preview path contains an invalid component.".into()),
+        }
+    }
+    if segments.is_empty() {
+        return Err("HTML preview path is empty.".into());
+    }
+
+    #[cfg(windows)]
+    let base = "http://mvhtml.localhost/document/";
+    #[cfg(not(windows))]
+    let base = "mvhtml://localhost/document/";
+    Ok(format!("{base}{}", segments.join("/")))
+}
+
+fn resolve_protocol_path(root: &Path, request_path: &str) -> Result<PathBuf, ProtocolFailure> {
+    let encoded_path = request_path
+        .strip_prefix(HTML_PROTOCOL_PREFIX)
+        .ok_or_else(|| {
+            protocol_failure(
+                StatusCode::BAD_REQUEST,
+                "The protocol path must start with /document/.",
+            )
+        })?;
+    if encoded_path.is_empty() {
+        return Err(protocol_failure(
+            StatusCode::BAD_REQUEST,
+            "The protocol path does not identify a resource.",
+        ));
+    }
+
+    let mut joined = root.to_path_buf();
+    for encoded_segment in encoded_path.split('/') {
+        if encoded_segment.is_empty() {
+            return Err(protocol_failure(
+                StatusCode::BAD_REQUEST,
+                "The protocol path contains an empty segment.",
+            ));
+        }
+        let segment = percent_decode_str(encoded_segment)
+            .decode_utf8()
+            .map_err(|_| {
+                protocol_failure(
+                    StatusCode::BAD_REQUEST,
+                    "The protocol path contains invalid UTF-8 encoding.",
+                )
+            })?;
+        if !is_safe_protocol_segment(&segment) {
+            return Err(protocol_failure(
+                StatusCode::BAD_REQUEST,
+                "The protocol path contains an unsafe segment.",
+            ));
+        }
+        joined.push(segment.as_ref());
+    }
+
+    let canonical = joined.canonicalize().map_err(|error| {
+        let status = if error.kind() == std::io::ErrorKind::NotFound {
+            StatusCode::NOT_FOUND
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        };
+        protocol_failure(status, "The requested resource could not be resolved.")
+    })?;
+    if !canonical.starts_with(root) {
+        return Err(protocol_failure(
+            StatusCode::FORBIDDEN,
+            "The requested resource is outside the selected root.",
+        ));
+    }
+    if !canonical.is_file() {
+        return Err(protocol_failure(
+            StatusCode::BAD_REQUEST,
+            "The requested resource is not a regular file.",
+        ));
+    }
+    Ok(canonical)
+}
+
+fn is_safe_protocol_segment(segment: &str) -> bool {
+    if segment.is_empty()
+        || segment == "."
+        || segment == ".."
+        || segment.contains('\0')
+        || segment.contains('/')
+        || segment.contains('\\')
+    {
+        return false;
+    }
+    let bytes = segment.as_bytes();
+    !(bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':')
+}
+
+fn resource_descriptor(path: &Path) -> Option<ResourceDescriptor> {
+    let (content_type, text_utf8, inject_bridge) = match extension(path)?.as_str() {
+        "html" => ("text/html; charset=utf-8", true, true),
+        "css" => ("text/css; charset=utf-8", true, false),
+        "js" | "mjs" => ("text/javascript; charset=utf-8", true, false),
+        "json" => ("application/json; charset=utf-8", true, false),
+        "svg" => ("image/svg+xml", false, false),
+        "png" => ("image/png", false, false),
+        "jpg" | "jpeg" => ("image/jpeg", false, false),
+        "gif" => ("image/gif", false, false),
+        "webp" => ("image/webp", false, false),
+        "bmp" => ("image/bmp", false, false),
+        "ico" => ("image/x-icon", false, false),
+        "avif" => ("image/avif", false, false),
+        "woff" => ("font/woff", false, false),
+        "woff2" => ("font/woff2", false, false),
+        _ => return None,
+    };
+    Some(ResourceDescriptor {
+        content_type,
+        text_utf8,
+        inject_bridge,
+    })
+}
+
+fn inject_html_bridge(source: &str) -> String {
+    if let Some(head_start) = find_html_tag(source, b"head") {
+        if let Some(tag_end) = source.as_bytes()[head_start..]
+            .iter()
+            .position(|value| *value == b'>')
+            .map(|offset| head_start + offset + 1)
+        {
+            return format!("{}{HTML_BRIDGE}{}", &source[..tag_end], &source[tag_end..]);
+        }
+    }
+    if let Some(doctype_start) = find_ascii_case_insensitive(source.as_bytes(), b"<!doctype") {
+        if let Some(tag_end) = source.as_bytes()[doctype_start..]
+            .iter()
+            .position(|value| *value == b'>')
+            .map(|offset| doctype_start + offset + 1)
+        {
+            return format!("{}{HTML_BRIDGE}{}", &source[..tag_end], &source[tag_end..]);
+        }
+    }
+    format!("{HTML_BRIDGE}{source}")
+}
+
+fn find_html_tag(source: &str, name: &[u8]) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut needle = Vec::with_capacity(name.len() + 1);
+    needle.push(b'<');
+    needle.extend_from_slice(name);
+    let mut offset = 0;
+    while let Some(index) = find_ascii_case_insensitive(&bytes[offset..], &needle) {
+        let absolute = offset + index;
+        let boundary = bytes.get(absolute + needle.len()).copied();
+        if matches!(
+            boundary,
+            Some(b'>') | Some(b' ') | Some(b'\t') | Some(b'\r') | Some(b'\n')
+        ) {
+            return Some(absolute);
+        }
+        offset = absolute + needle.len();
+    }
+    None
+}
+
+fn find_ascii_case_insensitive(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack
+        .windows(needle.len())
+        .position(|window| window.eq_ignore_ascii_case(needle))
 }
 
 fn path_to_string(path: &Path) -> String {
@@ -1067,6 +1502,386 @@ mod tests {
         directory
     }
 
+    fn protocol_request(method: Method, path: &str, origin: Option<&str>) -> Request<Vec<u8>> {
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(format!("mvhtml://localhost{path}"));
+        if let Some(origin) = origin {
+            builder = builder.header(header::ORIGIN, origin);
+        }
+        builder.body(Vec::new()).expect("request must be valid")
+    }
+
+    fn configured_document_store(root: &Path) -> DocumentStore {
+        let store = DocumentStore::default();
+        store
+            .scan_root(root.to_string_lossy().to_string())
+            .expect("test root must scan");
+        store
+    }
+
+    #[test]
+    fn tree_lists_html_case_insensitively_and_preserves_sort_contract() {
+        let root = test_directory("html-tree");
+        fs::create_dir(root.join("folder")).expect("folder must be created");
+        fs::write(root.join("z.md"), "# Z").expect("Markdown must be written");
+        fs::write(root.join("a.HTML"), "<html></html>").expect("HTML must be written");
+        fs::write(root.join("ignored.htm"), "<html></html>").expect("HTM must be written");
+        fs::write(root.join("image.png"), b"png").expect("image must be written");
+
+        let canonical_root = root.canonicalize().expect("root must resolve");
+        let tree = build_tree(&canonical_root, &canonical_root).expect("tree must build");
+        let node_types: Vec<FileNodeType> =
+            tree.children.iter().map(|node| node.node_type).collect();
+        assert_eq!(
+            node_types,
+            vec![
+                FileNodeType::Directory,
+                FileNodeType::Markdown,
+                FileNodeType::Html,
+                FileNodeType::Image,
+            ]
+        );
+        assert!(!tree.children.iter().any(|node| node.name == "ignored.htm"));
+        fs::remove_dir_all(root).expect("test root must be removed");
+    }
+
+    #[test]
+    fn open_document_returns_exclusive_markdown_and_html_payloads() {
+        let root = test_directory("open-document");
+        let markdown_path = root.join("spec.md");
+        let html_path = root.join("web spec").join("仕様.HTML");
+        fs::create_dir_all(html_path.parent().expect("HTML parent must exist"))
+            .expect("HTML parent must be created");
+        fs::write(&markdown_path, "# Spec").expect("Markdown must be written");
+        fs::write(&html_path, "<!doctype html><title>Spec</title>").expect("HTML must be written");
+        let store = configured_document_store(&root);
+
+        let markdown = store
+            .open_document(markdown_path.to_string_lossy().to_string())
+            .expect("Markdown must open");
+        assert_eq!(markdown.document_type, DocumentType::Markdown);
+        assert_eq!(markdown.source_text.as_deref(), Some("# Spec"));
+        assert_eq!(markdown.preview_url, None);
+
+        let html = store
+            .open_document(html_path.to_string_lossy().to_string())
+            .expect("HTML must open");
+        assert_eq!(html.document_type, DocumentType::Html);
+        assert_eq!(html.source_text, None);
+        let preview_url = html.preview_url.expect("HTML preview URL must exist");
+        assert!(preview_url.contains("/document/web%20spec/"));
+        assert!(preview_url.ends_with("%E4%BB%95%E6%A7%98%2EHTML"));
+        fs::remove_dir_all(root).expect("test root must be removed");
+    }
+
+    #[test]
+    fn open_document_rejects_missing_root_outside_directory_unsupported_and_non_utf8() {
+        let root = test_directory("open-errors");
+        let outside = test_directory("outside-document").join("outside.md");
+        fs::write(&outside, "outside").expect("outside file must be written");
+        let unsupported = root.join("spec.txt");
+        let invalid_html = root.join("invalid.html");
+        fs::write(&unsupported, "text").expect("unsupported file must be written");
+        fs::write(&invalid_html, [0xff, 0xfe]).expect("invalid HTML must be written");
+
+        assert!(DocumentStore::default()
+            .open_document(unsupported.to_string_lossy().to_string())
+            .unwrap_err()
+            .contains("Open a document folder"));
+        let store = configured_document_store(&root);
+        assert!(store
+            .open_document(outside.to_string_lossy().to_string())
+            .unwrap_err()
+            .contains("outside"));
+        assert!(store
+            .open_document(root.to_string_lossy().to_string())
+            .unwrap_err()
+            .contains("regular file"));
+        assert!(store
+            .open_document(unsupported.to_string_lossy().to_string())
+            .unwrap_err()
+            .contains("supported document"));
+        assert!(store
+            .open_document(invalid_html.to_string_lossy().to_string())
+            .unwrap_err()
+            .contains("UTF-8 HTML"));
+        fs::remove_dir_all(root).expect("test root must be removed");
+        fs::remove_dir_all(outside.parent().expect("outside parent must exist"))
+            .expect("outside root must be removed");
+    }
+
+    #[test]
+    fn protocol_path_decodes_segments_once_and_rejects_injection() {
+        let root = test_directory("protocol-path");
+        let resource = root.join("web spec").join("図.png");
+        fs::create_dir_all(resource.parent().expect("resource parent must exist"))
+            .expect("resource parent must be created");
+        fs::write(&resource, b"png").expect("resource must be written");
+        let canonical_root = root.canonicalize().expect("root must resolve");
+        let resolved =
+            resolve_protocol_path(&canonical_root, "/document/web%20spec/%E5%9B%B3%2Epng")
+                .expect("encoded path must resolve");
+        assert_eq!(
+            resolved,
+            resource.canonicalize().expect("resource must resolve")
+        );
+
+        for path in [
+            "/document/%2E%2E/secret.png",
+            "/document/a%2Fb.png",
+            "/document/a%5Cb.png",
+            "/document/C%3A/secret.png",
+            "/document//secret.png",
+            "/absolute.png",
+        ] {
+            assert_eq!(
+                resolve_protocol_path(&root, path)
+                    .expect_err("unsafe path must fail")
+                    .status,
+                StatusCode::BAD_REQUEST
+            );
+        }
+        fs::remove_dir_all(root).expect("test root must be removed");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn protocol_rejects_symlink_escape() {
+        use std::os::unix::fs::symlink;
+
+        let root = test_directory("protocol-symlink-root");
+        let outside = test_directory("protocol-symlink-outside");
+        let outside_file = outside.join("secret.png");
+        fs::write(&outside_file, b"secret").expect("outside file must be written");
+        symlink(&outside_file, root.join("linked.png")).expect("symlink must be created");
+        assert_eq!(
+            resolve_protocol_path(&root, "/document/linked.png")
+                .expect_err("symlink escape must fail")
+                .status,
+            StatusCode::FORBIDDEN
+        );
+        fs::remove_dir_all(root).expect("test root must be removed");
+        fs::remove_dir_all(outside).expect("outside root must be removed");
+    }
+
+    #[test]
+    fn resource_descriptor_is_the_allowlist_and_mime_source_of_truth() {
+        let cases = [
+            ("spec.html", "text/html; charset=utf-8"),
+            ("style.css", "text/css; charset=utf-8"),
+            ("runtime.js", "text/javascript; charset=utf-8"),
+            ("runtime.mjs", "text/javascript; charset=utf-8"),
+            ("data.json", "application/json; charset=utf-8"),
+            ("image.svg", "image/svg+xml"),
+            ("image.png", "image/png"),
+            ("image.jpg", "image/jpeg"),
+            ("image.jpeg", "image/jpeg"),
+            ("image.gif", "image/gif"),
+            ("image.webp", "image/webp"),
+            ("image.bmp", "image/bmp"),
+            ("image.ico", "image/x-icon"),
+            ("image.avif", "image/avif"),
+            ("font.woff", "font/woff"),
+            ("font.woff2", "font/woff2"),
+        ];
+        for (path, expected_mime) in cases {
+            assert_eq!(
+                resource_descriptor(Path::new(path))
+                    .expect("extension must be allowed")
+                    .content_type,
+                expected_mime
+            );
+        }
+        assert!(resource_descriptor(Path::new("secret.txt")).is_none());
+    }
+
+    #[test]
+    fn protocol_serves_get_and_head_with_security_headers_and_cors_policy() {
+        let root = test_directory("protocol-response");
+        fs::write(
+            root.join("index.html"),
+            "<html><head></head><body>ok</body></html>",
+        )
+        .expect("HTML must be written");
+        fs::write(root.join("data.json"), r#"{"ok":true}"#).expect("JSON must be written");
+        let store = configured_document_store(&root);
+
+        let response = store.serve_protocol_request(&protocol_request(
+            Method::GET,
+            "/document/index.html",
+            None,
+        ));
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers()[header::ACCESS_CONTROL_ALLOW_ORIGIN],
+            "null"
+        );
+        assert_eq!(
+            response.headers()[header::X_CONTENT_TYPE_OPTIONS],
+            "nosniff"
+        );
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(response.headers()[header::REFERRER_POLICY], "no-referrer");
+        assert_eq!(
+            response.headers()["Cross-Origin-Resource-Policy"],
+            "cross-origin"
+        );
+        assert!(response
+            .headers()
+            .contains_key(header::CONTENT_SECURITY_POLICY));
+        assert!(String::from_utf8_lossy(response.body()).contains(HTML_BRIDGE));
+
+        let json = store.serve_protocol_request(&protocol_request(
+            Method::GET,
+            "/document/data.json",
+            Some("null"),
+        ));
+        assert_eq!(json.status(), StatusCode::OK);
+        assert_eq!(json.body(), br#"{"ok":true}"#);
+        assert!(!String::from_utf8_lossy(json.body()).contains(HTML_BRIDGE));
+        assert!(!json.headers().contains_key(header::CONTENT_SECURITY_POLICY));
+
+        let head = store.serve_protocol_request(&protocol_request(
+            Method::HEAD,
+            "/document/data.json",
+            Some("null"),
+        ));
+        assert_eq!(head.status(), StatusCode::OK);
+        assert!(head.body().is_empty());
+        assert_eq!(
+            head.headers()[header::CONTENT_TYPE],
+            "application/json; charset=utf-8"
+        );
+
+        let rejected_origin = store.serve_protocol_request(&protocol_request(
+            Method::GET,
+            "/document/data.json",
+            Some("https://example.com"),
+        ));
+        assert_eq!(rejected_origin.status(), StatusCode::FORBIDDEN);
+        let options = store.serve_protocol_request(&protocol_request(
+            Method::OPTIONS,
+            "/document/data.json",
+            Some("null"),
+        ));
+        assert_eq!(options.status(), StatusCode::METHOD_NOT_ALLOWED);
+        fs::remove_dir_all(root).expect("test root must be removed");
+    }
+
+    #[test]
+    fn protocol_reports_unset_missing_unknown_and_directory_statuses() {
+        let root = test_directory("protocol-statuses");
+        fs::write(root.join("unknown.txt"), "text").expect("unknown file must be written");
+        let unset = DocumentStore::default().serve_protocol_request(&protocol_request(
+            Method::GET,
+            "/document/missing.png",
+            None,
+        ));
+        assert_eq!(unset.status(), StatusCode::CONFLICT);
+
+        let store = configured_document_store(&root);
+        assert_eq!(
+            store
+                .serve_protocol_request(&protocol_request(
+                    Method::GET,
+                    "/document/missing.png",
+                    None,
+                ))
+                .status(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            store
+                .serve_protocol_request(&protocol_request(
+                    Method::GET,
+                    "/document/unknown.txt",
+                    None,
+                ))
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        fs::remove_dir_all(root).expect("test root must be removed");
+    }
+
+    #[test]
+    fn protocol_reports_internal_error_when_root_lock_is_poisoned() {
+        let store = DocumentStore::default();
+        let lock = store.current_root.clone();
+        let result = thread::spawn(move || {
+            let _guard = lock.write().expect("root lock must initially be writable");
+            panic!("poison document root lock for protocol test");
+        })
+        .join();
+        assert!(result.is_err());
+
+        let response = store.serve_protocol_request(&protocol_request(
+            Method::GET,
+            "/document/index.html",
+            None,
+        ));
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn bridge_injection_prefers_head_then_doctype_then_source_start() {
+        let head = inject_html_bridge("<!doctype html><HTML><HEAD data-x='1'></HEAD></HTML>");
+        assert!(head.contains("<HEAD data-x='1'><script data-markdown-viewer-bridge>"));
+        let doctype = inject_html_bridge("<!DOCTYPE html><title>Spec</title>");
+        assert!(doctype.starts_with("<!DOCTYPE html><script data-markdown-viewer-bridge>"));
+        let fragment = inject_html_bridge("<main>Spec</main>");
+        assert!(fragment.starts_with("<script data-markdown-viewer-bridge>"));
+        let malformed = inject_html_bridge("<head");
+        assert!(malformed.starts_with("<script data-markdown-viewer-bridge>"));
+    }
+
+    #[test]
+    fn failed_root_scan_preserves_current_protocol_root() {
+        let root = test_directory("root-preserve");
+        fs::write(root.join("spec.md"), "# Spec").expect("Markdown must be written");
+        let store = configured_document_store(&root);
+        let missing = root.join("missing");
+        assert!(store
+            .scan_root(missing.to_string_lossy().to_string())
+            .is_err());
+        let current_root = store
+            .current_root
+            .read()
+            .expect("root lock must be readable");
+        let canonical_root = root.canonicalize().expect("root must resolve");
+        assert_eq!(current_root.as_deref(), Some(canonical_root.as_path()));
+        drop(current_root);
+        fs::remove_dir_all(root).expect("test root must be removed");
+    }
+
+    #[test]
+    fn successful_root_scan_replaces_document_and_protocol_root() {
+        let first = test_directory("root-switch-first");
+        let second = test_directory("root-switch-second");
+        let first_file = first.join("first.md");
+        let second_file = second.join("second.md");
+        fs::write(&first_file, "# First").expect("first Markdown must be written");
+        fs::write(&second_file, "# Second").expect("second Markdown must be written");
+        let store = configured_document_store(&first);
+
+        store
+            .scan_root(second.to_string_lossy().to_string())
+            .expect("second root must scan");
+        assert!(store
+            .open_document(first_file.to_string_lossy().to_string())
+            .unwrap_err()
+            .contains("outside"));
+        assert_eq!(
+            store
+                .open_document(second_file.to_string_lossy().to_string())
+                .expect("second document must open")
+                .document_type,
+            DocumentType::Markdown
+        );
+        fs::remove_dir_all(first).expect("first root must be removed");
+        fs::remove_dir_all(second).expect("second root must be removed");
+    }
+
     #[test]
     fn legacy_config_defaults_viewer_settings() {
         let config: AppConfig = serde_json::from_str(
@@ -1304,6 +2119,24 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppConfigStore::default())
+        .manage(DocumentStore::default())
+        .register_asynchronous_uri_scheme_protocol("mvhtml", |context, request, responder| {
+            if context.webview_label() != "main" {
+                responder.respond(protocol_error_response(
+                    StatusCode::FORBIDDEN,
+                    "The requesting webview is not allowed.",
+                ));
+                return;
+            }
+            let store = context
+                .app_handle()
+                .state::<DocumentStore>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                responder.respond(store.serve_protocol_request(&request));
+            });
+        })
         .setup(|app| {
             let store = app.state::<AppConfigStore>();
             match store.viewer_settings(app.handle()) {
@@ -1327,7 +2160,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             scan_directory,
-            read_text_file,
+            open_document,
             render_plantuml_diagrams,
             load_viewer_settings,
             save_viewer_preferences,

@@ -1,0 +1,66 @@
+:root {
+  color: #20304a;
+  background: #f6f8fc;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+header,
+section {
+  margin-bottom: 24px;
+  padding: 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: white;
+}
+
+.eyebrow {
+  color: #315b9d;
+  font-weight: 700;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+figure {
+  margin: 12px 0 0;
+}
+
+figcaption {
+  margin-top: 10px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.architecture-image {
+  width: 100%;
+  border: 1px solid #dbe4f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgb(37 99 235 / 12%);
+}
+
+svg,
+canvas,
+img {
+  display: block;
+  max-width: 100%;
+  margin: 12px 0;
+}
+
+svg rect {
+  fill: #dbeafe;
+  stroke: #2563eb;
+}
+
+svg path {
+  stroke: #2563eb;
+  stroke-width: 3;
+}

@@ -17,11 +17,14 @@
 - Rendererが生成するHTMLは `html: false` を前提とし、Markdown内HTMLを許可しない。
 - PlantUMLはReactでfence抽出とplaceholder差し替えを行い、Java process実行はRust commandへ寄せる。Theme切替だけではPlantUML commandを再実行しない。
 - Mermaid / PlantUML のfence言語判定はinfo stringの先頭tokenを小文字化して行う。`mermaid`, `plantuml`, `puml` の後ろに追加情報があっても先頭tokenを言語として扱う。
+- `OpenDocumentResponse` は Markdown / HTML の discriminated union とし、`sourceText` と `previewUrl` の混在や fallback を許可しない。
+- HTML message / URL 判定は副作用のない `documentPolicy.ts` へ集約し、iframe DOMへ React からアクセスしない。source、opaque origin、tab revision、message shape、transient user activation、duplicate をすべて満たす場合だけ外部 URL を開く。
 
 ## Rust / Tauri
 
 - フロントエンドから直接ファイルシステムを読まず、Rust command に寄せる。
-- `scan_directory` はExplorer用ツリー構築、`read_text_file` はMarkdown本文読み込み、`render_plantuml_diagrams` はPlantUML描画に責務を限定する。
+- `DocumentStore` は canonical current root の正本であり、`scan_directory`、`open_document`、`mvhtml` protocol が同じ root boundary を共有する。旧 `read_text_file` command は持たない。
+- custom protocol path は `/document/<segments>` を segment ごとに一度だけ decodeし、separator、dot segment、drive / UNC 注入を拒否した後に root へ join、canonicalize、boundary確認を行う。
 - 返却モデルは `serde::Serialize` を使い、TypeScript側の型と対応させる。
 - 除外ディレクトリや拡張子判定はRust側の小さな関数へ分離する。
 - 外部プロセスはshellを介さず `Command` の引数配列で起動し、stdout / stderrはUI表示可能な文字列へ変換する。WindowsのGUI起動では`CREATE_NO_WINDOW`を指定し、子processごとのterminal window表示を抑止する。
@@ -34,10 +37,10 @@
 
 ## テストパターン
 
-現時点で自動テストは未整備。変更時はビルド確認と手動UI確認を必須とする。
+Rust unit test と Vitest による frontend policy test を整備している。変更時は自動テスト、ビルド確認、手動UI確認を必須とする。
 
 将来的には以下を追加する。
 
 - C#: `FileTreeService` / `MarkdownRenderService` のユニットテスト
-- Rust: パス検証とファイルツリー構築のユニットテスト
-- Frontend: Markdown renderer とリンク処理のユニットテスト
+- Rust: PlantUML runtimeなど未網羅領域の追加ユニットテスト
+- Frontend: Markdown renderer / component lifecycle の追加ユニットテスト

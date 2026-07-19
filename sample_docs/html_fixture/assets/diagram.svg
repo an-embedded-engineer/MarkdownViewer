@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" role="img" aria-label="Relative SVG diagram">
+  <rect x="10" y="20" width="130" height="60" rx="10" fill="#dcfce7" stroke="#15803d" />
+  <path d="M140 50h140" stroke="#15803d" stroke-width="4" />
+  <rect x="280" y="20" width="130" height="60" rx="10" fill="#dcfce7" stroke="#15803d" />
+</svg>

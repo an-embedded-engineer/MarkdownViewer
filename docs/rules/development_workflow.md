@@ -154,6 +154,7 @@ dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj
 # Tauri frontend check
 cd markdown-viewer-tauri
 npm run build
+npm test -- --run
 
 # Tauri Rust check
 cd markdown-viewer-tauri/src-tauri
@@ -168,6 +169,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - フォルダ選択
 - Explorer から Markdown 選択
 - Markdown プレビュー表示
+- `sample_docs/image_link.md` のroot内相対PNG画像が表示されること
 - Mermaid 描画
 - Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること
 - PlantUML 描画
@@ -177,6 +179,11 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - resizeと再起動後にlogical window sizeが復元され、最大化中のsizeを保存しないこと
 - 既存Recent Foldersを保持し、明示jar pathの設定 / invalid path / Clearが仕様どおり動くこと
 - Reload 後の再描画
+- Explorerからtrusted UTF-8 HTMLを開き、self-contained SVG / Canvasとroot内relative CSS / JS / MJS / JSON / imageが表示されること
+- HTMLのfragment linkがiframe内で移動し、user-clicked `http(s)`だけがOS既定browserで1回開くこと
+- HTMLからroot外resource、external network、popup、form、download、Tauri IPCへ到達できないこと
+- HTML表示中にThemeを切り替えてもiframeがreloadされず、Markdown / HTML tab切替で状態が混線しないこと
+- `sample_docs/html_fixture/` と `sample_docs/html_fixture/malicious.html` をHTML手動fixtureとして使用すること
 
 ## 静的解析・整形
 
