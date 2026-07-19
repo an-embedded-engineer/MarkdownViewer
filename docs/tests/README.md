@@ -2,30 +2,42 @@
 
 ## 概要
 
-現時点では専用の自動テストプロジェクトは未整備である。MVP比較実装では、ビルド・型チェック・手動UI確認を最低限の品質ゲートとして扱う。
+Tauri版はRust unit testとVitest frontend policy testを持つ。ビルド・型チェック・自動test・手動UI確認を品質ゲートとして扱う。WebView固有のsandbox / CSP / custom protocol動作をjsdomだけで証明したとは扱わない。
 
 ## テスト構成
 
 ```text
 MarkdownViewer/
 ├── Avalonia/MarkdownViewer.Avalonia/      — Avaloniaアプリ本体
-├── markdown-viewer-tauri/                 — Tauriアプリ本体
+├── markdown-viewer-tauri/src/*.test.ts    — Vitest frontend policy test
+├── markdown-viewer-tauri/src-tauri/src/   — Rust unit test（`lib.rs`）
 └── docs/tests/                            — テスト方針
 ```
 
-将来的な追加候補:
+追加候補:
 
 - `Avalonia/MarkdownViewer.Avalonia.Tests/`
-- `markdown-viewer-tauri/src/**/*.test.ts`
-- `markdown-viewer-tauri/src-tauri/src/*` のRust unit tests
+- React component / WebView integration test
 
 ## テストカテゴリ
 
 - Build check: コンパイル、型チェック、Rust check。
-- Manual UI check: フォルダ選択、Markdown表示、Mermaid表示、テーマ切替、Reload。
+- Automated unit: document response / bridge policy、root / path / MIME / protocol response / bridge injection。
+- Manual UI check: フォルダ選択、Markdown / trusted HTML表示、relative resource、Mermaid / PlantUML、sandbox / CSP、テーマ切替、Reload。
 - Publish smoke check: `publish/` 配下の `.app` 起動確認。
 
 ## 実行方法
+
+```text
+cd markdown-viewer-tauri
+npm run build
+npm test -- --run
+
+cd src-tauri
+cargo fmt -- --check
+cargo check
+cargo test
+```
 
 - 開発・実行ルール: `docs/rules/development_workflow.md`
 - テスト方針: `docs/tests/strategy.md`

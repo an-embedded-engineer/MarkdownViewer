@@ -2,14 +2,15 @@
 
 ## 基本方針
 
-OS 連携とファイルシステム境界は Rust command へ寄せ、画面状態と Markdown 表示は React 側で扱う。Tauri が WebView を提供し、フロントは Vite で組み立てた React アプリ。PlantUML だけは Java プロセスを使うため Rust に集約する。
+OS 連携とファイルシステム境界は Rust command / `DocumentStore` へ寄せ、画面状態と Markdown 表示は React 側で扱う。trusted HTMLはRustのroot-scoped protocolからsandboxed iframeへ配信し、React DOMと分離する。Tauri が WebView を提供し、フロントは Vite で組み立てた React アプリ。PlantUML だけは Java プロセスを使うため Rust に集約する。
 
 ## 責務
 
-- React: MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、TabStrip、Preview、error strip、StatusBar、永続 Theme / window resize queue、tab単位のエラー / loading、Markdown → HTML 変換、リンク処理。
+- React: MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、TabStrip、Preview、error strip、StatusBar、永続 Theme / window resize queue、tab単位のエラー / loading、Markdown → HTML 変換、document type別preview。
 - TypeScript renderer (`renderMarkdown`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。
-- Rust: root 配下の安全なファイル走査、Markdown 本文の UTF-8 読み込み、PlantUML レンダリング (Java プロセス起動)、Recent Folders / Viewer settings の app config JSON 永続化。
-- Tauri config: dialog / opener / asset protocol の権限管理。capability で plugin 利用を許可する。
+- TypeScript policy (`documentPolicy.ts`): command responseの排他shape、HTML preview URL、opaque-origin messageをpure functionで検証する。
+- Rust: canonical current root、Markdown / HTML open、`mvhtml` resource配信、PlantUML レンダリング、Recent Folders / Viewer settings の app config JSON 永続化。
+- Tauri config: dialog / opener / asset protocol の権限管理とshell CSP。HTML protocol originをcapability remote URLへ追加しない。
 
 ## データモデル
 
@@ -20,8 +21,8 @@ OS 連携とファイルシステム境界は Rust command へ寄せ、画面状
 | `name` | string | ファイル / ディレクトリ名 |
 | `path` | string | OS絶対パス。Windowsではfrontend境界で`\\?\`を除いた通常形式を返す |
 | `relativePath` | string | root からの相対パス |
-| `nodeType` | `"directory" \| "markdown" \| "image"` | enum |
-| `children` | `FileTreeNode[]` | directory のみ非空、Directory→Markdown→Image の順で整列 |
+| `nodeType` | `"directory" \| "markdown" \| "html" \| "image"` | enum |
+| `children` | `FileTreeNode[]` | directory のみ非空、Directory→Markdown→HTML→Image の順で整列 |
 
 PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRenderResponse` / `PlantUmlDiagramResult`)。
 
@@ -33,14 +34,16 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 | `name` | string | `record_recent_folder` 実行時に Rust 側で確定した folder name snapshot |
 | `lastOpenedAt` | string | Unix seconds を文字列化した最終 open 時刻 |
 
-`OpenDocumentTab` はfrontend内だけの型付きstateで、同一root内のMarkdownを保持する。
+`OpenDocumentTab` はfrontend内だけの型付きstateで、同一root内のMarkdown / HTMLを保持する。
 
 | field | 型 | 補足 |
 |---|---|---|
 | `id` | string | App内で単調増加する不透明ID |
 | `path` | string | tab collection内で一意な絶対path |
 | `displayName` | string | TabStrip / StatusBar表示名 |
-| `markdown` | string | UTF-8本文。Reload失敗時は直前値を維持 |
+| `documentType` | `markdown \| html` | renderer branchの正本 |
+| `sourceText` | `string \| null` | MarkdownだけがUTF-8本文を持つ |
+| `previewUrl` | `string \| null` | HTMLだけがRust生成URLを持つ |
 | `revision` | number | 初回読込 / Reloadごとに増加するasync guard |
 | `loadState` | `loading \| rendering \| ready \| error` | tab単位状態 |
 | `errorMessage` | `string \| null` | tab単位代表error |
@@ -62,6 +65,7 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 React UI -> Tauri invoke -> Rust commands -> filesystem / Java
 React UI -> markdown-it / mermaid -> WebView DOM
 React UI -> @tauri-apps/plugin-dialog / plugin-opener -> OS
+HtmlPreview -> mvhtml protocol -> DocumentStore -> root内allowlist resource
 ```
 
 フロント → Rust の方向のみ。Rust 側から JS を呼び出すコールバックは使わず、結果は `invoke` の戻り値で返す。
@@ -75,7 +79,8 @@ skinparam componentStyle rectangle
 
 package "Frontend (React + Vite)" as F {
   [main.tsx]
-  [App / MenuBar / SettingsDialog / RootPathBar / FileTree / TabStrip / MarkdownPreview / ErrorBanner / StatusBar]
+  [App / MenuBar / SettingsDialog / RootPathBar / FileTree / TabStrip / MarkdownPreview / HtmlPreview / ErrorBanner / StatusBar]
+  [documentPolicy.ts]
   [renderMarkdown\n(markdown-it custom rules)]
   [mermaid (client)]
   [App.css (theme / layout)]
@@ -90,12 +95,14 @@ package "Tauri JS API" as TJS {
 package "Tauri Runtime / WebView" as TR {
   [WebView]
   [asset protocol]
+  [mvhtml protocol]
   [Capability: default]
 }
 
 package "Rust backend (lib.rs)" as R {
   [scan_directory]
-  [read_text_file]
+  [open_document]
+  [DocumentStore]
   [render_plantuml_diagrams\n(spawn_blocking)]
   [load_recent_folders]
   [record_recent_folder]
@@ -120,6 +127,9 @@ TJS --> TR
 TR --> R
 R --> E
 TR --> E : asset:// → filesystem
+[HtmlPreview] --> [mvhtml protocol]
+[mvhtml protocol] --> [DocumentStore]
+[DocumentStore] --> [filesystem]
 @enduml
 ```
 
@@ -189,7 +199,7 @@ state Error : error strip に errorMessage 表示
 
 NoRoot --> HasRoot : Open Folder / loadRoot scan成功
 HasRoot --> TabLoading : Explorer 選択 / Reload
-TabLoading --> HasRoot : read_text_file 成功
+TabLoading --> HasRoot : open_document / HTML ready 成功
 TabLoading --> Error : Tauri command 失敗
 HasRoot --> AppConfigUpdating : recent / theme / settings 保存
 AppConfigUpdating --> HasRoot : app config JSON 更新完了
@@ -204,7 +214,8 @@ Error --> HasRoot : 次の操作で復帰
 ## Tauri 設定要点
 
 - `assetProtocol.enable = true` + `scope = ["**"]` で `convertFileSrc` を介した相対画像参照を許可する。
-- `csp = null` (MVP)。本番化時は要見直し。
+- production / developmentを分けたshell CSPを設定し、HTML frame sourceは`mvhtml:` / `http://mvhtml.localhost`だけを許可する。remote `http(s)` frameは許可しない。
 - capability `default` は window `main` に対し `core:default` / `dialog:default` / `opener:default` のみを許可する。
+- HTML iframeは`sandbox="allow-scripts"`とresponse CSPを持ち、opaque originとする。root内JSON fetchは`Origin: null`のsimple GETだけを対象とする。
 - Recent Folders と Viewer settings は Tauri の app config directory 配下 `settings.json` に保存する。browser `localStorage` は使用しない。
 - `settings.json` は sibling temporary file へ全量write / sync後にatomic replaceする。replace 成功をlogical commit pointとし、それ以前の失敗では既存fileを維持する。replace後のdirectory sync失敗はlogical saveを失敗に戻せないためdurability warningとして記録する。

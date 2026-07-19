@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>HTML boundary fixture</title>
+  </head>
+  <body>
+    <h1>Boundary checks</h1>
+    <ul id="results"></ul>
+    <img src="https://example.com/external.png" alt="External image must be blocked" />
+    <form action="https://example.com/submit"><button type="submit">Blocked form</button></form>
+    <a href="file:///etc/passwd">Blocked file URL</a>
+    <a href="../../outside.html">Blocked root escape</a>
+    <a href="https://example.com/popup" target="_blank">External link via host bridge</a>
+    <script>
+      const results = document.querySelector("#results");
+      const record = (label, value) => {
+        const item = document.createElement("li");
+        item.textContent = `${label}: ${String(value)}`;
+        results.append(item);
+      };
+      try { record("parent DOM", window.parent.document.title); } catch { record("parent DOM", "blocked"); }
+      record("__TAURI_INTERNALS__", typeof window.__TAURI_INTERNALS__);
+      record("isTauri", typeof window.isTauri);
+      try { window.open("https://example.com/popup"); } catch { record("popup", "blocked"); }
+    </script>
+  </body>
+</html>

@@ -6,8 +6,15 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import MarkdownIt from "markdown-it";
 import mermaid from "mermaid";
 import "./App.css";
-
-type FileNodeType = "directory" | "markdown" | "image";
+import {
+  evaluateHtmlBridgeMessage,
+  hasHtmlReadyHandshakeTimedOut,
+  htmlReadyTimeoutMs,
+  parseOpenDocumentResponse,
+  withPreviewRevision,
+  type DocumentType,
+  type FileNodeType,
+} from "./documentPolicy";
 
 type FileTreeNode = {
   name: string;
@@ -36,7 +43,9 @@ type OpenDocumentTab = {
   id: string;
   path: string;
   displayName: string;
-  markdown: string;
+  documentType: DocumentType;
+  sourceText: string | null;
+  previewUrl: string | null;
   revision: number;
   loadState: TabLoadState;
   errorMessage: string | null;
@@ -115,7 +124,9 @@ function App() {
     : isAppConfigBusy
       ? "Updating app settings..."
       : activeTab?.loadState === "loading"
-        ? "Loading Markdown..."
+        ? activeTab.documentType === "html"
+          ? "Loading HTML..."
+          : "Loading Markdown..."
         : activeTab?.loadState === "rendering"
           ? "Rendering PlantUML diagrams..."
           : null;
@@ -156,7 +167,7 @@ function App() {
       directory: true,
       multiple: false,
       recursive: true,
-      title: "Open Markdown Folder",
+      title: "Open Document Folder",
     });
 
     if (typeof selected !== "string") {
@@ -180,9 +191,9 @@ function App() {
       setActiveTabId(null);
       setPendingNavigation(null);
 
-      const initialFile = findReadme(tree) ?? findFirstMarkdown(tree);
+      const initialFile = findReadme(tree) ?? findFirstMarkdown(tree) ?? findFirstHtml(tree);
       if (initialFile) {
-        openOrActivateTab(path, initialFile.path);
+        openOrActivateTab(initialFile.path);
       }
 
       if (options.recordRecent) {
@@ -346,10 +357,13 @@ function App() {
         updateTabIfCurrent(activeTab.id, activeTab.revision, (tab) => ({
           ...tab,
           revision,
+          sourceText: null,
+          previewUrl: null,
           loadState: "loading",
           errorMessage: null,
+          plantUmlDiagrams: [],
         }));
-        void loadTab(activeTab.id, rootPath, activeTab.path, revision);
+        void loadTab(activeTab.id, activeTab.path, revision);
       }
     } catch (error) {
       setRootOperationError(toErrorMessage(error));
@@ -358,7 +372,7 @@ function App() {
     }
   }
 
-  function openOrActivateTab(currentRootPath: string, filePath: string, anchor?: string) {
+  function openOrActivateTab(filePath: string, anchor?: string) {
     const existing = tabsRef.current.find((tab) => tab.path === filePath);
     if (existing) {
       setActiveTabId(existing.id);
@@ -371,7 +385,9 @@ function App() {
       id: tabId,
       path: filePath,
       displayName: getFileName(filePath),
-      markdown: "",
+      documentType: documentTypeForPath(filePath),
+      sourceText: null,
+      previewUrl: null,
       revision: 1,
       loadState: "loading",
       errorMessage: null,
@@ -380,16 +396,28 @@ function App() {
     updateTabs((current) => [...current, tab]);
     setActiveTabId(tabId);
     setPendingNavigation(anchor ? { tabId, anchor } : null);
-    void loadTab(tabId, currentRootPath, filePath, tab.revision);
+    void loadTab(tabId, filePath, tab.revision);
   }
 
-  async function loadTab(tabId: string, currentRootPath: string, filePath: string, revision: number) {
+  async function loadTab(tabId: string, filePath: string, revision: number) {
     try {
-      const markdown = await invoke<string>("read_text_file", {
-        rootPath: currentRootPath,
-        path: filePath,
-      });
-      const sources = extractPlantUmlSources(markdown);
+      const document = parseOpenDocumentResponse(
+        await invoke<unknown>("open_document", { path: filePath }),
+      );
+      if (document.documentType === "html") {
+        updateTabIfCurrent(tabId, revision, (tab) => ({
+          ...tab,
+          documentType: "html",
+          sourceText: null,
+          previewUrl: document.previewUrl,
+          loadState: "loading",
+          errorMessage: null,
+          plantUmlDiagrams: [],
+        }));
+        return;
+      }
+
+      const sources = extractPlantUmlSources(document.sourceText);
       const pendingDiagrams = sources.map(() => ({
         ok: false,
         html: `<pre class="plantuml-loading">PlantUML render pending...</pre>`,
@@ -397,7 +425,9 @@ function App() {
       }));
       updateTabIfCurrent(tabId, revision, (tab) => ({
         ...tab,
-        markdown,
+        documentType: "markdown",
+        sourceText: document.sourceText,
+        previewUrl: null,
         loadState: sources.length > 0 ? "rendering" : "ready",
         errorMessage: null,
         plantUmlDiagrams: pendingDiagrams,
@@ -435,6 +465,30 @@ function App() {
         loadState: "error",
         errorMessage: message,
       }));
+    }
+  }
+
+  function markHtmlReady(tabId: string, revision: number) {
+    updateTabIfCurrent(tabId, revision, (tab) => ({
+      ...tab,
+      loadState: "ready",
+      errorMessage: null,
+    }));
+  }
+
+  function markHtmlError(tabId: string, revision: number, message: string) {
+    updateTabIfCurrent(tabId, revision, (tab) => ({
+      ...tab,
+      loadState: "error",
+      errorMessage: message,
+    }));
+  }
+
+  async function openHtmlExternalUrl(tabId: string, revision: number, href: string) {
+    try {
+      await openUrl(href);
+    } catch (error) {
+      markHtmlError(tabId, revision, `Failed to open external URL: ${toErrorMessage(error)}`);
     }
   }
 
@@ -494,7 +548,7 @@ function App() {
 
     event.preventDefault();
     const nextPath = resolveSiblingPath(activeTab.path, safeDecode(rawPath));
-    openOrActivateTab(rootPath, nextPath, rawAnchor ? safeDecode(rawAnchor) : undefined);
+    openOrActivateTab(nextPath, rawAnchor ? safeDecode(rawAnchor) : undefined);
   }
 
   useEffect(() => {
@@ -698,7 +752,7 @@ function App() {
     });
 
     const container = previewRef.current;
-    if (!container || !activeTab) {
+    if (!container || !activeTab || activeTab.documentType !== "markdown") {
       return;
     }
 
@@ -729,6 +783,7 @@ function App() {
     if (
       !pendingNavigation ||
       !activeTab ||
+      activeTab.documentType !== "markdown" ||
       activeTab.loadState === "loading" ||
       pendingNavigation.tabId !== activeTab.id ||
       !previewRef.current
@@ -795,14 +850,14 @@ function App() {
               node={fileTree}
               selectedFilePath={activeTab?.path ?? null}
               disabled={isGlobalBusy}
-              onSelect={(node) => rootPath && openOrActivateTab(rootPath, node.path)}
+              onSelect={(node) => rootPath && openOrActivateTab(node.path)}
             />
           ) : (
-            <div className="empty-state">Open a folder to browse Markdown files.</div>
+            <div className="empty-state">Open a folder to browse documents.</div>
           )}
         </aside>
 
-        <section className="preview-workspace" aria-label="Markdown Preview">
+        <section className="preview-workspace" aria-label="Document Preview">
           <TabStrip
             tabs={tabs}
             activeTabId={activeTabId}
@@ -811,21 +866,37 @@ function App() {
           />
           <div
             className="preview-pane"
-            id="markdown-preview"
+            id="document-preview"
             role="tabpanel"
             aria-labelledby={activeTab ? `tab-${activeTab.id}` : undefined}
           >
-            {activeTab ? (
+            {activeTab?.documentType === "markdown" && activeTab.sourceText !== null ? (
               <MarkdownPreview
                 key={`${activeTab.id}-${theme}-${activeTab.revision}`}
-                markdown={activeTab.markdown}
+                markdown={activeTab.sourceText}
                 plantUmlDiagrams={activeTab.plantUmlDiagrams}
                 selectedFilePath={activeTab.path}
                 previewRef={previewRef}
                 onClick={handlePreviewClick}
               />
+            ) : activeTab?.documentType === "html" && activeTab.previewUrl !== null ? (
+              <HtmlPreview
+                key={`${activeTab.id}-${activeTab.revision}`}
+                tabId={activeTab.id}
+                revision={activeTab.revision}
+                previewUrl={activeTab.previewUrl}
+                onReady={markHtmlReady}
+                onError={markHtmlError}
+                onOpenExternal={(tabId, revision, href) =>
+                  void openHtmlExternalUrl(tabId, revision, href)
+                }
+              />
+            ) : activeTab ? (
+              <div className="preview-empty" role="status">
+                {activeTab.loadState === "error" ? "Document preview failed." : "Loading document..."}
+              </div>
             ) : (
-              <div className="preview-empty">No Markdown file selected.</div>
+              <div className="preview-empty">No document selected.</div>
             )}
           </div>
         </section>
@@ -1307,7 +1378,7 @@ function TabStrip({ tabs, activeTabId, onActivate, onClose }: TabStripProps) {
   }
 
   return (
-    <div className="tab-strip" role="tablist" aria-label="Open Markdown files">
+    <div className="tab-strip" role="tablist" aria-label="Open documents">
       {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId;
         const stateLabel =
@@ -1333,7 +1404,7 @@ function TabStrip({ tabs, activeTabId, onActivate, onClose }: TabStripProps) {
               className="tab-activate"
               role="tab"
               aria-selected={isActive}
-              aria-controls="markdown-preview"
+              aria-controls="document-preview"
               tabIndex={isActive ? 0 : -1}
               title={tab.path}
               onClick={() => onActivate(tab.id)}
@@ -1416,11 +1487,13 @@ function TreeNode({ node, selectedFilePath, disabled, onSelect, level }: TreeNod
       type="button"
       className={`tree-row file-row ${isSelected ? "selected" : ""}`}
       style={{ paddingLeft: 12 + level * 14 }}
-      disabled={disabled || node.nodeType !== "markdown"}
+      disabled={disabled || (node.nodeType !== "markdown" && node.nodeType !== "html")}
       onClick={() => onSelect(node)}
       title={node.path}
     >
-      <span className="tree-icon">{node.nodeType === "markdown" ? "MD" : "IMG"}</span>
+      <span className="tree-icon">
+        {node.nodeType === "markdown" ? "MD" : node.nodeType === "html" ? "HTML" : "IMG"}
+      </span>
       <span className="tree-label">{node.name}</span>
     </button>
   );
@@ -1452,6 +1525,93 @@ function MarkdownPreview({
       className="markdown-body"
       onClick={onClick}
       dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+type HtmlPreviewProps = {
+  tabId: string;
+  revision: number;
+  previewUrl: string;
+  onReady: (tabId: string, revision: number) => void;
+  onError: (tabId: string, revision: number, message: string) => void;
+  onOpenExternal: (tabId: string, revision: number, href: string) => void;
+};
+
+function HtmlPreview({
+  tabId,
+  revision,
+  previewUrl,
+  onReady,
+  onError,
+  onOpenExternal,
+}: HtmlPreviewProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    let readyAccepted = false;
+    let lastExternalOpen: { href: string; timestamp: number } | null = null;
+    const timeout = window.setTimeout(() => {
+      if (hasHtmlReadyHandshakeTimedOut(readyAccepted, htmlReadyTimeoutMs)) {
+        onError(
+          tabId,
+          revision,
+          "HTML preview did not complete its security handshake within 5 seconds.",
+        );
+      }
+    }, htmlReadyTimeoutMs);
+
+    function handleMessage(event: MessageEvent<unknown>) {
+      const href =
+        typeof event.data === "object" &&
+        event.data !== null &&
+        "href" in event.data &&
+        typeof event.data.href === "string"
+          ? event.data.href
+          : null;
+      const now = Date.now();
+      const duplicateExternalOpen =
+        href !== null &&
+        lastExternalOpen?.href === href &&
+        now - lastExternalOpen.timestamp < 750;
+      const decision = evaluateHtmlBridgeMessage(event.data, {
+        sourceMatches: event.source === iframeRef.current?.contentWindow,
+        origin: event.origin,
+        tabMatches: true,
+        revisionMatches: true,
+        readyAccepted,
+        hasTransientUserActivation: navigator.userActivation?.isActive === true,
+        duplicateExternalOpen,
+      });
+      if (!decision.accepted) {
+        console.debug(`Ignored HTML bridge message: ${decision.reason}`);
+        return;
+      }
+      if (decision.action.type === "ready") {
+        readyAccepted = true;
+        window.clearTimeout(timeout);
+        onReady(tabId, revision);
+        return;
+      }
+      lastExternalOpen = { href: decision.action.href, timestamp: now };
+      onOpenExternal(tabId, revision, decision.action.href);
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [tabId, revision]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      className="html-preview-frame"
+      src={withPreviewRevision(previewUrl, revision)}
+      sandbox="allow-scripts"
+      referrerPolicy="no-referrer"
+      title="HTML document preview"
     />
   );
 }
@@ -1545,6 +1705,21 @@ function findFirstMarkdown(node: FileTreeNode): FileTreeNode | null {
   return null;
 }
 
+function findFirstHtml(node: FileTreeNode): FileTreeNode | null {
+  if (node.nodeType === "html") {
+    return node;
+  }
+
+  for (const child of node.children) {
+    const match = findFirstHtml(child);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
 function extractPlantUmlSources(markdown: string) {
   const sources: string[] = [];
   const pattern = /^```[ \t]*(plantuml|puml)[^\r\n]*\r?\n([\s\S]*?)\r?\n```[ \t]*$/gim;
@@ -1557,6 +1732,10 @@ function extractPlantUmlSources(markdown: string) {
 function isMarkdownPath(path: string) {
   const extension = path.split(".").pop()?.toLowerCase();
   return extension ? markdownExtensions.has(extension) : false;
+}
+
+function documentTypeForPath(path: string): DocumentType {
+  return path.split(".").pop()?.toLowerCase() === "html" ? "html" : "markdown";
 }
 
 function isRelativeResource(path: string) {

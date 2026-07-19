@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trusted HTML specification fixture</title>
+    <link rel="stylesheet" href="./assets/style.css" />
+    <script src="./assets/runtime.js" defer></script>
+    <script type="module" src="./assets/module.mjs"></script>
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">TODO-2026-017 fixture</p>
+      <h1>Trusted HTML specification</h1>
+      <nav>
+        <a href="#diagram">Fragment</a>
+        <a href="https://example.com/spec" target="_blank">External HTTPS</a>
+        <a href="javascript:alert('blocked')">Blocked JavaScript URL</a>
+      </nav>
+    </header>
+    <main>
+      <section>
+        <h2>Inline SVG and Canvas</h2>
+        <svg viewBox="0 0 320 80" role="img" aria-label="Inline flow diagram">
+          <rect x="10" y="15" width="100" height="50" rx="8" />
+          <path d="M110 40h90" />
+          <rect x="200" y="15" width="110" height="50" rx="8" />
+        </svg>
+        <canvas id="fixture-canvas" width="320" height="80"></canvas>
+      </section>
+      <section id="diagram">
+        <h2>Root-scoped resources</h2>
+        <img src="./assets/diagram.svg" alt="Child SVG resource" />
+        <img src="../html_shared.svg" alt="Parent-directory SVG resource" />
+        <pre id="json-result">Loading JSON...</pre>
+        <p id="module-result">Loading module...</p>
+      </section>
+    </main>
+  </body>
+</html>

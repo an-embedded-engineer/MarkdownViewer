@@ -2,7 +2,7 @@
 
 ## 目的
 
-MarkdownViewer は、VSCode やコーディングエージェントが生成した Markdown ドキュメントを、編集環境から独立して素早く閲覧するための軽量ビューア比較実装である。
+MarkdownViewer は、VSCode やコーディングエージェントが生成した Markdown ドキュメントを、編集環境から独立して素早く閲覧するための軽量ビューア比較実装である。Tauri 版は同じ用途で生成された trusted UTF-8 HTML 形式仕様書も対象とする。
 
 同じ MVP 要件を以下 2 系統で実装し、実装容易性、Markdown/Mermaid 表示、ファイルアクセス、配布の見通しを比較する。
 
@@ -13,6 +13,7 @@ MarkdownViewer は、VSCode やコーディングエージェントが生成し�
 
 - `Avalonia/MarkdownViewer.Avalonia/`: C# / Avalonia 版のデスクトップアプリ。
 - `markdown-viewer-tauri/`: Tauri v2 + React + TypeScript 版のデスクトップアプリ。
+  - Markdown は React DOM で描画し、trusted HTML は root-scoped custom protocol と sandboxed iframe で分離表示する。
 - `docs/`: 設計、開発ルール、workflow 用の project-level 文書。
 - `instructions/`: Agent 向け共通指示の同期元。
 - `scripts/`: Agent 指示同期などの補助スクリプト。

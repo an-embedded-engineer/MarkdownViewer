@@ -17,7 +17,7 @@ components:
   - "docs/tests/README.md"
 status: "in_progress"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "draft"
 completion_status: "not_started"
 related_commits:
   - "24bcfb5 : Phase 0 define TODO-2026-017 scope"
@@ -54,5 +54,5 @@ source_report_path: "docs/design_analysis/research_analysis/20260719_html_docume
 | Phase 0 Requirements | Done (`24bcfb5`) |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (approved 2026-07-19, `59193e5`) |
-| Phase 3 Implementation and docs review | Not started |
+| Phase 3 Implementation and docs review | Draft (implementation and local verification in progress) |
 | Phase 4 Verification and completion | Not started |

@@ -1,6 +1,6 @@
 # MarkdownViewer Tauri 版
 
-Tauri v2、React、TypeScript、Rust で実装した読み取り専用 Markdown Viewer です。プロジェクト全体は [ルート README](../README.md) を参照してください。
+Tauri v2、React、TypeScript、Rust で実装した読み取り専用 document Viewer です。Markdown に加え、選択 root 内の trusted UTF-8 `.html` 仕様書を sandboxed iframe で表示します。プロジェクト全体は [ルート README](../README.md) を参照してください。
 
 ## 対応 OS と環境構築
 
@@ -24,8 +24,10 @@ npm run tauri dev
 
 ```text
 npm run build
+npm test -- --run
 cd src-tauri
 cargo check
+cargo test
 ```
 
 ## Publish / bundle
@@ -38,7 +40,7 @@ cargo check
 ## 主な機能
 
 - native folder picker からフォルダを開く
-- directory、Markdown、画像を Explorer tree に表示
+- directory、Markdown、HTML、画像を Explorer tree に表示
 - GitHub Flavored Markdown の基本表示
 - Mermaid / PlantUML fenced code block の描画
 - Light / Dark theme 切替
@@ -46,9 +48,14 @@ cargo check
 - Tauri asset protocol による相対画像表示
 - 相対 Markdown link のアプリ内遷移と外部 URL の既定ブラウザ起動
 - 複数タブ、active tab の Reload、recent folders
+- trusted HTML の inline SVG / Canvas / root 内 CSS・JavaScript・JSON・画像表示
+- root-scoped `mvhtml` protocol、iframe sandbox、CSP による HTML preview 境界
+- HTML 内の user-clicked `http:` / `https:` link のみを既定ブラウザで開く
 
 ## 注意事項
 
 - folder scan では `.git`、`node_modules`、`bin`、`obj`、`target`、`.venv`、`__pycache__` を除外します。
 - local image 表示のため、現在の MVP は選択フォルダに対して広い asset scope を許可しています。
+- HTML は利用者が内容を信頼できる active document に限定します。第三者由来の untrusted HTML、`.htm`、非 UTF-8 HTML、root 外／外部 network resource は対象外です。
+- HTML preview は asset protocol を使わず、current root に限定した `mvhtml` protocol で allowlist resource だけを配信します。
 - split view、tab persistence/reorder、file watching は現在の対象外です。

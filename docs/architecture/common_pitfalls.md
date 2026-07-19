@@ -37,3 +37,15 @@
 - Rustの`Path::canonicalize`はWindowsで`\\?\`付きのverbatim pathを返す。filesystem検証にはそのまま使い、Java processの引数やfrontendへ返す文字列では通常のdrive / UNC pathへ変換する。
 - WebView2の`NavigateToString`にはHTML size上限がある。Mermaid runtimeを埋め込んだHTMLは上限を超えるため、Avalonia版は一時HTML fileへ書き出してfile URIへnavigateする。
 - .NET正規表現のmultiline `$`はCRLFの`\r`より前には一致しない。fenced code blockの終了行を判定する場合は末尾の`\r?`を明示し、LF / CRLFの両方を扱う。
+
+## 8. HTML custom protocol URL
+
+- `convertFileSrc(path, "mvhtml")` は absolute path 全体を単一 segment に encodeするため、HTML 内の相対 resource base として使わない。
+- Rust が current root からの相対 path を segment ごとに encodeし、macOS / Linux は `mvhtml://localhost/document/...`、Windows は `http://mvhtml.localhost/document/...` を生成する。
+- protocol handler は URI 文字列の prefix 判定だけで許可せず、decode後segment検査、canonicalize、root boundary、regular file、extension allowlistをすべて確認する。
+
+## 9. sandboxed iframe の load 判定
+
+- cross-origin / opaque-origin iframe は HTTP error responseでも `load` eventを発火し得るため、`load` / `error` eventをprotocol成功判定に使わない。
+- 成功HTMLにだけ注入される`ready` handshakeを正本とし、source / origin / revisionを検証する。timeoutとlistenerはrevision変更・unmount時に必ず解除する。
+- HTMLを表示するためにcapability remote origin、`allow-same-origin`、external network sourceを追加して境界を緩和しない。
