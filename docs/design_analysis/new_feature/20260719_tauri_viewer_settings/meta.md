@@ -14,7 +14,7 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "not_started"
+completion_status: "done"
 verification_status: "done"
 related_commits:
   - "4b50af2 : Phase 0 define TODO-2026-014 and TODO-2026-015 scope"
@@ -27,7 +27,8 @@ related_commits:
   - "46f505f : Phase 3 implementation review (conditional approval)"
   - "cd13c37 : Phase 3 address Tauri settings implementation review"
   - "5321270 : Phase 3 approve Tauri settings implementation review"
-source_todo_path: "docs/todo/todo.md#todo-2026-014-tauri-viewer-設定永続化と設定-ui-導入"
+  - "dc97286 : Phase 4-a record Tauri settings user verification"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-014-tauri-viewer-設定永続化と設定-ui-導入"
 depends_on:
   - "TODO-2026-005 Tauri Multi-tab core introduction"
 follow_up:
@@ -66,4 +67,4 @@ follow_up:
 | Phase 1 Branch and meta | Done (Phase 1 initialization commit) |
 | Phase 2 Design review | Done (approved 2026-07-19) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-19, unresolved 0) |
-| Phase 4 Verification and completion | Phase 4-a user verification done (2026-07-19) |
+| Phase 4 Verification and completion | Phase 4-b completion artifacts done; awaiting Phase 4-c merge approval |

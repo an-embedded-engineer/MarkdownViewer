@@ -91,51 +91,6 @@
   - 共通仕様、差分理由、残課題、今後の follow-up が整理される。
   - todo の完了 / 残項目が整合する。
 
-## TODO-2026-014 Tauri Viewer 設定永続化と設定 UI 導入
-
-- status: open
-- workflow: new-feature
-- depends_on: TODO-2026-005
-- summary: Tauri 版で Viewer 設定を app config JSON に永続化し、MenuBar から確認・変更できるようにする。
-- target_users:
-  - Tauri 版を継続利用し、起動のたびに表示環境や PlantUML runtime を設定し直したくない利用者。
-- user_value:
-  - 前回終了時のウィンドウサイズと Theme が次回起動時に復元される。
-  - `plantuml.jar` の場所をアプリ内で確認・変更でき、runtime directory の設定ファイルを手編集しなくても PlantUML を利用できる。
-- use_cases:
-  - ウィンドウを使いやすい大きさに変更して終了し、次回起動時も同じサイズで閲覧を再開する。
-  - MenuBar から設定 UI を開き、現在の Theme と `plantuml.jar` path を確認・変更する。
-  - 保存済み設定がない初回起動では既定値で起動し、既存 Recent Folders は維持する。
-- minimum_scope:
-  - 既存 Recent Folders と同じ app config JSON に window width / height、Theme、`plantuml.jar` path を保存する。
-  - 起動時に保存済み設定を読み込み、ウィンドウサイズ、Theme、PlantUML runtime 解決へ反映する。
-  - MenuBar から設定 UI を開き、Theme と `plantuml.jar` path を確認・変更・保存できるようにする。
-  - ウィンドウサイズは resize 後に永続化し、設定 UI では現在値を確認できるようにする。
-- out_of_scope:
-  - Avalonia 版への実装（TODO-2026-015 で水平展開する）。
-  - ウィンドウ位置、最大化 / 最小化状態、open folder、open tab、split pane 状態の永続化。
-  - Java runtime 自体のインストールや `plantuml.jar` の自動ダウンロード。
-- prerequisites:
-  - Tauri 版の既存 app config JSON と Recent Folders を壊さず拡張する。
-  - Multi-tab core（TODO-2026-005）完了後に実装する。Split view（TODO-2026-006）とは独立に進め、Tauri 先行 UX 評価（TODO-2026-007）で両機能を統合評価する。
-  - Tauri 先行 UX 評価（TODO-2026-007）より前に完了する。
-- affected_components:
-  - `markdown-viewer-tauri/src/App.tsx`, `markdown-viewer-tauri/src/App.css`
-  - `markdown-viewer-tauri/src-tauri/src/lib.rs`, Tauri window / dialog capability の必要箇所
-  - `docs/components/tauri_viewer/*`, `docs/rules/development_workflow.md`
-- integration_points:
-  - MenuBar の設定導線、起動時設定ロード、Theme state、Tauri window resize event。
-  - `AppConfig` / `AppConfigStore` と PlantUML runtime resolver。
-- completion:
-  - window width / height、Theme、`plantuml.jar` path が app config JSON に保存され、アプリ再起動後に復元される。
-  - MenuBar から設定 UI を開き、現在値の確認と Theme / `plantuml.jar` path の変更・保存ができる。
-  - 未設定または無効な `plantuml.jar` path は UI で識別可能なエラーとなり、Markdown / Mermaid 閲覧は継続できる。
-  - 既存 `settings.json` の Recent Folders が保持され、追加設定がない既存 JSON も読み込める。
-  - `npm run build` と `cargo check` が成功し、設定保存・再起動復元・既定値・無効 path の手動確認が完了する。
-- success_metrics:
-  - 通常終了・再起動を挟んだ手動確認で、対象 3 設定が失われない。
-  - 設定変更のために `plantuml.config.json` を手編集する必要がない。
-
 ## TODO-2026-015 Avalonia Viewer 設定永続化と設定 UI 水平展開
 
 - status: open
@@ -147,3 +102,15 @@
   - MenuBar から設定 UI を開き、現在値の確認と変更・保存ができる。
   - Avalonia の user config JSON と既存 Recent Folders が共存し、再起動後に設定が復元される。
   - `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj` が成功し、設定保存・再起動復元・既定値・無効 path の手動確認が完了する。
+
+## TODO-2026-016 Tauri Viewer 設定 Windows platform verification
+
+- status: open
+- workflow: issue-resolution
+- depends_on: TODO-2026-014
+- summary: Windows環境でTauri Viewer設定永続化のtarget固有atomic replaceとpath境界を検証する。
+- completion:
+  - Windows targetで`cargo check`または同等のTauri buildが成功する。
+  - 既存`settings.json`を`MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`で置換し、Recent FoldersとViewer settingsが保持される。
+  - Unicode pathとWindows verbatim / drive / UNC path境界で設定保存・再起動復元を確認する。
+  - 検証結果と、必要な修正があればsource / tests / Tauri component docsへ反映する。
