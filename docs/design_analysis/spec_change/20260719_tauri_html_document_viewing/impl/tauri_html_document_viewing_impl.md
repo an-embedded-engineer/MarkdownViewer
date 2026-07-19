@@ -125,7 +125,7 @@ Windows / Linux実機はPhase 3のローカル自動検証では確認できな�
 
 2026-07-19のmacOS実機確認で、既存HTML / inline SVG表示、外部リンクのOS標準ブラウザ委譲、`javascript:` URL拒否を確認した。加えて、HTML custom protocol経由および既存Markdown画像経路で、root内相対参照の生成PNGが表示されることを確認した。詳細は `../verification/phase4a_user_verification.md` を参照する。
 
-設計書 §17.5 のWindows / Linuxを含むplatform matrixは未完了であり、未確認項目を成功と推定せずPhase 4 completion blockerとして継続する。
+設計書 §17.5 のWindows / Linuxを含むplatform matrixは未完了であり、未確認項目を成功と推定しない。2026-07-19のPhase 4-b進行承認で後日確認へ移し、問題が判明した場合は`docs/issues/`で対応する方針へ再承認された。
 
 ## 8. 実装レビュー反映
 

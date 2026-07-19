@@ -550,6 +550,8 @@ macOS / Windows / Linuxで少なくとも次を記録する。
 
 確認不能platformを「成功」と推定しない。Phase 4-aで実機証跡が得られない場合はcompletion blockerまたはplatform対応範囲の仕様再承認として扱う。
 
+2026-07-19のPhase 4-b進行時に、ユーザーはWindows / Linuxおよび未実施のplatform固有security matrixを後日確認へ移し、問題が判明した場合は`docs/issues/`で対応する方針を再承認した。したがって未確認項目は成功とは推定しないまま、現時点のPhase 4 completion blockerから外す。
+
 ## 18. ユーザ確認シナリオ
 
 1. Open Folder後、README Markdownが従来どおり初期表示される。

@@ -55,4 +55,4 @@
 - macOSのsandbox `Origin: null` / JSON simple GET、no-cors `Origin` header、iframe IPC非公開、CSP、root外 / symlink拒否。
 - Windows / Linuxの全platform matrix項目。
 
-これらはPhase 4 completion blockerとして継続管理し、Phase 4-bへ進む前に実機証跡を取得するか、対応platform範囲の仕様を再承認する。
+2026-07-19のPhase 4-b進行承認で、ユーザーはこれらを後日確認し、問題が判明した場合に`docs/issues/`へ起票して対応する方針を選択した。この再承認により現時点のPhase 4 completion blockerから外すが、未確認項目を成功とは推定しない。
