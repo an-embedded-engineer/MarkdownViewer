@@ -1,0 +1,1 @@
+docs/design_analysis/research_analysis/20260719_html_document_viewing_support/prompts/research_report_review_initial_claude.md を読んで、レビューを開始してください。
