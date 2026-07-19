@@ -107,9 +107,22 @@ Rust tests:
 - `@tauri-apps/api/window` dependency最適化後のreload。
 - startup command登録、window restore、WebView初期化でterminal errorなし。
 
-専用E2E test frameworkは未整備である。実filesystem I/OはRust testがtemporary directoryへ書き込み、旧config保持とatomic replaceを検証した。Settings dialog操作、resize後の再起動復元、実jar描画はPhase 4-aのユーザー動作確認で実施する。
+専用E2E test frameworkは未整備である。実filesystem I/OはRust testがtemporary directoryへ書き込み、旧config保持とatomic replaceを検証した。
 
-## 8. 既知制約・Phase 4引き継ぎ
+## 8. Phase 4-a ユーザー動作確認
+
+2026-07-19にユーザーがTauriアプリで次を確認し、全項目OKと報告した。
+
+1. `File > Settings...`からSettings dialogが表示される。
+2. Settings dialogでThemeを変更し、Save後にアプリへ反映される。
+3. app windowのresizeに応じてSettings dialog内の現在window size表示が変化する。
+4. `plantuml.jar` pathの明示指定時と未指定時のautomatic discoveryのどちらでもPlantUMLを正しく描画できる。
+5. `View > Theme`からの変更がSettings dialog側の現在値にも反映される。
+6. アプリ再起動後も保存済みwindow size、Theme、PlantUML jar path設定が復元された状態で起動する。
+
+以上により、TODO-2026-014のPhase 4-aユーザー動作確認は完了した。
+
+## 9. 既知制約・Phase 4引き継ぎ
 
 - window position、maximized / minimized / fullscreen状態、folder / tab / split paneは永続化しない。
 - 複数app instance間のcross-process transactionは対象外。単一process内はStore lockで直列化する。

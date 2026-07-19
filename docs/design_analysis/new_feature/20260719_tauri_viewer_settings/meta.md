@@ -15,7 +15,7 @@ status: "implemented"
 design_status: "done"
 impl_status: "done"
 completion_status: "not_started"
-verification_status: "not_started"
+verification_status: "done"
 related_commits:
   - "4b50af2 : Phase 0 define TODO-2026-014 and TODO-2026-015 scope"
   - "7e22284 : Phase 1 initialize Tauri viewer settings workflow"
@@ -66,4 +66,4 @@ follow_up:
 | Phase 1 Branch and meta | Done (Phase 1 initialization commit) |
 | Phase 2 Design review | Done (approved 2026-07-19) |
 | Phase 3 Implementation and docs review | Done (approved 2026-07-19, unresolved 0) |
-| Phase 4 Verification and completion | Not started |
+| Phase 4 Verification and completion | Phase 4-a user verification done (2026-07-19) |
