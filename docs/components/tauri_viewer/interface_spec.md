@@ -29,7 +29,7 @@ Recent Folders entry click で保存済み path が存在しない場合は erro
 - `PlantUML jar`: path input、`.jar` file picker、`Clear`。空欄はruntime directory自動探索を表す。
 - `Save`: pathを検証してpreferencesを保存し、成功後にThemeへ反映して閉じる。
 - `Cancel` / Escape / close / backdrop click: draftを破棄する。
-- `role="dialog"` / `aria-modal="true"`、初期focus、Tab focus loop、dialog内validation alertを持つ。
+- `role="dialog"` / `aria-modal="true"`、初期focus、Tab focus loop、dialog内validation alertを持つ。backgroundは`inert`とし、保存中に全controlがdisabledでもdialog containerへfocusを保持する。file picker失敗はdialog内alertへ表示し、Cancelはerrorにしない。
 
 ## Root Path Strip 表示
 
@@ -80,7 +80,7 @@ root配下のMarkdownファイルをUTF-8テキストとして読み込む。
 
 ### `render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRenderResponse, String>`
 
-PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。Java processを起動できないなどcommand全体の失敗は `Err(String)` とする。jar未設定、PlantUML構文エラー、timeoutなど図ごとの失敗は `PlantUmlDiagramResult` の `ok: false` として返す。
+PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。app config読込、明示jar missing、automatic discovery失敗などblocking task開始前のruntime解決失敗はcommand全体の`Err(String)`とする。runtime解決後のPlantUML構文エラー、Java process error、timeoutなどは図ごとの`PlantUmlDiagramResult`の`ok: false`として返す。frontendはcommand全体の`Err`でも全PlantUML placeholderをerror表示へ変換し、Markdown / Mermaid表示を維持する。
 
 `PlantUmlRenderResponse`:
 

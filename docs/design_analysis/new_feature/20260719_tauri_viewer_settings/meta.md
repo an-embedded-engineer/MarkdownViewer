@@ -13,7 +13,7 @@ components:
   - "docs/rules/development_workflow.md"
 status: "active"
 design_status: "done"
-impl_status: "draft"
+impl_status: "in_progress"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -25,8 +25,9 @@ related_commits:
   - "0d7342e : Phase 2 approve Tauri viewer settings design"
 source_todo_path: "docs/todo/todo.md#todo-2026-014-tauri-viewer-設定永続化と設定-ui-導入"
 depends_on:
-  - "TODO-2026-006 Tauri Split view introduction"
+  - "TODO-2026-005 Tauri Multi-tab core introduction"
 follow_up:
+  - "TODO-2026-006 Tauri Split view introduction (independent work package after TODO-2026-005)"
   - "TODO-2026-007 Tauri UX evaluation and Avalonia specification"
   - "TODO-2026-015 Avalonia Viewer settings persistence and settings UI rollout"
 ---
@@ -60,5 +61,5 @@ follow_up:
 | Phase 0 Requirements | Done (`4b50af2`) |
 | Phase 1 Branch and meta | Done (Phase 1 initialization commit) |
 | Phase 2 Design review | Done (approved 2026-07-19) |
-| Phase 3 Implementation and docs review | Draft ready for review |
+| Phase 3 Implementation and docs review | Implementation review findings being addressed |
 | Phase 4 Verification and completion | Not started |

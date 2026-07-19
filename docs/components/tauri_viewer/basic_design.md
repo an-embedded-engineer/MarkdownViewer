@@ -207,4 +207,4 @@ Error --> HasRoot : 次の操作で復帰
 - `csp = null` (MVP)。本番化時は要見直し。
 - capability `default` は window `main` に対し `core:default` / `dialog:default` / `opener:default` のみを許可する。
 - Recent Folders と Viewer settings は Tauri の app config directory 配下 `settings.json` に保存する。browser `localStorage` は使用しない。
-- `settings.json` は sibling temporary file へ全量write / sync後にatomic replaceし、失敗時は既存fileを維持する。
+- `settings.json` は sibling temporary file へ全量write / sync後にatomic replaceする。replace 成功をlogical commit pointとし、それ以前の失敗では既存fileを維持する。replace後のdirectory sync失敗はlogical saveを失敗に戻せないためdurability warningとして記録する。

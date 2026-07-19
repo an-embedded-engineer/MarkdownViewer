@@ -309,17 +309,21 @@ function App() {
   }
 
   async function browsePlantUmlJar() {
-    const selected = await openDialog({
-      directory: false,
-      multiple: false,
-      title: "Choose PlantUML jar",
-      filters: [{ name: "Java archives", extensions: ["jar"] }],
-    });
-    if (typeof selected === "string") {
-      setSettingsDraft((draft) =>
-        draft ? { ...draft, plantUmlJarPath: selected } : draft,
-      );
-      setSettingsError(null);
+    setSettingsError(null);
+    try {
+      const selected = await openDialog({
+        directory: false,
+        multiple: false,
+        title: "Choose PlantUML jar",
+        filters: [{ name: "Java archives", extensions: ["jar"] }],
+      });
+      if (typeof selected === "string") {
+        setSettingsDraft((draft) =>
+          draft ? { ...draft, plantUmlJarPath: selected } : draft,
+        );
+      }
+    } catch (error) {
+      setSettingsError(`Failed to open PlantUML jar picker: ${toErrorMessage(error)}`);
     }
   }
 
@@ -758,7 +762,11 @@ function App() {
 
   return (
     <>
-      <main className="app-shell" aria-hidden={settingsDraft ? true : undefined}>
+      <main
+        className="app-shell"
+        aria-hidden={settingsDraft ? true : undefined}
+        inert={settingsDraft ? true : undefined}
+      >
         <MenuBar
           menuBarRef={menuBarRef}
           fileMenuButtonRef={fileMenuButtonRef}
@@ -1021,7 +1029,11 @@ function SettingsDialog({
   const themeSelectRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
-    themeSelectRef.current?.focus();
+    if (isSaving) {
+      dialogRef.current?.focus();
+    } else {
+      themeSelectRef.current?.focus();
+    }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !isSaving) {
@@ -1039,6 +1051,8 @@ function SettingsDialog({
         ),
       );
       if (controls.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
         return;
       }
       const first = controls[0];
@@ -1071,6 +1085,8 @@ function SettingsDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
+        aria-busy={isSaving}
+        tabIndex={-1}
       >
         <div className="settings-header">
           <h2 id="settings-title">Viewer Settings</h2>

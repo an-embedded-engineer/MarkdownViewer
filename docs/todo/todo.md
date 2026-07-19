@@ -95,7 +95,7 @@
 
 - status: open
 - workflow: new-feature
-- depends_on: TODO-2026-006
+- depends_on: TODO-2026-005
 - summary: Tauri 版で Viewer 設定を app config JSON に永続化し、MenuBar から確認・変更できるようにする。
 - target_users:
   - Tauri 版を継続利用し、起動のたびに表示環境や PlantUML runtime を設定し直したくない利用者。
@@ -117,6 +117,7 @@
   - Java runtime 自体のインストールや `plantuml.jar` の自動ダウンロード。
 - prerequisites:
   - Tauri 版の既存 app config JSON と Recent Folders を壊さず拡張する。
+  - Multi-tab core（TODO-2026-005）完了後に実装する。Split view（TODO-2026-006）とは独立に進め、Tauri 先行 UX 評価（TODO-2026-007）で両機能を統合評価する。
   - Tauri 先行 UX 評価（TODO-2026-007）より前に完了する。
 - affected_components:
   - `markdown-viewer-tauri/src/App.tsx`, `markdown-viewer-tauri/src/App.css`

@@ -176,7 +176,7 @@ App -> Mer : mermaid.run({ nodes })
 
 ## PlantUML レンダリング
 
-PlantUML 表示は Rust 側の `render_plantuml_diagrams` command で行う。React は Markdown 本文から `plantuml` / `puml` fenced code block を抽出し、source 配列として command へ渡す。Rust command は `tauri::async_runtime::spawn_blocking` 経由で各 source を順次 `java -jar <plantuml.jar> -tsvg -pipe` に渡し、SVG HTML またはエラー HTML を返す。Windowsでは`CREATE_NO_WINDOW`を指定し、Java起動時のterminal windowを表示しない。
+PlantUML 表示は Rust 側の `render_plantuml_diagrams` command で行う。React は Markdown 本文から `plantuml` / `puml` fenced code block を抽出し、source 配列として command へ渡す。Rust command は app configを読み、全sourceで共有するruntimeをblocking task開始前に1回だけ解決する。runtime / app config解決失敗はcommand全体の`Err`とし、runtime解決後は`tauri::async_runtime::spawn_blocking`経由で各 source を順次 `java -jar <plantuml.jar> -tsvg -pipe` に渡し、SVG HTMLまたは図単位のエラーHTMLを返す。Windowsでは`CREATE_NO_WINDOW`を指定し、Java起動時のterminal windowを表示しない。
 
 ```plantuml
 @startuml
@@ -192,12 +192,12 @@ participant "java + plantuml.jar" as J
 App -> App : extractPlantUmlSources(markdown)
 App -> App : setPlantUmlRenderState({pending})
 App -> Inv : invoke("render_plantuml_diagrams", { sources })
+Inv -> RR : app configからruntimeを1回解決
+RR --> Inv : PlantUmlRuntimeOptions / command Err
 Inv -> Tk : spawn_blocking
 Tk -> Block : 各 source を順次処理
 loop 各 source
   Block -> RSvg : render_plantuml_svg
-  RSvg -> RR : resolve_plantuml_runtime
-  RR --> RSvg : PlantUmlRuntimeOptions
   RSvg -> J : Command::new("java")\n-jar <jar> -tsvg -pipe
   RSvg -> J : stdin: normalized source
   J --> RSvg : stdout SVG / stderr error
@@ -350,14 +350,14 @@ Rust は `AppConfigStore` を Tauri state として管理し、Recent Folders、
 }
 ```
 
-`AppConfigStore` はRecent FoldersとViewer settingsのfield-specific updateを同じlock内のread-modify-writeへ集約する。保存は同じdirectoryのtemporary fileへ全量write / syncし、Unixはrename、Windowsはreplace-existing + write-throughでdestinationを置換する。serialize / temporary write / replace失敗時は既存`settings.json`を維持する。
+`AppConfigStore` はRecent FoldersとViewer settingsのfield-specific updateを同じlock内のread-modify-writeへ集約する。保存は同じdirectoryのtemporary fileへ全量write / syncし、Unixはrename、Windowsはreplace-existing + write-throughでdestinationを置換する。replace成功をlogical commit pointとし、serialize / temporary create / write / sync / replace失敗時は既存`settings.json`を維持する。replace後のdirectory sync失敗はlogical saveを成功のままdurability warningとしてstderrへ記録する。
 
 `record_recent_folder` は directory であることを確認してから同一 `path` の既存 entry を削除し、新しい entry を先頭へ挿入する。最大件数は 10 件で、超過分は末尾から切り捨てる。保存後に folder が OS 側でリネームされた場合、既存 entry の `name` は保存時点の snapshot のまま残る。
 
 ### UI と操作
 
 - App 起動時に `load_recent_folders` を呼び、復元できた entry を File dropdown に表示する。
-- `File` dropdown には `Open Folder...`、`Recent Folders` list、`Reload` を表示する。
+- `File` dropdown には `Open Folder...`、`Recent Folders` list、`Reload`、separator、application-wideな`Settings...`を表示する。Settings dialogを閉じた後はFile menu triggerへfocusを戻す。
 - Recent entry は `entry.name` を主表示、`entry.path` を補助表示にする。`entry.name` が空の場合のみ path 全体を fallback 表示する。
 - Recent entry click は `scan_directory` → `record_recent_folder` → initial Markdown 読み込みの順で既存 `loadRoot` に統合する。
 - `x` delete button は `remove_recent_folder` を呼び、entry を明示削除する。
@@ -381,6 +381,7 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
 - `Builder::setup`がmain windowへ保存済みlogical sizeを適用する。範囲外sizeだけは800 x 600へ正規化してwarningを返し、frontendが正常値を再保存する。
 - frontendは`load_viewer_settings`と`load_recent_folders`を`Promise.allSettled`で読み、Dark themeのstartup flashを避けるため完了までloading shellを表示する。
 - `View > Theme`と`File > Settings...`は同じ`save_viewer_preferences`を使う。Settings dialogはdraftを持ち、Save成功前にapp Theme / runtimeを変更しない。
+- Settings dialog表示中はbackground app shellを`inert`かつ`aria-hidden`にする。保存中に全controlがdisabledでもdialog containerへfocusを保持し、Tabでbackgroundへ移動させない。jar file pickerのplugin / OS errorはdialog内alertへ表示し、Cancelはerrorにしない。
 - window resizeはphysical sizeをscale factorでlogical sizeへ変換し、500ms debounce後に`save_window_size`へ送る。maximized / minimized / fullscreen中は保存しない。resize commandは直列queueにし、最新pending sizeを追送する。
 - foreground config操作はoperation countでbusyを管理する。background resizeはMenuBarをdisableせず、backend lockとfield-specific updateでRecent Folders / preferencesとの競合を防ぐ。
 - 明示`plantUmlJarPath`がある場合は最優先し、削除済み・無効pathをruntime directory探索へfallbackしない。`Clear`した場合だけ`plantuml.config.json`、同梱`plantuml.jar`の探索へ戻る。
@@ -425,7 +426,7 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
 <SettingsDialog/>      ← modal。Theme / window size / PlantUML jar path
 ```
 
-`MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload` を持ち、`View` dropdown は theme 切替を持つ。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
+`MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload`、separator、`Settings...`を持ち、`View` dropdown は theme 切替を持つ。Settingsはapplication-wideな操作であり、dialog close後はFile triggerへfocusを戻す。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
 
 `RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`TabStrip` は PreviewWorkspace 上段でopen中Markdownを表示し、下段の単一`tabpanel`がactive tabを描画する。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
 

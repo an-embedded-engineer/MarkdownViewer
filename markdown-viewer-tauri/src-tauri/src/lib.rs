@@ -365,6 +365,26 @@ fn write_app_config_to_path(
     config: &AppConfig,
     sequence: u64,
 ) -> Result<(), String> {
+    let durability_warning = write_app_config_to_path_with(
+        config_path,
+        config,
+        sequence,
+        replace_app_config_file,
+        sync_app_config_directory,
+    )?;
+    if let Some(warning) = durability_warning {
+        eprintln!("App config durability warning: {warning}");
+    }
+    Ok(())
+}
+
+fn write_app_config_to_path_with(
+    config_path: &Path,
+    config: &AppConfig,
+    sequence: u64,
+    replace: impl FnOnce(&Path, &Path) -> Result<(), String>,
+    sync_directory: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<Option<String>, String> {
     if let Some(parent) = config_path.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| format!("Failed to create app config directory: {error}"))?;
@@ -384,9 +404,11 @@ fn write_app_config_to_path(
             .map_err(|error| format!("Failed to write temporary app config: {error}"))?;
         file.sync_all()
             .map_err(|error| format!("Failed to sync temporary app config: {error}"))?;
-        replace_app_config_file(&temp_path, config_path)?;
-        sync_app_config_directory(config_path)?;
-        Ok(())
+        replace(&temp_path, config_path)?;
+        let durability_warning = sync_directory(config_path)
+            .err()
+            .map(|error| format!("App config was replaced but directory sync failed: {error}"));
+        Ok(durability_warning)
     })();
 
     if write_result.is_err() {
@@ -1154,6 +1176,79 @@ mod tests {
         .expect("old config must remain complete JSON");
 
         assert_eq!(stored, old_config);
+        fs::remove_file(&config_path).expect("test config must be removed");
+        fs::remove_dir(&directory).expect("test directory must be removed");
+    }
+
+    #[test]
+    fn replace_failure_preserves_existing_document() {
+        let directory = test_directory("atomic-replace-failure");
+        let config_path = directory.join(APP_CONFIG_FILE_NAME);
+        let old_config = AppConfig::default();
+        fs::write(
+            &config_path,
+            serde_json::to_vec_pretty(&old_config).expect("old config must serialize"),
+        )
+        .expect("old config must be written");
+        let new_config = AppConfig {
+            viewer_settings: ViewerSettings {
+                theme: AppTheme::Dark,
+                ..ViewerSettings::default()
+            },
+            ..AppConfig::default()
+        };
+
+        let result = write_app_config_to_path_with(
+            &config_path,
+            &new_config,
+            1,
+            |_source, _destination| Err("injected replace failure".into()),
+            |_path| Ok(()),
+        );
+
+        assert!(result.is_err());
+        let stored: AppConfig = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("old config must remain readable"),
+        )
+        .expect("old config must remain complete JSON");
+        assert_eq!(stored, old_config);
+        fs::remove_file(&config_path).expect("test config must be removed");
+        fs::remove_dir(&directory).expect("test directory must be removed");
+    }
+
+    #[test]
+    fn directory_sync_failure_is_warning_after_committed_replace() {
+        let directory = test_directory("directory-sync-warning");
+        let config_path = directory.join(APP_CONFIG_FILE_NAME);
+        let old_config = AppConfig::default();
+        fs::write(
+            &config_path,
+            serde_json::to_vec_pretty(&old_config).expect("old config must serialize"),
+        )
+        .expect("old config must be written");
+        let new_config = AppConfig {
+            viewer_settings: ViewerSettings {
+                theme: AppTheme::Dark,
+                ..ViewerSettings::default()
+            },
+            ..AppConfig::default()
+        };
+
+        let warning = write_app_config_to_path_with(
+            &config_path,
+            &new_config,
+            1,
+            replace_app_config_file,
+            |_path| Err("injected directory sync failure".into()),
+        )
+        .expect("post-replace directory sync failure must not fail the save");
+
+        assert!(warning.is_some());
+        let stored: AppConfig = serde_json::from_str(
+            &fs::read_to_string(&config_path).expect("new config must be readable"),
+        )
+        .expect("new config must remain complete JSON");
+        assert_eq!(stored, new_config);
         fs::remove_file(&config_path).expect("test config must be removed");
         fs::remove_dir(&directory).expect("test directory must be removed");
     }

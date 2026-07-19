@@ -271,3 +271,20 @@ Viewer settings の型付き永続化、Recent Folders 互換、部分更新、P
 **条件付き承認 (Conditional approval)** とする。1.1〜1.3 を必須対応とし、2.1〜2.3 および docs / verification の 3.1〜3.2 を同じ Phase 3 指摘対応で解消した後、follow-up implementation review を行うこと。
 
 **未解決指摘数**: 8。High 3、Medium 3、Low 2。
+
+---
+
+## 9. 初回レビュー対応（実装者、2026-07-19）
+
+| 指摘 | 対応 | 再レビュー観点 |
+| --- | --- | --- |
+| 1.1 Split view prerequisite | ユーザーのPhase 3進行承認を実行順変更の承認として、TODO-2026-014の依存をTODO-2026-005へ変更した。WBS / meta / Phase 2設計も、Viewer settingsとSplit viewをMulti-tab後の独立work package、TODO-2026-007を両者の合流・統合UX評価として同期した。 | U-01を正式なdependency改訂としてclose可能か |
+| 1.2 post-replace directory sync | replace成功をlogical commit pointとした。directory sync失敗は`Err`に戻さずstderr durability warningとし、保存済み値とcommand successを一致させた。replace / sync closureを注入できるhelperと2 testsを追加した。 | pre/post commit境界とtestが契約に一致するか |
+| 1.3 modal focus | background app shellへ`inert`を追加した。dialogを`tabIndex={-1}`にし、保存開始時とenabled control 0件のTab時にcontainerへfocusを保持する。`aria-busy`も追加した。 | 保存中にfocusがbackgroundへ漏れないか |
+| 2.1 atomic / Windows tests | create failureに加え、replace failureとpost-replace directory sync failureをfailure injectionで追加し、10 Rust testsを通した。Windows targetはhostに未導入のため未実施であることを実装記録へ明記し、Phase 4のplatform verificationへ引き継いだ。 | failure seamの十分性とWindows制約の扱い |
+| 2.2 PlantUML contract | sourceに合わせ、app config / runtime解決失敗はcommand-level `Err`、解決後の構文error / process error / timeoutは図単位resultとdesign / detail / interfaceへ明記した。frontendの全placeholder error変換も記載した。 | 公開contractのsource/docs整合 |
+| 2.3 file picker error | `openDialog`を`try/catch`し、plugin / OS errorを`settingsError`へ表示する。Cancelはerrorにしない。 | unhandled rejectionが残らないか |
+| 3.1 diff check | 実装記録末尾の余分な空行を除去し、working treeの`git diff --check`を再実行した。response commit後にcommit範囲も検査する。 | commit範囲のwhitespace check |
+| 3.2 MenuBar detail docs | detail designへseparator + `Settings...`とdialog close後のFile trigger focus returnを追記した。 | UI tree / prose / interfaceの一致 |
+
+再検証結果は実装記録6へ反映した。初回レビューの未解決表と判定は履歴として維持し、follow-up reviewで各statusと最終未解決数を更新する。
