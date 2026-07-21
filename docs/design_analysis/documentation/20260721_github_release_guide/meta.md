@@ -5,11 +5,16 @@ category: documentation
 components:
   - release_documentation
   - root_readme
-status: draft
+status: implemented
 design_status: done
 impl_status: done
-completion_status: in_progress
-related_commits: []
+completion_status: done
+related_commits:
+  - "37295ba docs: initialize GitHub release guide workflow"
+  - "5152c15 docs: design GitHub release guide"
+  - "d675de8 docs: review GitHub release guide design"
+  - "700b8c9 docs: add GitHub release distribution guide"
+  - "5c52924 docs: finalize GitHub release guide"
 ---
 
 # GitHub Release 配布手順書の追加
