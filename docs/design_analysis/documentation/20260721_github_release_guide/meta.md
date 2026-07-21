@@ -6,7 +6,7 @@ components:
   - release_documentation
   - root_readme
 status: draft
-design_status: draft
+design_status: in_review
 impl_status: not_started
 completion_status: not_started
 related_commits: []
