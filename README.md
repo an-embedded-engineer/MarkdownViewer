@@ -39,6 +39,7 @@ npm run tauri dev
 - [プロジェクト概要](docs/rules/project_overview.md)
 - [アーキテクチャ概要](docs/architecture/overview.md)
 - [開発・実行ルール](docs/rules/development_workflow.md)
+- [GitHub Release 配布手順](docs/release/README.md)
 - [MVP 比較設計](docs/design_analysis/new_feature/markdown_viewer_mvp_comparison_initial_design/markdown_viewer_mvp_design_tauri_avalonia.md)
 
 `bin/`、`obj/`、`target/`、`node_modules/`、`dist/`、`publish/` と `plantuml.jar` はローカル生成物または runtime asset であり、コミットしません。
