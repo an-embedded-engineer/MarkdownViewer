@@ -24,7 +24,20 @@
 
 ## 文書検証
 
-実行結果は Phase 3 レビュー反映後に追記する。
+- `git diff --check`
+  - whitespace error なし。
+- `git diff --name-only 5152c15..HEAD` と未コミット差分一覧
+  - workflow 記録を含め、変更対象が Markdown 文書だけであることを確認した。
+- `test -f` によるローカルリンク先確認
+  - `README.md`、`docs/release/README.md`、`docs/rules/development_workflow.md`、`sample_docs/plantuml.md`、`LICENSE` が存在することを確認した。
+- `rg` による旧記述、重複、必須停止条件の確認
+  - 単一の `SHA256SUMS.txt` へ全 OS asset を集約する旧手順がないことを確認した。
+  - DMG に jar が入らない点を可能性として扱う旧記述がないことを確認した。
+  - `THIRD_PARTY_NOTICES.txt`、`third_party_licenses/`、個別 `.sha256`、`gh release upload`、version、必要環境の記述が存在することを確認した。
+- 外部公式リンク確認（2026-07-21）
+  - GitHub Release 管理、Tauri GitHub Actions、Tauri macOS / Windows code signing、PlantUML FAQ のリンク先を確認した。
+
+documentation workflow のため、アプリケーション build、test、publish、起動確認は実施していない。手順内の publish / smoke test は実際の Release 作業時に行う。
 
 ## docs-only 確認
 

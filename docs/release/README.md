@@ -15,8 +15,8 @@ publish コマンド自体の正本は [開発・実行ルール](../rules/devel
 | Avalonia | macOS arm64 | `.app` とライセンス通知を含む ZIP | `publish/avalonia/MarkdownViewer.Avalonia.app` |
 | Tauri | macOS arm64 | `.app` とライセンス通知を含む ZIP | `publish/tauri/markdown-viewer-tauri.app` |
 | Avalonia | Windows x64 | self-contained publish とライセンス通知を含む ZIP | `publish/avalonia/win-x64/` |
-| Tauri | Windows x64 | NSIS installer | `publish/tauri/bundle/nsis/` |
-| Tauri | Windows x64 | MSI installer（必要な場合） | `publish/tauri/bundle/msi/` |
+| Tauri | Windows x64 | NSIS installer とライセンス通知を含む ZIP | `publish/tauri/bundle/nsis/` |
+| Tauri | Windows x64 | MSI installer とライセンス通知を含む ZIP（必要な場合） | `publish/tauri/bundle/msi/` |
 
 Linux、macOS x64、Windows arm64 を追加する場合は、対象環境での publish、PlantUML runtime 配置、起動確認を別途定義してから配布対象へ加える。
 
@@ -30,7 +30,7 @@ Linux、macOS x64、Windows arm64 を追加する場合は、対象環境での 
 - [ ] 配布する PlantUML jar と全依存関係のライセンス条件を確認した
 - [ ] 必要なライセンス全文と third-party notices を配布物へ含めた
 - [ ] asset 名へ version、OS、architecture を含めた
-- [ ] SHA-256 checksum を作成した
+- [ ] 各 asset の SHA-256 checksum file を作成した
 - [ ] Draft Release へ asset を添付した
 - [ ] Draft Release から再ダウンロードした配布物で smoke test を実施した
 - [ ] Release notes に必要環境、署名状況、既知制約、source commit を記載した
@@ -53,6 +53,8 @@ Linux、macOS x64、Windows arm64 を追加する場合は、対象環境での 
   - `.csproj` から生成される assembly / file version
 
 現状は version の一元管理が未整備で、Windows Avalonia の `.csproj` に明示 version がない。tag と成果物内 version を一致させられない場合は公開を止め、仕様変更または軽微変更 workflow で version 定義と publish スクリプトを更新してから再開する。手動で生成物だけを書き換えない。
+
+したがって、初回 Release の前に Avalonia の version 定義を整備する別変更が必要である。
 
 ### 4.2 release commit と tag
 
@@ -93,6 +95,19 @@ publish/avalonia/MarkdownViewer.Avalonia.app/Contents/MacOS/plantuml.jar
 publish/tauri/markdown-viewer-tauri.app/Contents/MacOS/plantuml.jar
 ```
 
+生成後の macOS bundle version を確認する。
+
+```bash
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" \
+  publish/avalonia/MarkdownViewer.Avalonia.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
+  publish/avalonia/MarkdownViewer.Avalonia.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" \
+  publish/tauri/markdown-viewer-tauri.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
+  publish/tauri/markdown-viewer-tauri.app/Contents/Info.plist
+```
+
 ### 5.2 Windows x64
 
 依存関係を復元し、[開発・実行ルール](../rules/development_workflow.md#テスト) の検証を行ってから、リポジトリルートの PowerShell で実行する。
@@ -113,6 +128,15 @@ publish/tauri/bundle/nsis/
 publish/tauri/bundle/msi/
 ```
 
+生成後の実行ファイルについて、product / file version が release version と一致することを確認する。
+
+```powershell
+(Get-Item publish/avalonia/win-x64/MarkdownViewer.Avalonia.exe).VersionInfo |
+  Select-Object ProductVersion, FileVersion
+(Get-Item publish/tauri/raw/markdown-viewer-tauri.exe).VersionInfo |
+  Select-Object ProductVersion, FileVersion
+```
+
 ## 6. ライセンス確認
 
 `LICENSE` はプロジェクト本体の MIT License である。配布物にはこれに加え、実際に同梱する第三者コンポーネントについて必要なライセンス全文と通知を含める。
@@ -122,9 +146,21 @@ publish/tauri/bundle/msi/
 - `plantuml.jar` の version、入手元、SHA-256、配布版のライセンス
 - PlantUML jar 内の依存物を含む、jar の再配布条件
 - NuGet、npm、Cargo の直接／間接依存関係と通知要否
-- 各 ZIP／installer 内でライセンス全文と通知を確認できる場所
+- 各 Release asset ZIP 内でライセンス全文と通知を確認できる場所
 
 PlantUML には複数のライセンス版がある。ファイル名だけで判断せず、実際に配布する jar を確認する。必要な通知内容や再配布条件を確定できない場合は公開しない。参考: [PlantUML FAQ](https://plantuml.com/faq)
+
+確認例:
+
+```bash
+java -jar /absolute/path/to/plantuml.jar -version
+java -jar /absolute/path/to/plantuml.jar -license
+shasum -a 256 /absolute/path/to/plantuml.jar
+```
+
+コマンドが version / license を標準出力へ表示しない版では、jar manifest と jar 内の license files も確認する。
+
+正式な梱包手順では、確認結果をまとめたリポジトリ直下の `THIRD_PARTY_NOTICES.txt` と、必要なライセンス全文を置いた `third_party_licenses/` を使用する。この2つは現時点では未作成であるため、初回 Release の前に依存関係を調査して別の documentation workflow で追加する。存在しない状態では公開しない。
 
 ## 7. Release asset を作る
 
@@ -134,32 +170,93 @@ asset 名は次の形式へ揃える。
 MarkdownViewer-Avalonia-v0.1.0-macos-arm64.zip
 MarkdownViewer-Tauri-v0.1.0-macos-arm64.zip
 MarkdownViewer-Avalonia-v0.1.0-windows-x64.zip
-MarkdownViewer-Tauri-v0.1.0-windows-x64-setup.exe
-MarkdownViewer-Tauri-v0.1.0-windows-x64.msi
-SHA256SUMS.txt
+MarkdownViewer-Tauri-v0.1.0-windows-x64-nsis.zip
+MarkdownViewer-Tauri-v0.1.0-windows-x64-msi.zip
+<asset-name>.sha256
 ```
 
 作業用 staging directory は、コミット対象外の `publish/release-assets/<tag>/` 以下に作る。ZIP にはアプリ本体だけでなく、プロジェクトの `LICENSE` と確認済みの third-party notices / license files を含める。
 
-macOS の `.app` は Finder metadata を保持できる `ditto` で ZIP 化する。
+macOS の `.app` は、アプリ本体とライセンス一式を staging directory へコピーし、Finder metadata を保持できる `ditto` で ZIP 化する。
 
 ```bash
 RELEASE_VERSION="v0.1.0"
-ASSET_DIR="publish/release-assets/${RELEASE_VERSION}"
+ASSET_DIR="publish/release-assets/${RELEASE_VERSION}/macos-arm64"
+STAGE_DIR="publish/release-staging/${RELEASE_VERSION}"
+NOTICE_FILE="THIRD_PARTY_NOTICES.txt"
+LICENSE_DIR="third_party_licenses"
+
+test -f "${NOTICE_FILE}"
+test -d "${LICENSE_DIR}"
+test ! -e "${ASSET_DIR}"
+test ! -e "${STAGE_DIR}"
 mkdir -p "${ASSET_DIR}"
 
+mkdir -p "${STAGE_DIR}/avalonia-macos-arm64"
+ditto publish/avalonia/MarkdownViewer.Avalonia.app \
+  "${STAGE_DIR}/avalonia-macos-arm64/MarkdownViewer.Avalonia.app"
+cp LICENSE "${NOTICE_FILE}" "${STAGE_DIR}/avalonia-macos-arm64/"
+ditto "${LICENSE_DIR}" "${STAGE_DIR}/avalonia-macos-arm64/third_party_licenses"
 ditto -c -k --sequesterRsrc --keepParent \
-  publish/avalonia/MarkdownViewer.Avalonia.app \
+  "${STAGE_DIR}/avalonia-macos-arm64" \
   "${ASSET_DIR}/MarkdownViewer-Avalonia-${RELEASE_VERSION}-macos-arm64.zip"
 
+mkdir -p "${STAGE_DIR}/tauri-macos-arm64"
+ditto publish/tauri/markdown-viewer-tauri.app \
+  "${STAGE_DIR}/tauri-macos-arm64/markdown-viewer-tauri.app"
+cp LICENSE "${NOTICE_FILE}" "${STAGE_DIR}/tauri-macos-arm64/"
+ditto "${LICENSE_DIR}" "${STAGE_DIR}/tauri-macos-arm64/third_party_licenses"
 ditto -c -k --sequesterRsrc --keepParent \
-  publish/tauri/markdown-viewer-tauri.app \
+  "${STAGE_DIR}/tauri-macos-arm64" \
   "${ASSET_DIR}/MarkdownViewer-Tauri-${RELEASE_VERSION}-macos-arm64.zip"
 ```
 
-上記は `.app` の ZIP 化例である。正式 asset では、`LICENSE` と確認済みの第三者通知を含む staging directory を作成し、その directory を ZIP 化する。
+Windows でもアプリまたは installer とライセンス一式を staging directory へ入れてから ZIP 化する。
 
-Windows Avalonia は `publish/avalonia/win-x64/`、`LICENSE`、第三者通知を1つの staging directory へコピーし、`Compress-Archive` で ZIP 化する。Tauri installer は、bundle 内に必要なライセンス通知が組み込まれていることを確認してから、asset 命名規則に合わせてコピーする。
+```powershell
+$ReleaseVersion = "v0.1.0"
+$AssetDir = "publish/release-assets/$ReleaseVersion/windows-x64"
+$StageDir = "publish/release-staging/$ReleaseVersion"
+$NoticeFile = "THIRD_PARTY_NOTICES.txt"
+$LicenseDir = "third_party_licenses"
+
+if (-not (Test-Path $NoticeFile -PathType Leaf)) { throw "$NoticeFile is required." }
+if (-not (Test-Path $LicenseDir -PathType Container)) { throw "$LicenseDir is required." }
+if (Test-Path $AssetDir) { throw "$AssetDir already exists." }
+if (Test-Path $StageDir) { throw "$StageDir already exists." }
+New-Item -ItemType Directory -Path $AssetDir -Force | Out-Null
+
+$AvaloniaStage = "$StageDir/avalonia-windows-x64"
+New-Item -ItemType Directory -Path "$AvaloniaStage/app" -Force | Out-Null
+Copy-Item "publish/avalonia/win-x64/*" "$AvaloniaStage/app" -Recurse
+Copy-Item -Path @("LICENSE", $NoticeFile) -Destination $AvaloniaStage
+Copy-Item $LicenseDir "$AvaloniaStage/third_party_licenses" -Recurse
+$AvaloniaAsset = "$AssetDir/MarkdownViewer-Avalonia-$ReleaseVersion-windows-x64.zip"
+Compress-Archive -Path $AvaloniaStage -DestinationPath $AvaloniaAsset -Force
+
+$NsisFiles = @(Get-ChildItem "publish/tauri/bundle/nsis" -Filter *.exe -File)
+if ($NsisFiles.Count -ne 1) { throw "Expected exactly one NSIS installer." }
+$NsisStage = "$StageDir/tauri-windows-x64-nsis"
+New-Item -ItemType Directory -Path $NsisStage -Force | Out-Null
+Copy-Item $NsisFiles[0].FullName "$NsisStage/MarkdownViewer-Tauri-setup.exe"
+Copy-Item -Path @("LICENSE", $NoticeFile) -Destination $NsisStage
+Copy-Item $LicenseDir "$NsisStage/third_party_licenses" -Recurse
+$NsisAsset = "$AssetDir/MarkdownViewer-Tauri-$ReleaseVersion-windows-x64-nsis.zip"
+Compress-Archive -Path $NsisStage -DestinationPath $NsisAsset -Force
+
+$MsiFiles = @(Get-ChildItem "publish/tauri/bundle/msi" -Filter *.msi -File)
+if ($MsiFiles.Count -eq 1) {
+  $MsiStage = "$StageDir/tauri-windows-x64-msi"
+  New-Item -ItemType Directory -Path $MsiStage -Force | Out-Null
+  Copy-Item $MsiFiles[0].FullName "$MsiStage/MarkdownViewer-Tauri.msi"
+  Copy-Item -Path @("LICENSE", $NoticeFile) -Destination $MsiStage
+  Copy-Item $LicenseDir "$MsiStage/third_party_licenses" -Recurse
+  $MsiAsset = "$AssetDir/MarkdownViewer-Tauri-$ReleaseVersion-windows-x64-msi.zip"
+  Compress-Archive -Path $MsiStage -DestinationPath $MsiAsset -Force
+} elseif ($MsiFiles.Count -gt 1) {
+  throw "Expected at most one MSI installer."
+}
+```
 
 ## 8. 現行 macOS DMG の制約
 
@@ -169,18 +266,27 @@ Windows Avalonia は `publish/avalonia/win-x64/`、`LICENSE`、第三者通知�
 
 将来 DMG 作成処理を修正した場合も、DMG からインストールした `.app/Contents/MacOS/plantuml.jar` と PlantUML 表示を確認するまで、この制約を解除しない。
 
-## 9. checksum を作る
+## 9. asset ごとの checksum を作る
 
-最終的な全 asset を1つの directory に集めた後、SHA-256 を生成する。
+OS別成果物を1台へ集約せず、それぞれを作成した OS で asset ごとの SHA-256 fileを作る。
 
 macOS:
 
 ```bash
-cd publish/release-assets/v0.1.0
-shasum -a 256 *.zip *.exe *.msi > SHA256SUMS.txt
+cd publish/release-assets/v0.1.0/macos-arm64
+for asset in *.zip; do
+  shasum -a 256 "${asset}" > "${asset}.sha256"
+done
 ```
 
-存在しない拡張子は glob から外す。Windows では各ファイルに `Get-FileHash -Algorithm SHA256` を実行し、同じ asset 名と hash を `SHA256SUMS.txt` に記録する。
+Windows:
+
+```powershell
+Get-ChildItem "publish/release-assets/v0.1.0/windows-x64" -Filter *.zip -File | ForEach-Object {
+  $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+  "$hash  $($_.Name)" | Set-Content "$($_.FullName).sha256"
+}
+```
 
 ## 10. Draft Release を作る
 
@@ -189,17 +295,46 @@ GitHub の [Releases](https://github.com/an-embedded-engineer/MarkdownViewer/rel
 1. tag: release commit を指す `v0.1.0`
 2. title: `MarkdownViewer v0.1.0`
 3. Release notes: 対象 OS / architecture、source commit、必要環境、asset 一覧、署名状況、既知制約
-4. assets: OS別 ZIP／installer と `SHA256SUMS.txt`
+4. assets: OS別 ZIP と各 `.sha256`
 5. 初回確認中は `Save draft`
 
 GitHub CLI を使う場合:
 
 ```bash
 gh release create v0.1.0 \
-  publish/release-assets/v0.1.0/* \
   --title "MarkdownViewer v0.1.0" \
   --generate-notes \
   --draft
+```
+
+Draft 作成後、macOS と Windows の各環境から、その環境で作成した asset と `.sha256` を同じ Release へ追加する。
+
+macOS:
+
+```bash
+gh release upload v0.1.0 publish/release-assets/v0.1.0/macos-arm64/*
+```
+
+Windows:
+
+```powershell
+Get-ChildItem "publish/release-assets/v0.1.0/windows-x64" -File | ForEach-Object {
+  gh release upload v0.1.0 $_.FullName
+  if ($LASTEXITCODE -ne 0) { throw "Release upload failed: $($_.Name)" }
+}
+```
+
+Release notes には少なくとも次を記載する。
+
+```text
+- Source commit SHA / tag
+- 対象 OS version と CPU architecture
+- asset ごとの実装種別（Avalonia / Tauri）と package 形式
+- Java の要否と、配布する PlantUML jar で確認した Java version
+- Windows WebView2 Runtime の要否
+- macOS minimum version
+- code signing / notarization の有無
+- 現行 DMG を配布しないことなどの既知制約
 ```
 
 GitHub Release は tag に基づいて作成し、実行ファイルなどを asset として添付できる。詳細は [GitHub の Release 管理手順](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository) を参照する。
@@ -208,13 +343,14 @@ GitHub Release は tag に基づいて作成し、実行ファイルなどを as
 
 ローカル staging file ではなく、Draft Release からダウンロードした asset を使って確認する。
 
-- [ ] `SHA256SUMS.txt` とダウンロードした全 asset の SHA-256 が一致する
+- [ ] 各 `.sha256` とダウンロードした asset の SHA-256 が一致する
 - [ ] ZIP を新しい directory へ展開、または installer で新規インストールできる
 - [ ] 配布物の実体からアプリを起動できる
 - [ ] folder 選択、Markdown 表示、Mermaid 表示が動作する
 - [ ] `sample_docs/plantuml.md` で PlantUML と Mermaid が表示される
 - [ ] `plantuml.jar` が想定 runtime directory に存在する
 - [ ] version 表示または成果物メタデータが tag と一致する
+- [ ] Windows Tauri は NSIS / MSI からインストールした実行ファイルの `ProductVersion` / `FileVersion` も raw 実行ファイルおよび tag と一致する
 - [ ] 未署名の場合、OS の警告と利用者向け案内が Release notes と一致する
 - [ ] Windows installer の uninstall を確認する
 
@@ -230,6 +366,8 @@ smoke test が完了したら Draft Release を Publish する。公開後も Re
 - Release notes の download 対象、必要環境、署名状況、既知制約が正しい
 
 Release asset に誤りが見つかった場合は利用者へ影響を明記し、同じファイル名を黙って差し替えない。必要に応じて Release を Draft / pre-release 扱いへ戻すか、修正版 version を発行する。
+
+同じ version の asset / staging directory が既に存在する場合、手順は fail-fast で停止する。内容を確認して退避または削除してから再実行し、古い ZIP や checksum を混在させない。
 
 ## 13. GitHub Actions による将来自動化
 
