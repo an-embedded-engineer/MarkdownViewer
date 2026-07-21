@@ -33,15 +33,18 @@ Avalonia 版と Tauri 版の publish 手順は `docs/rules/development_workflow.
 1. 既存の publish コマンドは `docs/rules/development_workflow.md` を正とし、Release 手順書では利用順序と出力先を示す。
 2. 初回リリースで推奨する配布対象を Windows x64 と macOS arm64 に限定して明記する。
 3. macOS の `.app` は ZIP、Windows の Avalonia 出力は ZIP、Windows の Tauri は NSIS / MSI を Release asset とする。
-4. バージョン整合、PlantUML と MIT のライセンス通知、SHA-256、署名警告を公開前チェックに含める。
-5. 現行 macOS publish スクリプトの DMG には `plantuml.jar` が含まれない可能性があるため、修正前は jar 入り `.app` の ZIP を配布する制約を記載する。
-6. GitHub Web UI と `gh` CLI の両方を記載し、最初は Draft Release を使う。
-7. GitHub Actions 自動化は将来案として必要な構成要素だけを示し、未実装であることを明記する。
+4. clean worktree で release commit と tag を先に確定し、macOS / Windows の双方が同じ tag commit を checkout して publish する順序を正本とする。asset 名、Release notes、チェックサムには version と architecture を記録する。
+5. Tauri の `tauri.conf.json` / `Cargo.toml` / `package.json`、Avalonia macOS の publish スクリプト内 `Info.plist` 値、生成後の各成果物メタデータをバージョン確認対象とする。tag と一致しない場合は公開を止め、別 workflow でバージョン定義またはスクリプトを更新してから再開する。
+6. 配布する `plantuml.jar` の版、取得元、ライセンス条件と、NuGet / npm / Cargo を含む第三者依存関係の通知要否を公開前に確認する。必要な通知やライセンス全文を用意できない場合は公開しない。
+7. 現行 macOS publish スクリプトで生成した DMG には `plantuml.jar` が入らないため配布対象外とし、`publish/tauri/markdown-viewer-tauri.app/Contents/MacOS/plantuml.jar` を確認した `.app` の ZIP を配布する。将来 DMG 対応を修正した後も、インストール後の jar 同梱確認が済むまで制約を解除しない。
+8. SHA-256、署名警告に加え、配布用 ZIP の展開後またはインストーラのインストール後の実体から起動する smoke test を公開条件に含める。Draft Release から再ダウンロードした asset のチェックサムと PlantUML / Mermaid 表示も確認する。
+9. GitHub Web UI と `gh` CLI の両方を記載し、最初は Draft Release を使う。
+10. GitHub Actions 自動化は将来案として必要な構成要素だけを示し、未実装であることを明記する。
 
 ## 文書構成
 
 1. 対象範囲と前提
-2. リリース前準備
+2. リリース前準備、release commit と tag の確定
 3. macOS / Windows の publish
 4. Release asset の作成と命名
 5. ライセンス、署名、チェックサム
@@ -57,6 +60,8 @@ Avalonia 版と Tauri 版の publish 手順は `docs/rules/development_workflow.
 - `publish/` や `plantuml.jar` をコミットする説明になっていないこと
 - GitHub Actions、署名、DMG 対応を実装済みと誤読させないこと
 - Linux 版や macOS Intel 版を現行スクリプトで配布可能と誤記しないこと
+- Release tag、macOS / Windows の build 元 commit、成果物内バージョンが一致すること
+- 第三者ライセンス条件を確認できない状態で公開可能と読める記述がないこと
 
 ## レビュー方針
 
