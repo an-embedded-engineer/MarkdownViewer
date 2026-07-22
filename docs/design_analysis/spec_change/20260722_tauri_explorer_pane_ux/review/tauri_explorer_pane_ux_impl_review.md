@@ -37,7 +37,9 @@ Explorer 幅 policy (`explorerPane.ts`)、pointer capture / cancel / lost-captur
 
 **工程**: Phase 3（実装またはドキュメント修正）
 
-**status**: open
+**対応**: 推奨対応(a)を採用し、directory rowから`disabled={disabled}`を削除した。これによりglobal busy中も既存のclient-side tree開閉を維持し、file rowのdisabled契約だけを従来どおり保持する。実装記録にあった誤った設計差分の説明も訂正した。
+
+**status**: addressed; follow-up review pending
 
 ---
 
@@ -49,7 +51,9 @@ Explorer 幅 policy (`explorerPane.ts`)、pointer capture / cancel / lost-captur
 
 **severity**: Low
 
-**status**: open
+**対応**: `pointerdown`でseparator自身へ明示的に`focus()`してからpointer captureを開始するよう変更した。`preventDefault()`のWebView差異に依存せず、drag直後にkeyboard操作へ継続できる契約とした。Phase 4-aの手動確認項目にも追加した。
+
+**status**: addressed; follow-up review pending
 
 ### 2.2 drag中のcursor強制がsandboxed HTML iframeの内部文書には及ばない
 
@@ -57,7 +61,9 @@ Explorer 幅 policy (`explorerPane.ts`)、pointer capture / cancel / lost-captur
 
 **severity**: Low
 
-**status**: open
+**対応**: sandboxed iframeの内部文書へ親CSSを適用する変更は行わず、pointer captureによる機能継続を維持する。HTML表示中のiframe上でdrag継続とcursorの見え方を確認する項目を`docs/rules/development_workflow.md`と実装記録へ追加し、Phase 4-aへ明示的に引き継いだ。
+
+**status**: addressed by Phase 4-a verification handoff; follow-up review pending
 
 ---
 

@@ -155,6 +155,7 @@ function App() {
       return;
     }
 
+    event.currentTarget.focus();
     explorerResizeRef.current = {
       pointerId: event.pointerId,
       startClientX: event.clientX,
@@ -1625,7 +1626,6 @@ function TreeNode({ node, selectedFilePath, disabled, onSelect, level }: TreeNod
           type="button"
           className="tree-row directory-row"
           style={{ paddingLeft: 12 + level * 14 }}
-          disabled={disabled}
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
           title={node.path}

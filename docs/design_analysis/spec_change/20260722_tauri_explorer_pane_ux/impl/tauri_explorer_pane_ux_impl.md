@@ -13,7 +13,7 @@
 | --- | --- |
 | Explorer幅policy | `src/explorerPane.ts`へ初期280px、最小180px、hard最大640px、Preview予約320px、separator 6px、keyboard step 16pxとpure functionを集約した。dynamic maxは`max(180, min(640, workspaceWidth - 320 - 6))`で常にmin以上となる。 |
 | workspace計測とsession state | `App`が`requestedExplorerWidth`、`workspaceWidth`、drag stateを保持し、`ResizeObserver`でworkspace実寸を更新する。root変更・Reloadではresetせず、永続化は行わない。 |
-| pointer resize | primary pointerだけを受け、separatorのpointer captureを正本としてmove / up / cancel / lost captureを処理する。drag中はselectionを抑止し、app shell全体へ`col-resize` cursorを適用する。 |
+| pointer resize | primary pointerだけを受け、separatorへ明示的にfocusを移したうえでpointer captureを正本としてmove / up / cancel / lost captureを処理する。drag中はselectionを抑止し、app shell全体へ`col-resize` cursorを適用する。 |
 | keyboard / accessibility | separatorへvertical `role="separator"`、`aria-controls`、min / max / now、focus、ArrowLeft / ArrowRight / Home / Endを実装した。directory buttonへ`aria-expanded`を追加した。 |
 | layout / overflow | workspaceをExplorer / 6px separator / Previewの3列へ変更した。Explorer headerと`.explorer-scroll`を分離し、tree / rowへ`max-content`と`min-width: 100%`を併用した。固定220px media queryとlabel ellipsisは削除した。 |
 | tree icon | disclosure、directory、Markdown、HTML、imageを外部packageなしの`currentColor` inline SVGで表示した。iconは`aria-hidden`とし、node名をaccessible nameとして維持した。 |
@@ -21,7 +21,8 @@
 ## 3. 設計差分
 
 - 設計のpointer up / cancel cleanupに加え、WebView側でcaptureが失われた場合にもdrag状態を残さないよう`lostpointercapture`を同じ終了契約へ追加した。
-- global busy中のdirectory開閉buttonにも既存file rowと同様の`disabled`を適用し、設計で要求したdisabled状態の一貫性を確保した。
+- `pointerdown`のdefault focusが`preventDefault()`で抑止されるWebViewでもkeyboard操作へ継続できるよう、separatorを明示的にfocusする。
+- directory開閉はI/Oを伴わない既存のclient-side toggleとしてglobal busy中も維持し、file rowの既存disabled契約だけを変更せず保持する。
 - それ以外の数値、永続化範囲、Rust API、tree data contract、Avalonia非対象範囲に設計差分はない。
 
 ## 4. 互換性
@@ -53,5 +54,5 @@
 
 ## 7. 手動確認と未解決事項
 
-- pointer / keyboard resize、狭幅時ARIA、長いtreeの縦横scroll、Light / Dark icon、HTML iframe上でのpointer captureはPhase 4-aのユーザー動作確認で実施する。
+- pointer / keyboard resize、pointer drag後のseparator focus、狭幅時ARIA、長いtreeの縦横scroll、Light / Dark icon、HTML iframe上でのpointer captureとcursorの見え方はPhase 4-aのユーザー動作確認で実施する。
 - Phase 3実装時点の未解決実装事項はない。実装レビュー結果は`review/`へレビュー担当Agentが記録する。
