@@ -1,0 +1,1 @@
+`docs/design_analysis/spec_change/20260722_tauri_explorer_pane_ux/prompts/phase2_design_review_initial_claude.md` を読んで、レビューを開始してください。
