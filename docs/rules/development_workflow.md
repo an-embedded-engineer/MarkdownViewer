@@ -168,6 +168,10 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 
 - フォルダ選択
 - Explorer から Markdown 選択
+- Explorer separatorをpointer / ArrowLeft / ArrowRight / Home / Endで操作し、180pxからworkspaceに応じたdynamic最大幅まで変更できること
+- windowを506px未満へ縮めてもExplorer幅とseparatorのARIA値が180pxを下回らず、再拡大時に直前の要求幅へ戻ること
+- 深い階層・長いMarkdown / HTML / image名で必要時だけExplorer内の水平scrollbarが現れ、縦横の末尾へ到達できること
+- 短いtreeでは不要な水平scrollbarが出ず、directory / Markdown / HTML / imageのicon、開閉、選択、disabled状態をLight / Darkで判別できること
 - Markdown プレビュー表示
 - `sample_docs/image_link.md` のroot内相対PNG画像が表示されること
 - Mermaid 描画

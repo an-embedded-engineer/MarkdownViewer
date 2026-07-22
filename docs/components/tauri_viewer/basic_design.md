@@ -6,9 +6,10 @@ OS 連携とファイルシステム境界は Rust command / `DocumentStore` へ
 
 ## 責務
 
-- React: MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、TabStrip、Preview、error strip、StatusBar、永続 Theme / window resize queue、tab単位のエラー / loading、Markdown → HTML 変換、document type別preview。
+- React: MenuBar dropdown、Settings dialog、Recent Folders、root path strip、幅変更可能なExplorer、TabStrip、Preview、error strip、StatusBar、永続 Theme / window resize queue、tab単位のエラー / loading、Markdown → HTML 変換、document type別preview。
 - TypeScript renderer (`renderMarkdown`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。
 - TypeScript policy (`documentPolicy.ts`): command responseの排他shape、HTML preview URL、opaque-origin messageをpure functionで検証する。
+- TypeScript policy (`explorerPane.ts`): Explorer幅の最小値、workspace実寸に応じたdynamic最大値、clamp、keyboard操作をpure functionで管理する。幅はsession-onlyで永続化しない。
 - Rust: canonical current root、Markdown / HTML open、`mvhtml` resource配信、PlantUML レンダリング、Recent Folders / Viewer settings の app config JSON 永続化。
 - Tauri config: dialog / opener / asset protocol の権限管理とshell CSP。HTML protocol originをcapability remote URLへ追加しない。
 
@@ -64,6 +65,7 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 ```text
 React UI -> Tauri invoke -> Rust commands -> filesystem / Java
 React UI -> markdown-it / mermaid -> WebView DOM
+React UI -> explorerPane.ts -> Explorer width bounds / keyboard policy
 React UI -> @tauri-apps/plugin-dialog / plugin-opener -> OS
 HtmlPreview -> mvhtml protocol -> DocumentStore -> root内allowlist resource
 ```
