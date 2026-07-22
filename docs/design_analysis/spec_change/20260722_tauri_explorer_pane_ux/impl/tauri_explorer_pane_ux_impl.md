@@ -62,3 +62,12 @@
 - 初回レビューcommit `4dd42ee`: Changes Requested（Medium 1件、Low 2件）。
 - 指摘対応commit `e43ecf9`: directory開閉の既存契約を復元し、separator focusを明示化し、iframe上のcursor確認をPhase 4-aへ引き継いだ。
 - follow-up review commit `aaedc2c`: Approved、未解決指摘0件。自動検証一式もレビュー担当が独立再実行して成功した。
+
+## 9. Phase 4-a ユーザー動作確認結果
+
+確認日: 2026-07-22
+
+- Explorerツリーペインの幅変更: PASS。
+- 長いpathのfile選択時にExplorer内へ水平scrollbarが表示される: PASS。
+- folder、Markdown、HTML、imageの各icon表示: PASS。
+- ユーザーは上記主要UXの確認結果をもってPhase 4-aをOKと判断した。詳細は`../verification/phase4a_user_verification.md`を参照する。

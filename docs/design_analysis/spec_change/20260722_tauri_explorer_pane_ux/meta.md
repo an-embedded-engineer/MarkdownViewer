@@ -15,7 +15,7 @@ status: "in_progress"
 design_status: "done"
 impl_status: "done"
 completion_status: "pending"
-verification_status: "pending"
+verification_status: "done"
 related_commits:
   - "d2091b3 : Phase 0 define TODO-2026-019 scope"
   - "f8607df : Phase 1 initialize Tauri Explorer pane UX workflow"
@@ -63,4 +63,4 @@ related_commits:
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
 | Phase 3 Implementation and docs review | Done (Approved, unresolved findings: 0) |
-| Phase 4 Verification and completion | Pending |
+| Phase 4 Verification and completion | Phase 4-a Done (user verification accepted); Phase 4-b pending |
