@@ -28,6 +28,7 @@ related_commits:
   - "e43ecf9 : Phase 3 address Tauri Explorer pane UX implementation review"
   - "aaedc2c : Phase 3 approve Tauri Explorer pane UX implementation after follow-up"
   - "c9a0153 : Phase 4-a record Tauri Explorer pane UX user verification"
+  - "e14348b : Phase 4-b complete report, diff archive, TODO archive, and history"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-019-tauri-explorer-ツリーペイン-ux-改善"
 follow_up:
   - "TODO-2026-020 Avalonia Explorer tree pane UX rollout"
