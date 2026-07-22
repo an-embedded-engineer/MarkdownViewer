@@ -15,6 +15,12 @@ import {
   type DocumentType,
   type FileNodeType,
 } from "./documentPolicy";
+import {
+  clampExplorerWidth,
+  getExplorerWidthBounds,
+  getExplorerWidthForKey,
+  initialExplorerWidth,
+} from "./explorerPane";
 
 type FileTreeNode = {
   name: string;
@@ -86,6 +92,12 @@ type ViewerPreferencesDraft = {
 
 type ActiveMenu = "file" | "view" | null;
 
+type ExplorerResizeState = {
+  pointerId: number;
+  startClientX: number;
+  startWidth: number;
+};
+
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 const defaultWindowSize: WindowSize = { width: 800, height: 600 };
@@ -109,13 +121,20 @@ function App() {
   const [foregroundConfigOperationCount, setForegroundConfigOperationCount] = useState(0);
   const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([]);
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
+  const [requestedExplorerWidth, setRequestedExplorerWidth] = useState(initialExplorerWidth);
+  const [workspaceWidth, setWorkspaceWidth] = useState<number | null>(null);
+  const [isExplorerResizing, setIsExplorerResizing] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
+  const explorerResizeRef = useRef<ExplorerResizeState | null>(null);
   const menuBarRef = useRef<HTMLElement>(null);
   const fileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const tabsRef = useRef<OpenDocumentTab[]>([]);
   const nextTabIdRef = useRef(1);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
+  const explorerWidth = clampExplorerWidth(requestedExplorerWidth, workspaceWidth);
+  const explorerWidthBounds = getExplorerWidthBounds(workspaceWidth);
   const isAppConfigBusy = isStartupConfigLoading || foregroundConfigOperationCount > 0;
   const isGlobalBusy = isRootLoading || isAppConfigBusy;
   const errorMessage = appConfigError ?? rootOperationError ?? activeTab?.errorMessage ?? null;
@@ -130,6 +149,65 @@ function App() {
         : activeTab?.loadState === "rendering"
           ? "Rendering PlantUML diagrams..."
           : null;
+
+  function handleExplorerPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || !event.isPrimary || explorerResizeRef.current) {
+      return;
+    }
+
+    event.currentTarget.focus();
+    explorerResizeRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startWidth: explorerWidth,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsExplorerResizing(true);
+    event.preventDefault();
+  }
+
+  function handleExplorerPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const resize = explorerResizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) {
+      return;
+    }
+
+    setRequestedExplorerWidth(
+      clampExplorerWidth(resize.startWidth + event.clientX - resize.startClientX, workspaceWidth),
+    );
+  }
+
+  function finishExplorerResize(event: React.PointerEvent<HTMLDivElement>) {
+    const resize = explorerResizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) {
+      return;
+    }
+
+    explorerResizeRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsExplorerResizing(false);
+  }
+
+  function handleExplorerLostPointerCapture(event: React.PointerEvent<HTMLDivElement>) {
+    if (explorerResizeRef.current?.pointerId !== event.pointerId) {
+      return;
+    }
+
+    explorerResizeRef.current = null;
+    setIsExplorerResizing(false);
+  }
+
+  function handleExplorerKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const nextWidth = getExplorerWidthForKey(event.key, explorerWidth, workspaceWidth);
+    if (nextWidth === null) {
+      return;
+    }
+
+    event.preventDefault();
+    setRequestedExplorerWidth(nextWidth);
+  }
 
   function updateTabs(updater: (current: OpenDocumentTab[]) => OpenDocumentTab[]) {
     const next = updater(tabsRef.current);
@@ -556,6 +634,33 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (isStartupConfigLoading || !workspaceRef.current) {
+      return;
+    }
+
+    const workspace = workspaceRef.current;
+    const updateWorkspaceWidth = (width: number) => {
+      if (Number.isFinite(width) && width > 0) {
+        setWorkspaceWidth(width);
+      }
+    };
+    updateWorkspaceWidth(workspace.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        updateWorkspaceWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(workspace);
+
+    return () => {
+      observer.disconnect();
+      explorerResizeRef.current = null;
+    };
+  }, [isStartupConfigLoading]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadAppConfig() {
@@ -818,7 +923,7 @@ function App() {
   return (
     <>
       <main
-        className="app-shell"
+        className={`app-shell ${isExplorerResizing ? "explorer-resizing" : ""}`}
         aria-hidden={settingsDraft ? true : undefined}
         inert={settingsDraft ? true : undefined}
       >
@@ -842,22 +947,46 @@ function App() {
 
         <RootPathBar rootPath={rootPath} />
 
-      <section className="workspace">
-        <aside className="explorer-pane" aria-label="Explorer">
-          <div className="pane-title">Explorer</div>
-          {fileTree ? (
-            <FileTree
-              node={fileTree}
-              selectedFilePath={activeTab?.path ?? null}
-              disabled={isGlobalBusy}
-              onSelect={(node) => rootPath && openOrActivateTab(node.path)}
-            />
-          ) : (
-            <div className="empty-state">Open a folder to browse documents.</div>
-          )}
-        </aside>
+        <section
+          ref={workspaceRef}
+          className="workspace"
+          style={{ "--explorer-width": `${explorerWidth}px` } as React.CSSProperties}
+        >
+          <aside className="explorer-pane" id="explorer-pane" aria-label="Explorer">
+            <div className="pane-title">Explorer</div>
+            <div className="explorer-scroll">
+              {fileTree ? (
+                <FileTree
+                  node={fileTree}
+                  selectedFilePath={activeTab?.path ?? null}
+                  disabled={isGlobalBusy}
+                  onSelect={(node) => rootPath && openOrActivateTab(node.path)}
+                />
+              ) : (
+                <div className="empty-state">Open a folder to browse documents.</div>
+              )}
+            </div>
+          </aside>
 
-        <section className="preview-workspace" aria-label="Document Preview">
+          <div
+            className="explorer-separator"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize Explorer pane"
+            aria-controls="explorer-pane document-preview"
+            aria-valuemin={explorerWidthBounds.min}
+            aria-valuemax={explorerWidthBounds.max}
+            aria-valuenow={explorerWidth}
+            tabIndex={0}
+            onPointerDown={handleExplorerPointerDown}
+            onPointerMove={handleExplorerPointerMove}
+            onPointerUp={finishExplorerResize}
+            onPointerCancel={finishExplorerResize}
+            onLostPointerCapture={handleExplorerLostPointerCapture}
+            onKeyDown={handleExplorerKeyDown}
+          />
+
+          <section className="preview-workspace" aria-label="Document Preview">
           <TabStrip
             tabs={tabs}
             activeTabId={activeTabId}
@@ -901,8 +1030,8 @@ function App() {
               <div className="preview-empty">No document selected.</div>
             )}
           </div>
+          </section>
         </section>
-      </section>
 
         {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
 
@@ -1447,6 +1576,40 @@ function FileTree({ node, selectedFilePath, disabled, onSelect }: FileTreeProps)
   );
 }
 
+function TreeDisclosure({ expanded }: { expanded: boolean }) {
+  return (
+    <span className="tree-disclosure" aria-hidden="true">
+      <svg viewBox="0 0 16 16" focusable="false">
+        <path d={expanded ? "M3.5 5.5 8 10l4.5-4.5" : "M5.5 3.5 10 8l-4.5 4.5"} />
+      </svg>
+    </span>
+  );
+}
+
+function TreeNodeIcon({ nodeType, expanded }: { nodeType: FileNodeType; expanded?: boolean }) {
+  return (
+    <span className={`tree-type-icon tree-type-${nodeType}`} aria-hidden="true">
+      {nodeType === "directory" ? (
+        <svg viewBox="0 0 18 16" focusable="false">
+          <path d={expanded ? "M1.5 5.5h15l-1.8 8H2.6z" : "M1.5 3h5l1.6 2h8.4v8.5h-15z"} />
+        </svg>
+      ) : nodeType === "markdown" ? (
+        <svg viewBox="0 0 18 16" focusable="false">
+          <path d="M3 1.5h8l4 4v9H3z M11 1.5v4h4 M5.5 11V8l1.7 2 1.7-2v3 M11 8.5v2.5m0 0-1-1m1 1 1-1" />
+        </svg>
+      ) : nodeType === "html" ? (
+        <svg viewBox="0 0 18 16" focusable="false">
+          <path d="M3 1.5h8l4 4v9H3z M11 1.5v4h4 M7.5 8 5.7 9.7l1.8 1.8 M10.5 8l1.8 1.7-1.8 1.8" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 18 16" focusable="false">
+          <path d="M2 2h14v12H2z M4 12l3.2-3.5 2.3 2.2 1.8-1.8L14 12 M12.5 5.5h.01" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 type TreeNodeProps = FileTreeProps & {
   level: number;
 };
@@ -1463,10 +1626,12 @@ function TreeNode({ node, selectedFilePath, disabled, onSelect, level }: TreeNod
           type="button"
           className="tree-row directory-row"
           style={{ paddingLeft: 12 + level * 14 }}
+          aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
           title={node.path}
         >
-          <span className="tree-icon">{expanded ? "v" : ">"}</span>
+          <TreeDisclosure expanded={expanded} />
+          <TreeNodeIcon nodeType={node.nodeType} expanded={expanded} />
           <span className="tree-label">{node.name}</span>
         </button>
         {expanded &&
@@ -1493,9 +1658,8 @@ function TreeNode({ node, selectedFilePath, disabled, onSelect, level }: TreeNod
       onClick={() => onSelect(node)}
       title={node.path}
     >
-      <span className="tree-icon">
-        {node.nodeType === "markdown" ? "MD" : node.nodeType === "html" ? "HTML" : "IMG"}
-      </span>
+      <span className="tree-disclosure-spacer" aria-hidden="true" />
+      <TreeNodeIcon nodeType={node.nodeType} />
       <span className="tree-label">{node.name}</span>
     </button>
   );

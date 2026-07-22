@@ -41,7 +41,9 @@ markdown-viewer-tauri/
 │   ├── App.tsx                   — UI + typed document tab / settings状態管理
 │   ├── documentPolicy.ts         — HTML URL / bridge message policy
 │   ├── documentPolicy.test.ts    — frontend policy unit test
-│   ├── App.css                   — Light / Dark テーマ + MenuBar / TabStrip / 2 ペイン / StatusBar レイアウト
+│   ├── explorerPane.ts           — Explorer幅の境界 / keyboard policy
+│   ├── explorerPane.test.ts      — Explorer幅policy unit test
+│   ├── App.css                   — Light / Dark テーマ + MenuBar / resizable Explorer / TabStrip / StatusBar レイアウト
 │   └── vite-env.d.ts             — Vite 型定義
 └── src-tauri/                    — Rust バックエンド (Tauri 本体)
     ├── Cargo.toml                — クレート / プラグイン
@@ -61,7 +63,8 @@ markdown-viewer-tauri/
 | `main.tsx` | React DOM ルートに `App` をマウント | [markdown-viewer-tauri/src/main.tsx](../../../markdown-viewer-tauri/src/main.tsx) |
 | `App` / `MenuBar` / `SettingsDialog` / `RootPathBar` / `FileTree` / `TabStrip` / `MarkdownPreview` / `HtmlPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`tabs` / `activeTabId` を typed document stateの正本とし、HTMLはsandboxed iframeだけで表示する | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
 | `documentPolicy.ts` | Markdown / HTML response shape、preview revision URL、opaque-origin bridge messageをpure functionで検証する | [markdown-viewer-tauri/src/documentPolicy.ts](../../../markdown-viewer-tauri/src/documentPolicy.ts) |
-| `App.css` | Light / Dark テーマ、MenuBar、Settings dialog、TabStripのactive/loading/error/横overflow、2ペイン、error strip、StatusBar、Markdown図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
+| `explorerPane.ts` | Explorerの初期/最小/dynamic最大幅、clamp、ArrowLeft / ArrowRight / Home / End操作をDOM非依存のpure functionで管理する | [markdown-viewer-tauri/src/explorerPane.ts](../../../markdown-viewer-tauri/src/explorerPane.ts) |
+| `App.css` | Light / Dark テーマ、MenuBar、Settings dialog、幅変更可能なExplorer、treeの縦横overflowとtyped SVG icon、TabStrip、error strip、StatusBar、Markdown図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
 | `scan_directory` | Rust command。root 配下を再帰走査して `FileTreeNode` を返す。除外ディレクトリあり | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `open_document` | Rust command。`DocumentStore` current root内のMarkdownはUTF-8本文、HTMLはroot-relative `previewUrl`を排他的responseで返す | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `mvhtml` protocol | segment decode、canonical root、MIME allowlist、CSP/CORSを検証し、HTMLへready / external-link bridgeを注入する | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |

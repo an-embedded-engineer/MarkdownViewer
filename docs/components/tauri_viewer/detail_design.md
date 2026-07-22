@@ -17,6 +17,9 @@
 | `isRecentFoldersBusy` | Recent Folders command 実行中フラグ | app config JSON 読み書き中の重複操作を抑止 |
 | `recentFolders` | 最近開いた root folder 一覧 | `RecentFolderEntry[]`。app config JSON から復元 |
 | `activeMenu` | 開いている MenuBar dropdown | `"file"` / `"view"` / `null` |
+| `requestedExplorerWidth` | 利用者が最後に要求したExplorer幅 | 初期280px。window縮小時の実効clamp後も保持し、再拡大時に復元 |
+| `workspaceWidth` | workspace content width | `ResizeObserver`で計測。未計測時は`null` |
+| `isExplorerResizing` | Explorer separator drag中フラグ | app shellのselection抑止と`col-resize` cursorに使用 |
 | `isGlobalBusy` | `isRootLoading OR isRecentFoldersBusy` | root競合操作だけを抑止。tab activate / closeは許可 |
 | `nextTabIdRef` | tab ID採番 | close後も再利用しない単調増加counter |
 
@@ -423,9 +426,13 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
   <MenuBar/>           ← File: Open Folder / Recent Folders / Reload / Settings、View: Theme
   <RootPathBar/>       ← root path。未選択時は No folder selected
   <section.workspace>
-    <aside.explorer-pane>
-      <FileTree/>      ← 再帰 TreeNode、Markdown / HTML / Image / Directory アイコン
+    <aside#explorer-pane.explorer-pane>
+      <div.pane-title/>
+      <div.explorer-scroll>
+        <FileTree/>      ← 再帰 TreeNode、disclosureとtyped inline SVG icon
+      </div>
     </aside>
+    <div.explorer-separator role="separator"/> ← pointer / keyboard resize、ARIA値
     <section.preview-workspace>
       <TabStrip/>        ← horizontal overflow / activate / close / roving focus
       <div#document-preview.preview-pane role="tabpanel">
@@ -441,8 +448,8 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
 
 `MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload`、separator、`Settings...`を持ち、`View` dropdown は theme 切替を持つ。Settingsはapplication-wideな操作であり、dialog close後はFile triggerへfocusを戻す。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
 
-`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。`TabStrip` は PreviewWorkspace 上段でopen中documentを表示し、下段の単一`tabpanel`がactive tabを描画する。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
+`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。Explorer幅は`explorerPane.ts`のpure policyで180pxからworkspace実寸に応じたdynamic最大幅へclampし、`ResizeObserver`によるwindow追従とpointer captureによるdragを`App`が調停する。separatorはArrowLeft / ArrowRight / Home / Endでも操作でき、現在のmin / max / nowをARIAへ公開する。`TabStrip` は PreviewWorkspace 上段でopen中documentを表示し、下段の単一`tabpanel`がactive tabを描画する。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
 
-`html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠には縦スクロールバーを出さない。スクロールは `.explorer-pane` と `.preview-pane` の `overflow: auto` に限定し、MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。`ErrorBanner` は条件付き描画のため、chrome 要素は CSS grid の自動配置に依存せず、`grid-row` で MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の行を明示する。
+`html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠にはスクロールバーを出さない。Explorer titleは固定し、treeの縦横scrollは`.explorer-scroll`、documentのscrollは`.preview-pane`へ限定する。`.file-tree`と`.tree-row`は`width: max-content; min-width: 100%`を併用し、短いtreeのrow背景をpane端まで維持しながら、深い階層・長い名前で必要な場合だけ水平scrollを発生させる。tree rowはdisclosure / type icon / labelの3列を共通利用し、labelはellipsisしない。MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。`ErrorBanner` は条件付き描画のため、chrome 要素は CSS grid の自動配置に依存せず、`grid-row` で MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の行を明示する。
 
 テーマは `document.documentElement.dataset.theme` に `"light" \| "dark"` を書き込み、`App.css` の `:root[data-theme=...]` で CSS 変数を切り替える。

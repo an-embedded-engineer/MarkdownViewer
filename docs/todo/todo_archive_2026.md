@@ -251,3 +251,34 @@
 - Follow-up:
   - Windows / Linux and remaining platform-specific security matrix checks will be performed separately.
   - A platform-specific problem found later will be filed under `docs/issues/` and handled through the issue-resolution or bugfix workflow.
+
+## TODO-2026-019 Tauri Explorer ツリーペイン UX 改善
+
+- Status: `done`
+- Category: `spec-change`
+- Created: `2026-07-22`
+- Completed: `2026-07-22`
+- Branch: `spec-change/tauri-explorer-pane-ux`
+- Design analysis:
+  - `docs/design_analysis/spec_change/20260722_tauri_explorer_pane_ux/`
+- Change report:
+  - `docs/design_analysis/spec_change/20260722_tauri_explorer_pane_ux/change_report.md`
+- Review records:
+  - `docs/design_analysis/spec_change/20260722_tauri_explorer_pane_ux/review/tauri_explorer_pane_ux_design_review.md`
+  - `docs/design_analysis/spec_change/20260722_tauri_explorer_pane_ux/review/tauri_explorer_pane_ux_impl_review.md`
+- Summary:
+  - Added pointer and keyboard resizing between the Tauri Explorer and Preview with bounded width policy and separator ARIA semantics.
+  - Added Explorer-local horizontal scrolling for deep paths and long names without changing app-shell scrolling.
+  - Added distinct folder, Markdown, HTML, and image SVG icons while preserving selection, expansion, and disabled behavior.
+  - Kept Explorer width session-only and left Rust tree/data contracts unchanged.
+- Verification:
+  - User confirmed Explorer width resizing.
+  - User confirmed the horizontal scrollbar appears for a selected file with a long path.
+  - User confirmed folder, Markdown, HTML, and image icons are displayed.
+  - `npm run build` and 29 frontend tests passed.
+  - `cargo fmt -- --check`, `cargo check`, and 22 Rust tests passed.
+  - Design and implementation follow-up reviews were approved with no unresolved findings.
+  - `diff.zip` generated from `dc4fc398..c9a0153` and verified with `unzip -t`.
+  - Completion artifacts are ready for Phase 4-c merge approval.
+- Follow-up:
+  - `TODO-2026-020` tracks the Avalonia Explorer UX rollout using GridSplitter / TreeView-specific design.

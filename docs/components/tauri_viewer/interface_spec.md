@@ -6,6 +6,7 @@
 - Recent Folders: MenuBar の File dropdown から最近開いた root folder を開く。
 - Remove Recent Folder: Recent Folders entry の delete button から該当 entry を削除する。
 - Explorer item click: 未openのMarkdown / HTMLは新規tabを開き、同一pathがopen済みならactivateする。
+- Explorer resize: ExplorerとPreview間のseparatorをpointerでdragする。separatorへfocus後、ArrowLeft / ArrowRightは16px単位、Home / Endは現在の最小 / dynamic最大幅へ移動する。
 - Tab activate: TabStripから表示するdocumentを切り替える。ArrowLeft / ArrowRight / Home / Endでもfocusとselectionを移動できる。
 - Tab close: 非active tabではselectionを維持する。active tabでは右隣、なければ左隣へ移り、最後のtab close後は未選択表示になる。
 - Reload: MenuBar の File dropdown から root treeとactive tabだけを再読み込みする。
@@ -36,6 +37,14 @@ Recent Folders entry click で保存済み path が存在しない場合は erro
 - `Root`: 選択中 root path。未選択時は `No folder selected`。
 
 MenuBar 直下に常時表示する。長い path は ellipsis と `title` で全文確認できる。
+
+## Explorer 表示
+
+- 初期幅280px、最小幅180px、hard最大幅640pxとする。dynamic最大幅は`max(180, min(640, workspaceWidth - 320 - 6))`で、Preview予約幅320pxとseparator幅6pxを考慮する。
+- 幅はsession中だけ保持し、root変更やReloadでは維持する。アプリ再起動またはfrontend reloadでは初期幅へ戻す。
+- separatorは`role="separator"`、vertical orientation、Explorer / Previewへの`aria-controls`、現在の有効範囲と値を公開する。
+- pane titleは固定し、tree viewportだけが縦横scrollを所有する。深い階層・長い名前は省略せず、表示幅を超える場合だけ水平scrollで末尾へ到達可能にする。
+- directoryは開閉chevronとfolder icon、Markdown / HTML / imageは種別ごとのinline SVG iconを表示する。iconは装飾扱いとし、node名をaccessible nameの正本にする。
 
 ## TabStrip 表示
 
