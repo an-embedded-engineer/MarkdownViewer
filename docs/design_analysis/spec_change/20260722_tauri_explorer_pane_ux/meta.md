@@ -13,7 +13,7 @@ components:
   - "docs/rules/development_workflow.md"
 status: "in_progress"
 design_status: "done"
-impl_status: "in_review"
+impl_status: "done"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
@@ -28,6 +28,9 @@ related_commits:
   - "6310f88 : Phase 3 implement Tauri Explorer pane UX"
   - "9c1dbfb : Phase 3 add Tauri Explorer pane UX implementation review prompt"
   - "4dd42ee : Phase 3 review Tauri Explorer pane UX implementation (changes requested)"
+  - "e43ecf9 : Phase 3 address Tauri Explorer pane UX implementation review"
+  - "f929ccd : Phase 3 add Tauri Explorer pane UX implementation follow-up prompt"
+  - "aaedc2c : Phase 3 approve Tauri Explorer pane UX implementation after follow-up"
 ---
 
 # TODO-2026-019 Tauri Explorer ツリーペイン UX 改善 meta
@@ -59,5 +62,5 @@ related_commits:
 | Phase 0 Requirements | Done (`d2091b3`) |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
-| Phase 3 Implementation and docs review | In review (Round 1 findings addressed; follow-up pending) |
+| Phase 3 Implementation and docs review | Done (Approved, unresolved findings: 0) |
 | Phase 4 Verification and completion | Pending |

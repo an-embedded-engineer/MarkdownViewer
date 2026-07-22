@@ -56,3 +56,9 @@
 
 - pointer / keyboard resize、pointer drag後のseparator focus、狭幅時ARIA、長いtreeの縦横scroll、Light / Dark icon、HTML iframe上でのpointer captureとcursorの見え方はPhase 4-aのユーザー動作確認で実施する。
 - Phase 3実装時点の未解決実装事項はない。実装レビュー結果は`review/`へレビュー担当Agentが記録する。
+
+## 8. 実装レビュー結果
+
+- 初回レビューcommit `4dd42ee`: Changes Requested（Medium 1件、Low 2件）。
+- 指摘対応commit `e43ecf9`: directory開閉の既存契約を復元し、separator focusを明示化し、iframe上のcursor確認をPhase 4-aへ引き継いだ。
+- follow-up review commit `aaedc2c`: Approved、未解決指摘0件。自動検証一式もレビュー担当が独立再実行して成功した。
