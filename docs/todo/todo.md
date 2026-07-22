@@ -132,3 +132,64 @@
   - 既存`settings.json`を`MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`で置換し、Recent FoldersとViewer settingsが保持される。
   - Unicode pathとWindows verbatim / drive / UNC path境界で設定保存・再起動復元を確認する。
   - 検証結果と、必要な修正があればsource / tests / Tauri component docsへ反映する。
+
+## TODO-2026-019 Tauri Explorer ツリーペイン UX 改善
+
+- status: open
+- workflow: spec-change
+- summary: Tauri版のExplorerを利用者が適切な幅へ変更できるようにし、長い階層・ファイル名への到達性とノード種別の識別性を改善する。
+- existing_spec:
+  - Explorer幅は280px固定で、利用者は変更できない。
+  - Explorer pane自体は`overflow: auto`だが、tree rowとlabelがpane幅へ縮小され、長い表示名はellipsisになるため水平スクロールで全文へ到達できない。
+  - Markdown / HTML / imageは文字アイコン、directoryは開閉記号だけで表示する。
+- expected_spec:
+  - ExplorerとPreviewの境界を操作して、Explorer幅を定義済みの最小値・最大値の範囲で変更できる。
+  - 階層indent、アイコン、ファイル名を含むtree contentがExplorer幅を超える場合、Explorer内だけに水平スクロールバーを表示し、表示名を末尾まで確認できる。
+  - directory、Markdown、HTMLを視覚的に区別できるアイコンを表示し、選択・開閉・disabled状態と共存させる。
+- scope:
+  - `markdown-viewer-tauri/src/App.tsx`のExplorer / tree UIとresize操作。
+  - `markdown-viewer-tauri/src/App.css`のworkspace columns、resizer、tree overflow、icon styling。
+  - Tauri viewerのcomponent docsとUI手動確認項目。
+- out_of_scope:
+  - Explorer幅の再起動後永続化。
+  - tree nodeのdrag and drop、rename、context menu、file system監視。
+  - Rustのtree走査・document data contract変更。
+  - Avalonia版の同時実装。水平展開はTODO-2026-020で追跡する。
+- affected_contracts:
+  - Explorer / Preview間のlayoutとpointer・keyboard操作。
+  - Explorer内の縦横scroll責務、tree rowの最小content幅、長い名前の表示方法。
+  - directory / Markdown / HTML / image nodeの視覚表現と既存selection / expand / open操作。
+- permanent_docs:
+  - `docs/components/tauri_viewer/README.md`
+  - `docs/components/tauri_viewer/basic_design.md`
+  - `docs/components/tauri_viewer/detail_design.md`
+  - `docs/components/tauri_viewer/interface_spec.md`
+  - `docs/rules/development_workflow.md`
+- compatibility:
+  - root選択、tree開閉、Markdown / HTML選択、tab操作、Preview表示の既存契約を維持する。
+  - app shell全体にはscrollbarを出さず、scroll責務をExplorer / Preview内部に限定する既存方針を維持する。
+- completion:
+  - pointer操作でExplorer幅を最小値・最大値の範囲内に変更でき、Previewが残り幅へ追従する。
+  - resizerがseparatorとして認識でき、keyboard操作でもExplorer幅を変更できる。
+  - 深い階層または長い名前がpane幅を超えた場合だけExplorer内に水平scrollbarが表示され、tree contentの末尾へ到達できる。
+  - directory、Markdown、HTMLに識別可能なアイコンが表示され、imageを含む各nodeの名前、選択、開閉、disabled状態が判別できる。
+  - Explorer幅変更中と変更後にroot選択、tree開閉、Markdown / HTML選択、tab操作、Previewの縦scrollが退行しない。
+  - `npm run build`、`npm test -- --run`、`cargo check`、`cargo test`が成功し、幅変更、最小・最大境界、横scroll、Light / Dark、長い名前と深い階層を手動確認する。
+
+## TODO-2026-020 Avalonia Explorer ツリーペイン UX 水平展開
+
+- status: open
+- workflow: spec-change
+- depends_on: TODO-2026-019
+- execution_order: TODO-2026-019のTauri先行実装とUX確認完了後に実施する。
+- summary: Tauri版で確定したExplorer幅変更、横scroll、node iconのUXを、AvaloniaのGridSplitter / TreeViewの自然な責務境界に合わせて水平展開する。
+- scope:
+  - Avalonia版Explorer / Preview layout、TreeView表示、関連ViewModelまたはconverter、component docs。
+- out_of_scope:
+  - Tauri版と内部実装を共通化すること。
+  - Explorer幅の再起動後永続化。Tauri評価で必要性が確認された場合は別途仕様化する。
+- completion:
+  - Tauri先行UXで確定した最小・最大幅と操作契約をAvalonia版へ反映し、stack差分を文書化する。
+  - tree contentがExplorer幅を超えた場合だけExplorer内に水平scrollbarが表示され、長い表示名の末尾へ到達できる。
+  - directory、Markdown、HTMLに識別可能なアイコンが表示され、既存のtree開閉・document選択が退行しない。
+  - `dotnet build Avalonia/MarkdownViewer.Avalonia/MarkdownViewer.Avalonia.csproj`が成功し、幅変更、境界値、横scroll、Light / Darkを手動確認する。
