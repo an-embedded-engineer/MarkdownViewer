@@ -79,7 +79,7 @@ Explorer layout policyを`explorerPane.ts`へ閉じ込め、次の定数とpure 
 | separator幅 | 6px | 1px線より広いpointer hit targetを確保する。 |
 | keyboard step | 16px | 微調整可能で操作回数が過剰にならない単位。 |
 
-dynamic maxは`min(640, workspaceWidth - 320 - 6)`とし、最小幅を下回るworkspaceでは180pxを優先してPreviewを残り幅へ縮小する。workspace未計測時だけhard最大幅を利用し、`ResizeObserver`の初回通知後に実寸へclampする。
+dynamic maxは`max(180, min(640, workspaceWidth - 320 - 6))`とし、常に`max >= min`を保証する。workspaceが506px未満ではdynamic maxを180pxへfloorし、Explorer最小幅を優先してPreviewを残り幅へ縮小する。workspace未計測または非有限・0以下の時だけhard最大幅を利用し、`ResizeObserver`の初回有効通知後に実寸へclampする。
 
 `getExplorerWidthBounds(workspaceWidth)`、`clampExplorerWidth(width, workspaceWidth)`、`getExplorerWidthForKey(key, currentWidth, workspaceWidth)`をExplorer固有policyとして定義する。汎用splitter abstractionは作らない。現時点でsplit viewは未実装であり、向き・pane数・永続化が異なる将来機能まで先取りすると責務が曖昧になるためである。
 
@@ -103,6 +103,8 @@ separatorの`onPointerDown`でprimary buttonだけを受け付ける。active po
 
 `pointerup` / `pointercancel`ではcaptureを解放し、resize stateを必ずclearする。pointer ID不一致は無視する。drag中はapp shellへclassを付与して`user-select: none`と`col-resize` cursorを適用する。HTML iframe上へpointerが移動してもseparatorがeventを受け続けるようpointer captureを正本とし、別のwindow listenerや透明overlayは重複追加しない。
 
+separator自体は非drag時も`cursor: col-resize`を持ち、操作可能な境界であることを示す。`touch-action: none`を指定し、touch / trackpad由来のPointer EventsをWebViewの既定scroll gestureへ渡さず、pointer captureの開始・移動・終了を同じ契約で扱う。
+
 ### 6.4 Keyboardとaccessibility
 
 separatorは次の契約を持つ。
@@ -115,6 +117,8 @@ separatorは次の契約を持つ。
 - `tabIndex={0}`
 
 ArrowLeftは16px縮小、ArrowRightは16px拡大、Homeは最小、Endはdynamic maxへ移動する。処理したkeyだけ`preventDefault()`し、その他は既定動作を維持する。focus-visible時はtheme変数を使ったoutlineを表示する。
+
+workspaceが506px未満の時は`aria-valuemin`と`aria-valuemax`がともに180となり、Home / Endはいずれも180pxへ収束する。これは変更不能な現在の有効範囲を表す意図した同値状態であり、最小値より小さい幅をARIAへ公開しない。
 
 Explorerには`id="explorer-pane"`を付ける。directory buttonには既存button semanticsに加えて`aria-expanded`を設定する。iconとdisclosureはdecorativeなため`aria-hidden="true"`とし、node名をaccessible nameの正本にする。
 
@@ -137,7 +141,7 @@ aside.explorer-pane
     └── FileTree
 ```
 
-`.file-tree`は`width: max-content; min-width: 100%`、`.tree-row`は`width: max-content; min-width: 100%`とする。labelのellipsisを撤去し、`white-space: nowrap`を維持する。indent、leading icons、label、右paddingを含むintrinsic widthがviewportを超えた時だけ、`overflow: auto`によりhorizontal scrollbarが現れる。短いtreeでは各rowがviewport幅を満たし、hover / selected背景がpane端まで届く。
+`.file-tree`は`width: max-content; min-width: 100%`、`.tree-row`は`width: max-content; min-width: 100%`とする。全rowは`grid-template-columns: 16px 18px max-content`と4pxのcolumn gapを共通利用し、第1列をdisclosureまたは同幅spacer、第2列をtype icon、第3列をlabelとする。右端には12px paddingを確保する。labelのellipsisを撤去し、`white-space: nowrap`を維持する。indent、3列、gap、label、右paddingを含むintrinsic widthがviewportを超えた時だけ、`overflow: auto`によりhorizontal scrollbarが現れる。短いtreeでは`min-width: 100%`により各rowのbutton boxがviewport幅を満たし、hover / selected背景がpane端まで届く。
 
 vertical scrollbarも同じ`.explorer-scroll`が所有する。app shell / workspaceの`overflow: hidden`、Previewの独立`overflow: auto`は維持する。
 
@@ -150,7 +154,7 @@ vertical scrollbarも同じ`.explorer-scroll`が所有する。app shell / works
 - html: document outline + code識別形状。
 - image: image outline。
 
-directoryのdisclosure chevronはtype iconと分離し、file rowにも同じ幅のspacerを置いてlabel位置を揃える。SVG markupは`TreeNodeIcon`へ集約し、各branchへ重複させない。React function componentをmodule scopeへ置くのは、既存`FileTree` / `TreeNode`と同じframework component契約に従う例外であり、汎用global utilityは増やさない。
+directoryのdisclosure chevronは第1列の`.tree-disclosure`、type iconは第2列の`.tree-type-icon`へ分離する。file rowは第1列へ`.tree-disclosure-spacer`を置き、directory / fileで同じ3列templateとlabel開始位置を共有する。既存`.tree-icon`と文字icon向けの`font-size` / `font-weight` / `letter-spacing`は削除し、`.tree-disclosure` / `.tree-type-icon`配下のSVGへ16px以下のwidth / heightと`currentColor`を指定する。SVG markupは`TreeNodeIcon`へ集約し、各branchへ重複させない。React function componentをmodule scopeへ置くのは、既存`FileTree` / `TreeNode`と同じframework component契約に従う例外であり、汎用global utilityは増やさない。
 
 iconはnode名の代替ではないためaccessible nameを持たせず、色だけに依存しないshape差で種別を表現する。Light / Darkでは`currentColor`と既存theme変数を使う。
 
@@ -256,11 +260,13 @@ ADRは追加しない。Explorer固有のsession layout判断であり、複数�
 
 1. workspace未計測時のmin / hard max。
 2. default 800px相当workspaceでPreview予約幅を差し引くdynamic max。
-3. min未満、max超過、範囲内のclamp。
-4. 非有限値をdefaultへ正規化する。
-5. ArrowLeft / ArrowRightが16px単位で変化し、boundsを超えない。
-6. Home / Endがその時点のmin / dynamic maxへ移動する。
-7. unsupported keyは`null`を返す。
+3. workspaceが506px未満の場合に`bounds.max === bounds.min === 180`となる。
+4. 狭幅時のHome / Endがともに180pxへ収束し、ARIAへ渡すboundsが逆転しない。
+5. min未満、max超過、範囲内のclamp。
+6. 非有限値をdefaultへ正規化する。
+7. ArrowLeft / ArrowRightが16px単位で変化し、boundsを超えない。
+8. Home / Endがその時点のmin / dynamic maxへ移動する。
+9. unsupported keyは`null`を返す。
 
 既存の`npm test -- --run`も全件実行し、document policyを回帰確認する。DOM pointer captureとCSS overflowの見え方はmanual UI verificationで確認する。
 
@@ -270,12 +276,12 @@ ADRは追加しない。Explorer固有のsession layout判断であり、複数�
 2. separatorを左右へdragし、ExplorerとPreviewが追従する。
 3. 最小値より左、dynamic maxより右へdragしても境界を超えない。
 4. separatorへTabでfocusし、ArrowLeft / ArrowRight / Home / Endで幅を変更でき、focus indicatorとARIA値が対応する。
-5. windowを狭めてdynamic maxが縮み、再拡大すると直前の要求幅へ戻る。
-6. 深いdirectoryと長いMarkdown / HTML / image名を含むrootで、必要時だけ水平scrollbarが現れ、末尾へ到達できる。
-7. 短いtreeでは不要な水平scrollbarが出ず、hover / selected背景がviewport幅を覆う。
+5. windowを506px未満まで狭め、Explorerが180pxを下回らず、separatorの`aria-valuemin` / `aria-valuemax` / `aria-valuenow`が180で矛盾せず、Home / Endで不正な幅へ移動しない。再拡大すると直前の要求幅へ戻る。
+6. 深いdirectoryと長いMarkdown / HTML / image名を含むrootで、必要時だけ水平scrollbarが現れ、末尾へ到達できる。水平scrollbar追加後も縦方向の末尾へ到達できる。
+7. 1階層の短い名前だけを持つtreeでは不要な水平scrollbarが出ず、共通3列のlabel位置が揃い、hover / selected背景がviewport幅を覆う。
 8. directoryを開閉し、chevronとfolder icon、Markdown / HTML / image iconがLight / Darkで識別できる。
 9. root選択、Reload、Markdown / HTML open、tab activate / close、Preview縦scrollを確認する。
-10. resize中にpointerをPreview / HTML iframe側へ移動してrelease / cancelしてもdrag状態が残らない。
+10. resize中にpointerをPreview / HTML iframe側へ移動してrelease / cancelしてもdrag状態が残らない。利用可能なtouch / trackpad環境ではscroll gestureへ奪われずresizeできる。
 
 ## 17. 検証コマンド
 
@@ -298,6 +304,7 @@ Rust source変更はないが、Tauri bundle境界を含む回帰として`cargo
 | --- | --- |
 | intrinsic width指定により短いrowの背景がpane端まで届かない | `min-width: 100%`を併用し、短い／長いtreeをmanual確認する。 |
 | scrollbarの常時表示設定がOSごとに異なる | `overflow: auto`を契約とし、content overflow時の到達性を確認する。 |
+| 水平scrollbar出現でtree viewportの高さが減り縦scrollへ影響する | 長いtreeで縦横両方の末尾へ到達できることをmanual確認する。 |
 | iframe上でdrag eventが途切れる | pointer captureとpointercancel cleanupを使い、HTML tabでもmanual確認する。 |
 | 狭いwindowでPreviewが読みにくい | Explorer最小幅とPreview予約幅を通常時のdynamic maxに使い、極端な狭幅ではPreviewを残り幅へ縮小してapp外枠overflowを避ける。 |
 | SVG iconの細線がthemeで見えにくい | `currentColor`、既存muted/text変数、Light / Dark manual確認を使う。 |

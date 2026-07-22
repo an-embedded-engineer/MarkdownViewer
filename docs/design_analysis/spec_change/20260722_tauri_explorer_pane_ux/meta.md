@@ -12,13 +12,15 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "draft"
+design_status: "in_review"
 impl_status: "pending"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
   - "d2091b3 : Phase 0 define TODO-2026-019 scope"
   - "f8607df : Phase 1 initialize Tauri Explorer pane UX workflow"
+  - "69f920c : Phase 2 add Tauri Explorer pane UX design review prompt"
+  - "706ebcd : Phase 2 review Tauri Explorer pane UX design (changes requested)"
 ---
 
 # TODO-2026-019 Tauri Explorer ツリーペイン UX 改善 meta
@@ -49,6 +51,6 @@ related_commits:
 | --- | --- |
 | Phase 0 Requirements | Done (`d2091b3`) |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | Draft |
+| Phase 2 Design review | In review (Round 1 findings addressed) |
 | Phase 3 Implementation and docs review | Pending |
 | Phase 4 Verification and completion | Pending |

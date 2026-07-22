@@ -33,7 +33,11 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 **工程**: Phase 2（設計書修正・再レビュー）
 
-**status**: open
+**initial status**: open
+
+**対応**: design §6.1の式を`max(180, min(640, workspaceWidth - 320 - 6))`へ修正し、workspaceが506px未満でも`max >= min`を保証する契約を明記した。未計測・非有限・0以下の扱いもhard max利用として固定した。§6.4へ狭幅時のARIA同値契約、§15へ`bounds.max === bounds.min === 180`とHome / End収束のunit test、§16へ実ウィンドウを506px未満へ縮める手動確認を追加した。
+
+**status**: 対応済み（Claude follow-up確認待ち）
 
 ### 1.2 disclosure chevron / type icon / spacer / label の列構成契約が未確定で、既存 `.tree-icon` / `grid-template-columns` との置き換え関係が設計書に明記されていない
 
@@ -50,7 +54,11 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 **工程**: Phase 2（設計書修正）または Phase 3 着手前の実装方針確定
 
-**status**: open
+**initial status**: open
+
+**対応**: design §6.5 / §6.6へ全row共通の`16px 18px max-content` 3列、4px gap、12px右paddingを定義した。第1列を`.tree-disclosure` / `.tree-disclosure-spacer`、第2列を`.tree-type-icon`、第3列をlabelとし、既存`.tree-icon`の文字用font stylingをSVG size / `currentColor`へ置換する方針を明記した。短いtreeと長いtreeの双方を§16の手動確認へ具体化した。
+
+**status**: 対応済み（Claude follow-up確認待ち）
 
 ---
 
@@ -68,7 +76,11 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 **severity**: Low
 
-**status**: open
+**initial status**: open
+
+**対応**: design §6.3へseparatorの`touch-action: none`を追加し、touch / trackpad由来のPointer Eventsもpointer capture契約で扱う方針を明記した。§16の手動確認にも利用可能なtouch / trackpad環境での確認を追加した。
+
+**status**: 対応済み（Claude follow-up確認待ち）
 
 ### 3.2 非drag時のseparator hoverカーソルが設計に明記されていない
 
@@ -76,7 +88,11 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 **severity**: Low
 
-**status**: open
+**initial status**: open
+
+**対応**: design §6.3へ非drag時もseparator自体が`cursor: col-resize`を持つbase styleを明記した。
+
+**status**: 対応済み（Claude follow-up確認待ち）
 
 ---
 
@@ -134,3 +150,16 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 一方、Explorer 幅の dynamic max 計算式 (design 82行) が、`tauri.conf.json` に window の実サイズを強制する制約がないために実際に到達可能な極端な狭幅 window で、design 自身が定義した最小幅 180px を下回る値を返し得るという契約矛盾（指摘1.1, High）を検出した。これは TODO-2026-019 の完了条件「Explorer幅を最小値・最大値の範囲内に変更できる」の中核部分であり、設計記載のままでは実装可能な形で成立しない。あわせて、disclosure/type icon/spacer の列構成契約が未確定であるためdesign自身が認識済みのriskを再発させ得る指摘（1.2, Medium）を検出した。
 
 以上より、本設計を**要修正 (Changes Requested)** と判定する。指摘1.1の`getExplorerWidthBounds`契約（`max >= min`の保証）と対応する自動テストケースの追記、指摘1.2の列構成契約の明記を設計書へ反映した上で、再レビューを経てPhase 3（実装）へ進行すること。
+
+---
+
+## 9. 指摘対応 Round 1
+
+| 指摘 | severity | 対応 | 状態 |
+| --- | --- | --- | --- |
+| 1.1 dynamic maxと最小幅の契約矛盾 | High | max floor、狭幅ARIA契約、自動・手動境界テストを設計へ追加 | 対応済み・follow-up待ち |
+| 1.2 tree 3列契約の不足 | Medium | 列幅、gap、class、旧style置換、短／長tree確認を確定 | 対応済み・follow-up待ち |
+| 3.1 touch-action不足 | Low | `touch-action: none`とmanual確認を追加 | 対応済み・follow-up待ち |
+| 3.2 resting cursor不足 | Low | separator base styleへ`cursor: col-resize`を追加 | 対応済み・follow-up待ち |
+
+Round 1では未対応理由による保留はない。Claude follow-upで設計式、3列layout、Pointer Events、検証観点の整合を再確認する。
