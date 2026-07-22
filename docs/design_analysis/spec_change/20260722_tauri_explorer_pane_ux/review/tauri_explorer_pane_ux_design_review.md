@@ -1,11 +1,13 @@
 # TODO-2026-019 Tauri Explorer ツリーペイン UX 改善 設計レビュー
 
 **レビュー日**: 2026-07-22
+**再確認日**: 2026-07-22
 **対象ドキュメント**: `docs/design_analysis/spec_change/20260722_tauri_explorer_pane_ux/design/tauri_explorer_pane_ux_design.md`
 **対象 meta**: `docs/design_analysis/spec_change/20260722_tauri_explorer_pane_ux/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-019
-**レビュー対象コミット**: `c1038c9` (docs: design Tauri explorer pane UX)
-**判定**: **要修正 (Changes Requested)**。未解決指摘 4 件（High 1 / Medium 1 / Low 2）。High 指摘は完了条件の中核（Explorer 幅の最小値保証）が設計記載どおりでは成立しない契約矛盾であり、Phase 3 着手前に設計書修正が必要。
+**初回レビュー対象コミット**: `c1038c9` (docs: design Tauri explorer pane UX)
+**Round 1 fix コミット**: `0edff56` (docs: address Tauri explorer design review)
+**判定**: **承認 (Approved)**。Phase 3 進行可。初回判定は要修正 (Changes Requested) だったが、全指摘 (High 1 / Medium 1 / Low 2) の設計反映を Round 1 follow-up 再確認で解決済みと判定した。未解決指摘 0 件。
 
 ---
 
@@ -37,7 +39,9 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 **対応**: design §6.1の式を`max(180, min(640, workspaceWidth - 320 - 6))`へ修正し、workspaceが506px未満でも`max >= min`を保証する契約を明記した。未計測・非有限・0以下の扱いもhard max利用として固定した。§6.4へ狭幅時のARIA同値契約、§15へ`bounds.max === bounds.min === 180`とHome / End収束のunit test、§16へ実ウィンドウを506px未満へ縮める手動確認を追加した。
 
-**status**: 対応済み（Claude follow-up確認待ち）
+**確認 (0edff56)**: design 82行の式が `dynamic max = max(180, min(640, workspaceWidth - 320 - 6))` へ修正され、外側の`max(180, ...)`により`workspaceWidth`がどれだけ小さくても戻り値が180未満にならないことを数式レベルで確認した（例: `workspaceWidth = 400` → `min(640, 74) = 74` → `max(180, 74) = 180`）。これにより`clampExplorerWidth`・`getExplorerWidthForKey("Home"/"End", ...)`の出力が常に`min <= width <= max`を満たし、TODO-2026-019完了条件「Explorer幅を最小値・最大値の範囲内に変更できる」と矛盾しなくなった。design 121行に「workspaceが506px未満の時は`aria-valuemin`と`aria-valuemax`がともに180となり、Home / Endはいずれも180pxへ収束する」という意図した同値状態が明記され、指摘時に残した「ARIA値の同値ケースをスクリーンリーダーが正しく扱えるか」という残リスクも、design 279行（手動シナリオ5）で明示的な手動確認対象になった。design 262-264行（自動テスト項目3-4）に推奨した`bounds.max === bounds.min === 180`とHome/End収束のテストケースが追加され、design §15の自動テスト一覧の欠落も解消されている。`workspace未計測または非有限・0以下の時だけhard最大幅を利用し`という追記（design 82行）は、当初の「未計測時」限定の記載より広い防御的正規化であり、既存のNaN/非有限値正規化方針（design 221行）と矛盾しない。新たな契約矛盾は確認されなかった。
+
+**status**: 解決済み（2026-07-22 再確認、commit `0edff56`）
 
 ### 1.2 disclosure chevron / type icon / spacer / label の列構成契約が未確定で、既存 `.tree-icon` / `grid-template-columns` との置き換え関係が設計書に明記されていない
 
@@ -58,7 +62,9 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 **対応**: design §6.5 / §6.6へ全row共通の`16px 18px max-content` 3列、4px gap、12px右paddingを定義した。第1列を`.tree-disclosure` / `.tree-disclosure-spacer`、第2列を`.tree-type-icon`、第3列をlabelとし、既存`.tree-icon`の文字用font stylingをSVG size / `currentColor`へ置換する方針を明記した。短いtreeと長いtreeの双方を§16の手動確認へ具体化した。
 
-**status**: 対応済み（Claude follow-up確認待ち）
+**確認 (0edff56)**: design 144行に「全rowは`grid-template-columns: 16px 18px max-content`と4pxのcolumn gapを共通利用し、第1列をdisclosureまたは同幅spacer、第2列をtype icon、第3列をlabelとする」という具体的な列テンプレートが明記され、directory row / file rowが列数・列幅を共有することが数値レベルで確定した。design 157行で、旧`.tree-icon`とその文字向け`font-size` / `font-weight` / `letter-spacing`を明示的に削除し、`.tree-disclosure` / `.tree-disclosure-spacer` / `.tree-type-icon`という新クラス名とSVG向け`16px以下のwidth / height` + `currentColor`の指定へ置き換える方針が確定しており、置き換え関係の曖昧さは解消された。design 144行末尾に「短いtreeでは`min-width: 100%`により各rowのbutton boxがviewport幅を満たし、hover / selected背景がpane端まで届く」と明記され、`min-width: 100%`と背景到達の関係も列構成確定後の文脈で再確認できる。design 279行（手動シナリオ7）が「1階層の短い名前だけを持つtreeでは...共通3列のlabel位置が揃い」を明示的に確認対象にしており、directory/file行のインデント整合という懸念点も手動確認計画に反映されている。新たな齟齬は確認されなかった。
+
+**status**: 解決済み（2026-07-22 再確認、commit `0edff56`）
 
 ---
 
@@ -80,7 +86,9 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 **対応**: design §6.3へseparatorの`touch-action: none`を追加し、touch / trackpad由来のPointer Eventsもpointer capture契約で扱う方針を明記した。§16の手動確認にも利用可能なtouch / trackpad環境での確認を追加した。
 
-**status**: 対応済み（Claude follow-up確認待ち）
+**確認 (0edff56)**: design 106行に「`touch-action: none`を指定し、touch / trackpad由来のPointer EventsをWebViewの既定scroll gestureへ渡さず、pointer captureの開始・移動・終了を同じ契約で扱う」と明記され、推奨対応どおりの反映を確認した。design 279行（手動シナリオ10末尾）に「利用可能なtouch / trackpad環境ではscroll gestureへ奪われずresizeできる」という手動確認項目も追加されている。
+
+**status**: 解決済み（2026-07-22 再確認、commit `0edff56`）
 
 ### 3.2 非drag時のseparator hoverカーソルが設計に明記されていない
 
@@ -92,7 +100,9 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 **対応**: design §6.3へ非drag時もseparator自体が`cursor: col-resize`を持つbase styleを明記した。
 
-**status**: 対応済み（Claude follow-up確認待ち）
+**確認 (0edff56)**: design 106行冒頭に「separator自体は非drag時も`cursor: col-resize`を持ち、操作可能な境界であることを示す」と明記され、drag前のhoverアフォーダンスがdrag中のapp shell側cursor制御（design 105行）と区別して定義された。推奨対応どおりの反映を確認した。
+
+**status**: 解決済み（2026-07-22 再確認、commit `0edff56`）
 
 ---
 
@@ -100,12 +110,12 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 | `docs/todo/todo.md` TODO-2026-019 完了条件 | 設計書での対応箇所 | 結果 |
 | --- | --- | --- |
-| pointer操作でExplorer幅を最小値・最大値の範囲内に変更でき、Previewが残り幅へ追従する | §6.1 (bounds/clamp policy)、§6.2 (state)、§6.3 (pointer)、§6.5 (3列 grid) | △ 指摘1.1により、極端な狭幅では「最小値・最大値の範囲内」という契約自体が式のままでは保証されない |
-| resizerがseparatorとして認識でき、keyboard操作でもExplorer幅を変更できる | §6.4 (role="separator", ARIA, ArrowLeft/Right/Home/End) | ✓ 整合。ARIA属性・key処理・focus-visible方針は妥当 |
-| 深い階層または長い名前がpane幅を超えた場合だけExplorer内に水平scrollbarが表示され、tree contentの末尾へ到達できる | §6.5 (`.explorer-scroll`分離、`max-content`/`min-width:100%`) | ✓ 整合。header/scroll viewport分離とintrinsic width方式は妥当なCSS手法である |
-| directory、Markdown、HTMLに識別可能なアイコンが表示され、imageを含む各nodeの名前、選択、開閉、disabled状態が判別できる | §6.6 (TreeNodeIcon)、§6.4 (aria-hidden iconとaccessible name分離) | △ 指摘1.2により、列構成・既存`.tree-icon`置き換えの契約が未確定 |
+| pointer操作でExplorer幅を最小値・最大値の範囲内に変更でき、Previewが残り幅へ追従する | §6.1 (bounds/clamp policy, floor修正済み)、§6.2 (state)、§6.3 (pointer)、§6.5 (3列 grid) | ✓ 整合（Round 1解決）。指摘1.1の`max(180, ...)`floorにより、極端な狭幅でも`max >= min`が常に保証される |
+| resizerがseparatorとして認識でき、keyboard操作でもExplorer幅を変更できる | §6.4 (role="separator", ARIA, ArrowLeft/Right/Home/End、狭幅ARIA同値契約) | ✓ 整合。ARIA属性・key処理・focus-visible方針、および506px未満での`aria-valuemin`/`aria-valuemax`同値契約が妥当 |
+| 深い階層または長い名前がpane幅を超えた場合だけExplorer内に水平scrollbarが表示され、tree contentの末尾へ到達できる | §6.5 (`.explorer-scroll`分離、`max-content`/`min-width:100%`、3列grid確定) | ✓ 整合。header/scroll viewport分離とintrinsic width方式は妥当なCSS手法であり、列構成確定後も矛盾しない |
+| directory、Markdown、HTMLに識別可能なアイコンが表示され、imageを含む各nodeの名前、選択、開閉、disabled状態が判別できる | §6.6 (TreeNodeIcon、`.tree-disclosure`/`.tree-type-icon`列契約確定)、§6.4 (aria-hidden iconとaccessible name分離) | ✓ 整合（Round 1解決）。指摘1.2の列テンプレート・クラス名・旧`.tree-icon`置換方針が具体化された |
 | Explorer幅変更中と変更後にroot選択、tree開閉、Markdown / HTML選択、tab操作、Previewの縦scrollが退行しない | §10 (互換性)、§16 シナリオ9-10 | ✓ 整合。resize stateとroot/tab/document stateの独立、Preview overflow維持が明記されている |
-| `npm run build`、`npm test -- --run`、`cargo check`、`cargo test`が成功し、幅変更・最小最大境界・横scroll・Light/Dark・長い名前と深い階層を手動確認する | §15 (自動テスト)、§16 (手動シナリオ)、§17 (検証コマンド) | △ 指摘1.1の狭幅境界ケースが自動テスト一覧(§15)に含まれていない |
+| `npm run build`、`npm test -- --run`、`cargo check`、`cargo test`が成功し、幅変更・最小最大境界・横scroll・Light/Dark・長い名前と深い階層を手動確認する | §15 (自動テスト、狭幅floorテスト追加)、§16 (手動シナリオ、狭幅/touch確認追加)、§17 (検証コマンド) | ✓ 整合（Round 1解決）。狭幅境界ケースの自動テスト(§15項目3-4)と手動シナリオ(§16項目5)が追加された |
 
 ---
 
@@ -125,21 +135,24 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 ---
 
-## 6. 対応優先度
+## 6. 対応優先度（初回レビュー時点）
 
-| 優先度 | 項目 | 理由 |
-| --- | --- | --- |
-| 高 | 1.1 dynamic maxが最小幅を下回り得る契約矛盾 | 到達可能な狭幅操作で完了条件の中核（幅の最小値保証）が設計のまま成立せず、実装後の境界値テストまで発覚しない可能性が高い |
-| 中 | 1.2 icon/disclosure列構成契約の未確定 | 実装時の解釈のブレが、design自身が認識済みのrisk（短い行の背景がpane端まで届かない）を再発させ得る |
-| 低 | 3.1 touch-action未指定 / 3.2 非drag時cursor未指定 | 実装時確定で手戻りが小さく、機能要求の充足自体は妨げない |
+| 優先度 | 項目 | 理由 | Round 1結果 |
+| --- | --- | --- | --- |
+| 高 | 1.1 dynamic maxが最小幅を下回り得る契約矛盾 | 到達可能な狭幅操作で完了条件の中核（幅の最小値保証）が設計のまま成立せず、実装後の境界値テストまで発覚しない可能性が高い | 解決済み |
+| 中 | 1.2 icon/disclosure列構成契約の未確定 | 実装時の解釈のブレが、design自身が認識済みのrisk（短い行の背景がpane端まで届かない）を再発させ得る | 解決済み |
+| 低 | 3.1 touch-action未指定 / 3.2 非drag時cursor未指定 | 実装時確定で手戻りが小さく、機能要求の充足自体は妨げない | 解決済み |
 
 ---
 
 ## 7. 残リスク / Phase 3 での注意点
 
-- 指摘1.1の修正方針次第で、`aria-valuemax`が極端な狭幅で`aria-valuemin`と同値になる。ARIA値の同値ケースをスクリーンリーダーが正しく扱えるかは、design §16の手動シナリオへ狭幅ケースを追加して確認すること。
-- `.explorer-scroll`が縦横両方の`overflow: auto`を持つため、水平scrollbarの出現がcontent高さを圧迫し縦scrollbarの要否が変化する相互作用がある。OS/WebView別のscrollbar表示設定差はdesign §18で既にriskとして認識されているが、Phase 4の手動確認でLight/Dark双方・3 platformでの見え方を実機確認すること。
-- 指摘1.2の列構成が確定した後、`min-width: 100%`が新しい列テンプレートでも維持されることを、短い名前のtree（1階層、短いlabel）と長い名前のtree（深い階層、長いlabel）の両方でPhase 4手動シナリオに含めること。
+Round 1で以下はすべてdesign §16の手動シナリオへ具体的な確認項目として反映済みである（新たな指摘ではなく、Phase 4実施時に観察結果を確認する項目として記録する）。
+
+- `aria-valuemax`が極端な狭幅で`aria-valuemin`と同値になる契約（design 121行）について、design 279行（手動シナリオ5）で狭幅時のARIA値と不正な幅への非遷移を確認する計画になっている。実機でのスクリーンリーダー挙動をPhase 4で観察すること。
+- `.explorer-scroll`が縦横両方の`overflow: auto`を持つため、水平scrollbarの出現がcontent高さを圧迫し縦scrollbarの要否が変化する相互作用がある。design §18のrisk行と手動シナリオ6（design 278行、水平scrollbar追加後の縦到達性）に追加済みだが、Light/Dark双方・3 platformでの見え方をPhase 4で実機確認すること。
+- 指摘1.2で確定した3列テンプレート・`min-width: 100%`が、短い名前のtree（1階層、短いlabel）と長い名前のtree（深い階層、長いlabel）の両方で意図どおり動くことを、design 279行（手動シナリオ7）に沿ってPhase 4で確認すること。
+- touch-action / trackpad環境でのresize操作（design 279行、手動シナリオ10）は実機がないと自動テストで検証できないため、Phase 4の利用可能な環境で確認すること。
 
 ---
 
@@ -147,9 +160,18 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 設計は Explorer 幅の pointer/keyboard resize、tree の水平 scroll 分離、icon 導入、既存操作への回帰観点、Avalonia 後続 TODO との責務境界を丁寧に整理しており、pointer capture の設計、`max-content`/`min-width: 100%` による scroll 分離の CSS 手法、`explorerPane.ts` の pure policy 分離度（過剰抽象化にも重複実装にも該当しない）、恒久ドキュメント更新先の網羅性はいずれも高品質である。
 
-一方、Explorer 幅の dynamic max 計算式 (design 82行) が、`tauri.conf.json` に window の実サイズを強制する制約がないために実際に到達可能な極端な狭幅 window で、design 自身が定義した最小幅 180px を下回る値を返し得るという契約矛盾（指摘1.1, High）を検出した。これは TODO-2026-019 の完了条件「Explorer幅を最小値・最大値の範囲内に変更できる」の中核部分であり、設計記載のままでは実装可能な形で成立しない。あわせて、disclosure/type icon/spacer の列構成契約が未確定であるためdesign自身が認識済みのriskを再発させ得る指摘（1.2, Medium）を検出した。
+初回レビューでは、Explorer 幅の dynamic max 計算式 (design 82行) が、`tauri.conf.json` に window の実サイズを強制する制約がないために実際に到達可能な極端な狭幅 window で、design 自身が定義した最小幅 180px を下回る値を返し得るという契約矛盾（指摘1.1, High）を検出した。これは TODO-2026-019 の完了条件「Explorer幅を最小値・最大値の範囲内に変更できる」の中核部分であり、設計記載のままでは実装可能な形で成立しなかった。あわせて、disclosure/type icon/spacer の列構成契約が未確定であるためdesign自身が認識済みのriskを再発させ得る指摘（1.2, Medium）を検出し、**要修正 (Changes Requested)** とした。
 
-以上より、本設計を**要修正 (Changes Requested)** と判定する。指摘1.1の`getExplorerWidthBounds`契約（`max >= min`の保証）と対応する自動テストケースの追記、指摘1.2の列構成契約の明記を設計書へ反映した上で、再レビューを経てPhase 3（実装）へ進行すること。
+### 再確認結果 (2026-07-22, commit `0edff56`)
+
+実装担当による指摘1.1〜1.2および改善提案3.1〜3.2の設計書反映を、commit `0edff56` の差分 (`git show 0edff56`) と更新後設計書の全体整合で再確認した。
+
+- **1.1 (High) — 解決済み**: dynamic maxの式が`max(180, min(640, workspaceWidth - 320 - 6))`へ修正され、外側の`max(180, ...)`により戻り値が常に最小幅180px以上になることを数式レベルで確認した。狭幅時（workspaceWidth < 506px）の`aria-valuemin`/`aria-valuemax`同値契約（design 121行）、`bounds.max === bounds.min === 180`とHome/End収束の自動テスト（design §15項目3-4）、実ウィンドウを506px未満へ縮める手動シナリオ（design §16項目5）がいずれも整合して追加されており、TODO-2026-019完了条件「Explorer幅を最小値・最大値の範囲内に変更できる」が設計記載のまま成立するようになった。
+- **1.2 (Medium) — 解決済み**: 全rowで共有する`grid-template-columns: 16px 18px max-content`・4px gap・12px右paddingの3列テンプレートが確定し（design 144行）、`.tree-disclosure`/`.tree-disclosure-spacer`/`.tree-type-icon`という新クラス名と、旧`.tree-icon`の文字向けfont stylingを削除してSVG size/`currentColor`へ置き換える方針が明記された（design 157行）。directory/file行が同じ列テンプレートとlabel開始位置を共有する契約により、実装時の列構成解釈のブレは解消された。
+- **3.1 (Low) — 解決済み**: separatorへの`touch-action: none`指定と、touch/trackpad由来のPointer Eventsをpointer capture契約で扱う方針がdesign 106行へ追加され、design §16項目10末尾へ利用可能なtouch/trackpad環境での手動確認も追加された。
+- **3.2 (Low) — 解決済み**: 非drag時もseparator自体が`cursor: col-resize`を持つbase styleがdesign 106行冒頭へ明記され、drag中のapp shell側cursor制御（design 105行）と区別して定義された。
+
+対応による新たな齟齬・実装不能な契約は検出しなかった。受け入れ条件トレース（第4節）は全行 ✓ へ更新済みである。以上より本設計を**承認 (Approved)** とし、Phase 3（実装）への進行を可とする。Phase 3では第7節の残リスク（狭幅時ARIA値の実機スクリーンリーダー挙動、水平/縦scrollbar相互作用のLight/Dark・3 platform確認、短い/長いtreeでの3列レイアウト確認、touch/trackpad環境でのresize確認）に留意すること。
 
 ---
 
@@ -157,9 +179,9 @@ pointer capture / pointer cancel の設計、tree の `max-content` + `min-width
 
 | 指摘 | severity | 対応 | 状態 |
 | --- | --- | --- | --- |
-| 1.1 dynamic maxと最小幅の契約矛盾 | High | max floor、狭幅ARIA契約、自動・手動境界テストを設計へ追加 | 対応済み・follow-up待ち |
-| 1.2 tree 3列契約の不足 | Medium | 列幅、gap、class、旧style置換、短／長tree確認を確定 | 対応済み・follow-up待ち |
-| 3.1 touch-action不足 | Low | `touch-action: none`とmanual確認を追加 | 対応済み・follow-up待ち |
-| 3.2 resting cursor不足 | Low | separator base styleへ`cursor: col-resize`を追加 | 対応済み・follow-up待ち |
+| 1.1 dynamic maxと最小幅の契約矛盾 | High | max floor、狭幅ARIA契約、自動・手動境界テストを設計へ追加 | 解決済み（再確認済み、`0edff56`） |
+| 1.2 tree 3列契約の不足 | Medium | 列幅、gap、class、旧style置換、短／長tree確認を確定 | 解決済み（再確認済み、`0edff56`） |
+| 3.1 touch-action不足 | Low | `touch-action: none`とmanual確認を追加 | 解決済み（再確認済み、`0edff56`） |
+| 3.2 resting cursor不足 | Low | separator base styleへ`cursor: col-resize`を追加 | 解決済み（再確認済み、`0edff56`） |
 
-Round 1では未対応理由による保留はない。Claude follow-upで設計式、3列layout、Pointer Events、検証観点の整合を再確認する。
+Round 1の全指摘について、設計書 (`0edff56`) への反映内容が推奨対応と整合し、新たな齟齬を生じさせていないことを確認した。未解決指摘は0件であり、総合判定は**承認 (Approved)**。Phase 3（実装）へ進行してよい。
