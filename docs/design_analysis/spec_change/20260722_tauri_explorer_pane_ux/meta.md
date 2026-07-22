@@ -11,26 +11,26 @@ components:
   - "markdown-viewer-tauri/src/explorerPane.test.ts"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
-status: "in_progress"
+status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "pending"
+completion_status: "done"
 verification_status: "done"
 related_commits:
   - "d2091b3 : Phase 0 define TODO-2026-019 scope"
   - "f8607df : Phase 1 initialize Tauri Explorer pane UX workflow"
   - "c1038c9 : Phase 2 design Tauri Explorer pane UX"
-  - "69f920c : Phase 2 add Tauri Explorer pane UX design review prompt"
   - "706ebcd : Phase 2 review Tauri Explorer pane UX design (changes requested)"
   - "0edff56 : Phase 2 address Tauri Explorer pane UX design review"
-  - "68a2010 : Phase 2 add Tauri Explorer pane UX design follow-up prompt"
   - "f1da27b : Phase 2 approve Tauri Explorer pane UX design after follow-up"
   - "6310f88 : Phase 3 implement Tauri Explorer pane UX"
-  - "9c1dbfb : Phase 3 add Tauri Explorer pane UX implementation review prompt"
   - "4dd42ee : Phase 3 review Tauri Explorer pane UX implementation (changes requested)"
   - "e43ecf9 : Phase 3 address Tauri Explorer pane UX implementation review"
-  - "f929ccd : Phase 3 add Tauri Explorer pane UX implementation follow-up prompt"
   - "aaedc2c : Phase 3 approve Tauri Explorer pane UX implementation after follow-up"
+  - "c9a0153 : Phase 4-a record Tauri Explorer pane UX user verification"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-019-tauri-explorer-ツリーペイン-ux-改善"
+follow_up:
+  - "TODO-2026-020 Avalonia Explorer tree pane UX rollout"
 ---
 
 # TODO-2026-019 Tauri Explorer ツリーペイン UX 改善 meta
@@ -63,4 +63,4 @@ related_commits:
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
 | Phase 3 Implementation and docs review | Done (Approved, unresolved findings: 0) |
-| Phase 4 Verification and completion | Phase 4-a Done (user verification accepted); Phase 4-b pending |
+| Phase 4 Verification and completion | Phase 4-b completion artifacts done; awaiting Phase 4-c merge approval |
