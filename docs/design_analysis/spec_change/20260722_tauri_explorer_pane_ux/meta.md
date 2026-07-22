@@ -7,15 +7,18 @@ work_branch: "spec-change/tauri-explorer-pane-ux"
 components:
   - "markdown-viewer-tauri/src/App.tsx"
   - "markdown-viewer-tauri/src/App.css"
+  - "markdown-viewer-tauri/src/explorerPane.ts"
+  - "markdown-viewer-tauri/src/explorerPane.test.ts"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "pending"
+design_status: "draft"
 impl_status: "pending"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
   - "d2091b3 : Phase 0 define TODO-2026-019 scope"
+  - "f8607df : Phase 1 initialize Tauri Explorer pane UX workflow"
 ---
 
 # TODO-2026-019 Tauri Explorer ツリーペイン UX 改善 meta
@@ -46,6 +49,6 @@ related_commits:
 | --- | --- |
 | Phase 0 Requirements | Done (`d2091b3`) |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | Pending |
+| Phase 2 Design review | Draft |
 | Phase 3 Implementation and docs review | Pending |
 | Phase 4 Verification and completion | Pending |

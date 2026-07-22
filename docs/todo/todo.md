@@ -149,6 +149,7 @@
 - scope:
   - `markdown-viewer-tauri/src/App.tsx`のExplorer / tree UIとresize操作。
   - `markdown-viewer-tauri/src/App.css`のworkspace columns、resizer、tree overflow、icon styling。
+  - Explorer幅境界とkeyboard操作を扱うfrontend policy moduleとunit test。
   - Tauri viewerのcomponent docsとUI手動確認項目。
 - out_of_scope:
   - Explorer幅の再起動後永続化。
