@@ -148,7 +148,7 @@
   - `cargo check` in `markdown-viewer-tauri/src-tauri/`
   - `git diff --check`
   - `diff.zip` generated from `0967086..653d075`.
-  - Completion artifacts are ready for Phase 4-c merge approval.
+  - Merged into `main` with `--no-ff` at `f68cbcd` after Phase 4-c approval.
 
 ## TODO-2026-005 Tauri Multi-tab core 導入
 

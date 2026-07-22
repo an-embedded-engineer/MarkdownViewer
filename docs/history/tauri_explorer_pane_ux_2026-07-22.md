@@ -34,3 +34,4 @@ Tauri版Explorerは280px固定で、深い階層や長いfile名がellipsis表�
   - `aaedc2c` Phase 3 implementation approval
   - `c9a0153` Phase 4-a user verification
   - `e14348b` Phase 4-b completion artifacts
+  - `f68cbcd` Phase 4-c merge into `main`

@@ -11,7 +11,7 @@ components:
   - "markdown-viewer-tauri/src/explorerPane.test.ts"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -29,6 +29,7 @@ related_commits:
   - "aaedc2c : Phase 3 approve Tauri Explorer pane UX implementation after follow-up"
   - "c9a0153 : Phase 4-a record Tauri Explorer pane UX user verification"
   - "e14348b : Phase 4-b complete report, diff archive, TODO archive, and history"
+  - "f68cbcd : Phase 4-c merge spec-change branch into main with --no-ff"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-019-tauri-explorer-ツリーペイン-ux-改善"
 follow_up:
   - "TODO-2026-020 Avalonia Explorer tree pane UX rollout"
@@ -64,4 +65,4 @@ follow_up:
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
 | Phase 3 Implementation and docs review | Done (Approved, unresolved findings: 0) |
-| Phase 4 Verification and completion | Phase 4-b completion artifacts done; awaiting Phase 4-c merge approval |
+| Phase 4 Verification and completion | Done (merged into `main` at `f68cbcd`) |
