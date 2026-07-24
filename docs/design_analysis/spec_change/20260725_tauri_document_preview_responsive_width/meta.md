@@ -11,7 +11,7 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "pending"
+design_status: "draft"
 impl_status: "pending"
 completion_status: "pending"
 verification_status: "pending"
