@@ -726,7 +726,7 @@ button {
 }
 
 .markdown-body {
-  width: min(980px, calc(100% - 48px));
+  width: calc(100% - 48px);
   min-height: 100%;
   margin: 0 auto;
   padding: 32px 0 56px;

@@ -302,6 +302,7 @@ stop
 - HTML responseへCSPとbridgeを注入する。iframeは`sandbox="allow-scripts"`だけを持ち、bridgeの`ready`が5秒以内にsource / opaque origin / revision policyを通った場合だけreadyにする。
 - `openExternal`はactive iframe source、`Origin: null`、exact shape、ready済み、transient user activation、duplicate guard、`http(s)` URLを満たす場合だけOS browserへ渡す。
 - HTML branchではMarkdown変換、Mermaid effect、PlantUML commandを実行しない。Theme変更だけではiframeをremountしない。
+- `MarkdownPreview`は`renderMarkdown`結果だけでなく`dangerouslySetInnerHTML`へ渡すobjectもHTML単位でmemoizeする。Mermaidは初期source nodeをReact外でSVGへ置換するため、window size保存やExplorer操作による無関係なApp再描画で元HTMLを再注入しない。Markdown / PlantUML結果 / path変更時は新しいHTMLを注入し、Theme / revision変更時は既存keyとMermaid effectにより再描画する。
 
 ## ファイル走査 (`scan_directory`)
 
@@ -451,5 +452,7 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
 `RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。Explorer幅は`explorerPane.ts`のpure policyで180pxからworkspace実寸に応じたdynamic最大幅へclampし、`ResizeObserver`によるwindow追従とpointer captureによるdragを`App`が調停する。separatorはArrowLeft / ArrowRight / Home / Endでも操作でき、現在のmin / max / nowをARIAへ公開する。`TabStrip` は PreviewWorkspace 上段でopen中documentを表示し、下段の単一`tabpanel`がactive tabを描画する。`ErrorBanner` はエラー発生時のみ StatusBar 直上に表示し、薄い赤背景で代表 error を表示する。`StatusBar` は active file と loading state を下部に常時表示する。`State` の値だけを `aria-live="polite"` にし、root path / active file は live region に含めない。代表 error は `ErrorBanner` の `role="alert"` で通知する。
 
 `html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠にはスクロールバーを出さない。Explorer titleは固定し、treeの縦横scrollは`.explorer-scroll`、documentのscrollは`.preview-pane`へ限定する。`.file-tree`と`.tree-row`は`width: max-content; min-width: 100%`を併用し、短いtreeのrow背景をpane端まで維持しながら、深い階層・長い名前で必要な場合だけ水平scrollを発生させる。tree rowはdisclosure / type icon / labelの3列を共通利用し、labelはellipsisしない。MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。`ErrorBanner` は条件付き描画のため、chrome 要素は CSS grid の自動配置に依存せず、`grid-row` で MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の行を明示する。
+
+Markdown本文の`.markdown-body`は、固定px最大幅を持たず、containing blockである`.preview-pane`のcontent boxを基準に`calc(100% - 48px)`で幅を決め、`margin: 0 auto`で左右24pxのgutterを確保する。window viewportが760px以下の場合だけ既存media queryにより`calc(100% - 28px)`へ切り替え、左右gutterを14pxとする。本文widthの基準はpreview paneだがgutterのbreakpointはwindow viewportであるため、window viewportが760px超のままExplorer resizeや将来のsplit viewで個別paneだけが狭くなってもgutterは24pxのまま切り替えない。table、code block、Mermaid、PlantUMLは必要時の要素内横scroll、imageとPlantUML SVGは`max-width: 100%`による縮小を維持する。Mermaid SVGはReact外で生成されるため、内容を変えないApp再描画ではMarkdown HTMLを再注入せず、window / Explorer resize後も描画済みSVGを維持する。trusted HTMLのiframeはpreview pane全幅を使い、iframe内文書自身の`width` / `max-width`はViewerから上書きしない。
 
 テーマは `document.documentElement.dataset.theme` に `"light" \| "dark"` を書き込み、`App.css` の `:root[data-theme=...]` で CSS 変数を切り替える。

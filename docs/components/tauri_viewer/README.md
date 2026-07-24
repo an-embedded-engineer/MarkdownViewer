@@ -10,6 +10,7 @@ Tauri v2 + React + TypeScript + Rust による Markdown / trusted HTML document 
 - Rust `DocumentStore` で current root、ファイルツリー構築、Markdown / HTML open、root-scoped protocolを管理する。
 - React で MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、TabStrip、Markdown / HTML preview、error strip、StatusBar を表示する。
 - 同一 root 内の Markdown / HTML を複数タブで保持し、active tabだけを単一preview paneへ描画する。
+- Markdown本文はpreview pane幅からresponsiveな左右gutterを引いた幅へ追従し、trusted HTML iframeはpreview pane全幅へ追従する。
 - `markdown-it`、`mermaid`、Rust 側 PlantUML command で Markdown / Mermaid / PlantUML を描画する。
 
 ## 技術スタック
@@ -64,7 +65,7 @@ markdown-viewer-tauri/
 | `App` / `MenuBar` / `SettingsDialog` / `RootPathBar` / `FileTree` / `TabStrip` / `MarkdownPreview` / `HtmlPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`tabs` / `activeTabId` を typed document stateの正本とし、HTMLはsandboxed iframeだけで表示する | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
 | `documentPolicy.ts` | Markdown / HTML response shape、preview revision URL、opaque-origin bridge messageをpure functionで検証する | [markdown-viewer-tauri/src/documentPolicy.ts](../../../markdown-viewer-tauri/src/documentPolicy.ts) |
 | `explorerPane.ts` | Explorerの初期/最小/dynamic最大幅、clamp、ArrowLeft / ArrowRight / Home / End操作をDOM非依存のpure functionで管理する | [markdown-viewer-tauri/src/explorerPane.ts](../../../markdown-viewer-tauri/src/explorerPane.ts) |
-| `App.css` | Light / Dark テーマ、MenuBar、Settings dialog、幅変更可能なExplorer、treeの縦横overflowとtyped SVG icon、TabStrip、error strip、StatusBar、Markdown図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
+| `App.css` | Light / Dark テーマ、MenuBar、Settings dialog、幅変更可能なExplorer、treeの縦横overflowとtyped SVG icon、TabStrip、error strip、StatusBar、pane相対のMarkdown本文幅と図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
 | `scan_directory` | Rust command。root 配下を再帰走査して `FileTreeNode` を返す。除外ディレクトリあり | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `open_document` | Rust command。`DocumentStore` current root内のMarkdownはUTF-8本文、HTMLはroot-relative `previewUrl`を排他的responseで返す | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `mvhtml` protocol | segment decode、canonical root、MIME allowlist、CSP/CORSを検証し、HTMLへready / external-link bridgeを注入する | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |

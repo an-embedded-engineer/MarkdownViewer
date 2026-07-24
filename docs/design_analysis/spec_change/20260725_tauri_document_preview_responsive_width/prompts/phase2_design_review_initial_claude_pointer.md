@@ -1,0 +1,1 @@
+`docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/prompts/phase2_design_review_initial_claude.md` を読んで、レビューを開始してください。
