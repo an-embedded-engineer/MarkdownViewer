@@ -59,7 +59,9 @@ design §16-5 は window 幅で狭幅を説明しているため実挙動と一�
 
 **工程**: Phase 3（恒久ドキュメント更新時に明記）
 
-**status**: open（非ブロッキング。承認は本改善提案の解決を前提としない）
+**status**: addressed（reviewer follow-up確認待ち）
+
+**対応**: 設計書§3の完了条件を「window viewportが760px以下」と明確化し、§9.1へ本文widthの基準はpreview pane content box、gutter切替の基準はwindow viewportであり、Explorer resizeや将来のsplit viewによる個別pane幅の変化ではgutterを切り替えないことを追記した。§16-6にも、window viewportを760px超に保ったExplorer resizeでは左右gutterが24pxのまま維持される確認観点を追加した。Phase 3では同じ契約を`detail_design.md`を含む恒久ドキュメントへ反映する。
 
 ---
 

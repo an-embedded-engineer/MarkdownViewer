@@ -11,12 +11,15 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "draft"
+design_status: "in_review"
 impl_status: "pending"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
   - "3aaa5a2 : Phase 0 define TODO-2026-021 preview width scope"
+  - "8ace19e : Phase 1 initialize Tauri preview width workflow"
+  - "3942be4 : Phase 2 design responsive Tauri preview width"
+  - "92eab1e : Phase 2 review Tauri preview width design"
 ---
 
 # TODO-2026-021 Tauri document preview 横幅の可変化 meta

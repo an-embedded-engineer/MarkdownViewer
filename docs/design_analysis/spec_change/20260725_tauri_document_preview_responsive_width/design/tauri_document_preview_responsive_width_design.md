@@ -23,7 +23,7 @@ width: min(980px, calc(100% - 48px));
 | 完了条件 | 設計対応 |
 | --- | --- |
 | 980px超のpaneでMarkdown本文が拡張 | `.markdown-body`から`min(980px, ...)`を除き、pane基準の`calc()`だけを正本にする。 |
-| 狭幅でもpaneからはみ出さない | 通常48px、760px以下28pxの既存inline gutterを維持する。 |
+| 狭幅でもpaneからはみ出さない | 通常48px、window viewportが760px以下では28pxとなる既存inline gutterを維持する。 |
 | 横長要素が拡張幅を利用 | table / Mermaid / PlantUML / imageの親である`.markdown-body`だけを拡張し、子要素の既存契約は変更しない。 |
 | HTML iframeがpane全幅へ追従 | `.html-preview-frame { width: 100%; }`を維持し、固定最大幅を追加しない。 |
 | 操作回帰がない | Explorer resize、tab切替、Markdown / HTML切替、Preview scrollを手動確認する。 |
@@ -151,7 +151,8 @@ Preview workspace / pane (available width)
 ### 9.1 UI契約
 
 - Markdown本文の通常幅から固定980px上限を取り除く。
-- 通常時は左右24px、760px以下では左右14pxの余白を維持する。
+- 通常時は左右24px、window viewportが760px以下では左右14pxの余白を維持する。
+- 本文widthの`100%`はpreview pane content box基準だが、gutterを24pxから14pxへ切り替える既存media queryはwindow viewport幅基準である。Explorer resizeや将来のsplit viewで個別paneだけが狭くなってもgutterは切り替えない。
 - HTML iframeは全幅のままとする。
 
 ### 9.2 API / state / data
@@ -231,7 +232,7 @@ cargo fmt -- --check
 3. 横長table、Mermaid、PlantUML、imageが拡張された本文幅を利用する。
 4. 親幅を超えるtable、code、diagramでは既存の局所横scrollまたは縮小が機能する。
 5. windowを760px以下へ狭め、本文が左右14pxを残してpane内へ収まる。
-6. Explorer separatorを最小・最大へ動かし、Markdown本文とHTML iframeが残りのpreview pane幅へ追従する。
+6. window viewportを760px超に保ったままExplorer separatorを最小・最大へ動かし、Markdown本文とHTML iframeが残りのpreview pane幅へ追従する一方、Markdownの左右gutterは24pxのまま切り替わらない。
 7. Markdown / HTML tabを切り替え、HTML iframeがpane全幅を使い、既存fixture内の文書固有`max-width`は維持される。
 8. Previewの縦scroll、tab切替、Reload、Light / Dark、Mermaid / PlantUML再描画に退行がない。
 
