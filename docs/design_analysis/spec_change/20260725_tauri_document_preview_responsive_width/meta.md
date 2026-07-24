@@ -29,6 +29,7 @@ related_commits:
   - "adc1a49 : Phase 3 fix Mermaid rendering across resize after Phase 4-a feedback"
   - "87d438a : Phase 3 approve Mermaid resize fix after follow-up"
   - "7b6dee5 : Phase 4-a record Tauri preview width user verification"
+  - "ce94a9f : Phase 4-b complete report, diff archive, TODO archive, and history"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-021-tauri-document-preview-横幅の可変化"
 ---
 

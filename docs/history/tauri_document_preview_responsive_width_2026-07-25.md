@@ -34,3 +34,4 @@ Tauri版Markdown preview本文には980pxの固定最大幅があり、広いwin
   - `adc1a49` Phase 4-a Mermaid feedback fix
   - `87d438a` Mermaid fix approval
   - `7b6dee5` Phase 4-a user verification
+  - `ce94a9f` Phase 4-b completion artifacts
