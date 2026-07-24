@@ -80,6 +80,8 @@ Tauri版Markdown本文の固定980px上限を撤去し、preview pane content bo
 6. Markdown / HTML tab切替、HTML iframe全幅、HTML文書固有layout、Preview scroll、Reload、Light / Darkを回帰確認する。
 7. Mermaid初期SVG描画後にwindow幅とExplorer幅を変更し、SVG表示が維持されることを再確認する。
 
+修正後の再確認では、Mermaidの初期SVG表示、複数回のwindow resize後のSVG維持、Explorer resize後のSVG維持、Light / Dark切替とReload後の正常再描画がすべてPASSした。ユーザーは1〜4の確認項目がすべて問題ないとしてPhase 4-bへの進行を承認した。詳細は`../verification/phase4a_user_verification.md`を参照する。
+
 ## 9. 未解決事項
 
-修正後のMermaidリサイズ再確認を含むPhase 4-aユーザー動作確認が未完了。
+実装およびPhase 4-a動作確認の未解決事項はない。

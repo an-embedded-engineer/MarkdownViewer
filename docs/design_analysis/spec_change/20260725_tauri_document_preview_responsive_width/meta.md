@@ -13,8 +13,8 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "pending"
-verification_status: "pending"
+completion_status: "in_progress"
+verification_status: "done"
 related_commits:
   - "3aaa5a2 : Phase 0 define TODO-2026-021 preview width scope"
   - "8ace19e : Phase 1 initialize Tauri preview width workflow"
@@ -61,4 +61,4 @@ related_commits:
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
 | Phase 3 Implementation and docs review | Done (Round 2 approved, unresolved findings: 0) |
-| Phase 4 Verification and completion | In progress (4-a re-verification pending) |
+| Phase 4 Verification and completion | Phase 4-a Done (user verification accepted); Phase 4-b in progress |
