@@ -59,6 +59,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - Markdown本文はpreview pane content boxから左右gutterを引いた幅へ追従し、固定px最大幅を持たない。
 - 通常のMarkdown左右gutterは24pxとする。window viewportが760px以下の場合は既存responsive layoutにより14pxへ切り替える。Explorer resizeなどでpreview paneだけが狭くなってもgutterは切り替えない。
 - Markdown内のtable、code block、Mermaid、PlantUMLは必要時に要素内で横scrollし、imageとPlantUML SVGは本文幅以下へ縮小する。
+- 描画済みMermaidはwindow / Explorer resize後もSVG表示を維持し、元のdiagram source文字列へ戻らない。
 - trusted HTML iframeはpreview pane全幅へ追従し、HTML文書自身の`width` / `max-width`とsecurity境界をViewerから変更しない。
 - documentの縦scrollは`.preview-pane`が所有し、app shell全体へscrollを移さない。
 

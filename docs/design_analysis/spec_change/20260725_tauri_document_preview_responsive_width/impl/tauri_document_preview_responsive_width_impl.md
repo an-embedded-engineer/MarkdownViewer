@@ -9,7 +9,7 @@
 
 ## 2. 実装概要
 
-Tauri版Markdown本文の固定980px上限を撤去し、preview pane content boxから左右gutterを引いた幅へ追従させた。React DOM、state、event handler、Rust command、HTML iframe、security boundaryは変更していない。
+Tauri版Markdown本文の固定980px上限を撤去し、preview pane content boxから左右gutterを引いた幅へ追従させた。Phase 4-aで検出したMermaidのリサイズ退行に対し、Markdown内容を変えないReact再描画では描画済みSVGを元HTMLで上書きしないよう`dangerouslySetInnerHTML`値を安定化した。width state、event handler、Rust command、HTML iframe、security boundaryは変更していない。
 
 横長contentの手動確認用に`sample_docs/preview_width.md`を追加し、変更後の幅契約をTauri Viewer component docsと開発・手動確認ルールへ同期した。
 
@@ -22,7 +22,8 @@ Tauri版Markdown本文の固定980px上限を撤去し、preview pane content bo
 | viewport 760px以下の左右gutter 14px | 既存media queryの`calc(100% - 28px)`を変更せず維持した。 |
 | Markdown子要素契約を維持 | table / pre / Mermaid / PlantUMLの`overflow-x: auto`、image / PlantUML SVGの`max-width: 100%`を変更していない。 |
 | HTML iframe全幅を維持 | `.html-preview-frame { width: 100%; }`、iframe DOM、protocol / sandbox / CSPを変更していない。 |
-| JavaScript計測を追加しない | `App.tsx`、`explorerPane.ts`、`documentPolicy.ts`を変更していない。 |
+| JavaScript計測を追加しない | width計測、observer、listenerは追加していない。`App.tsx`はMermaid SVGを保持するため`dangerouslySetInnerHTML` objectを既存HTML単位でmemoizeした。`explorerPane.ts`と`documentPolicy.ts`は変更していない。 |
+| Mermaidリサイズ退行を解消 | window size保存stateによるApp再描画で元Markdown HTMLが再注入されないようにし、描画済みSVGを維持する。Markdown内容や既存再描画依存値が変わる場合の更新は維持した。 |
 | 横長fixture | `sample_docs/preview_width.md`へtable、Mermaid、PlantUML、image、long code lineをまとめた。 |
 
 ## 4. 設計レビュー指摘の反映
@@ -40,9 +41,9 @@ Tauri版Markdown本文の固定980px上限を撤去し、preview pane content bo
 | --- | --- |
 | `docs/components/tauri_viewer/README.md` | Markdown本文のpane追従とHTML iframe全幅、`App.css`の責務を追記。 |
 | `docs/components/tauri_viewer/basic_design.md` | 固定px最大幅を持たないCSS layoutとHTML文書layoutの非上書きを追記。 |
-| `docs/components/tauri_viewer/detail_design.md` | box model、gutter値、pane / viewport基準の違い、子要素overflow / scalingを追記。 |
-| `docs/components/tauri_viewer/interface_spec.md` | Document Preview表示契約を追加。 |
-| `docs/rules/development_workflow.md` | `sample_docs/preview_width.md`を使う広幅・狭幅・Explorer resize・HTML回帰の手動確認を追加。 |
+| `docs/components/tauri_viewer/detail_design.md` | box model、gutter値、pane / viewport基準の違い、子要素overflow / scaling、Mermaid SVGを保持するReact DOM契約を追記。 |
+| `docs/components/tauri_viewer/interface_spec.md` | Document Preview表示契約とresize後のMermaid SVG維持を追加。 |
+| `docs/rules/development_workflow.md` | `sample_docs/preview_width.md`を使う広幅・狭幅・Explorer resize・HTML回帰とMermaid SVG維持の手動確認を追加。 |
 
 ## 6. 互換性
 
@@ -65,9 +66,11 @@ Tauri版Markdown本文の固定980px上限を撤去し、preview pane content bo
 | `cd markdown-viewer-tauri/src-tauri && cargo fmt -- --check` | 成功。差分なし。 |
 | `git diff --check` | 成功。whitespace errorなし。 |
 
-CSS-onlyのvisible layout変更であり、現行VitestはDOM / computed layoutを提供しないため、CSS source文字列へ結合するunit testは追加していない。外部I/O、永続化、serialization、主要導線、integration test codeを変更していないため、追加の統合テスト対象には該当しない。
+初回の幅変更はCSS-onlyであり、CSS source文字列へ結合するunit testは追加していない。Phase 4-aフィードバック修正後にも同じ一式を再実行し、frontend build、既存Vitest 29件、`cargo check`、Rust 22件、format check、`git diff --check`が成功した。Mermaid SVG保持はReact外のDOM mutationとwindow resize state更新を含むWebView上の振る舞いであり、現行のNode環境VitestにはDOM環境がないため、`sample_docs/preview_width.md`を使う再手動確認を完了条件とする。外部I/O、永続化、serialization、Rust、Tauri integration境界は変更していない。
 
-## 8. Phase 4-a手動確認予定
+## 8. Phase 4-a手動確認
+
+2026-07-25の初回ユーザー確認では、本文幅とgutterの追従は期待どおりだった。Mermaidは初期状態でSVG描画されたが、window resize後にdiagram source文字列へ戻ったためNGとなり、Phase 3へ戻して修正した。
 
 1. `sample_docs/preview_width.md`をpreview pane 1028px以下で開き、従来相当のmarginを確認する。
 2. preview paneを1028px超へ広げ、本文が980pxで止まらず左右24pxを残して拡張することを確認する。
@@ -75,7 +78,8 @@ CSS-onlyのvisible layout変更であり、現行VitestはDOM / computed layout�
 4. window viewportを760px以下へ縮め、左右gutterが14pxになることを確認する。
 5. window viewportを760px超に保ってExplorerをresizeし、pane追従中もgutterが24pxのままであることを確認する。
 6. Markdown / HTML tab切替、HTML iframe全幅、HTML文書固有layout、Preview scroll、Reload、Light / Darkを回帰確認する。
+7. Mermaid初期SVG描画後にwindow幅とExplorer幅を変更し、SVG表示が維持されることを再確認する。
 
 ## 9. 未解決事項
 
-実装上の未解決事項はない。visible layoutの最終確認はPhase 4-aのユーザー動作確認で行う。
+修正後のMermaidリサイズ再確認を含むPhase 4-aユーザー動作確認が未完了。

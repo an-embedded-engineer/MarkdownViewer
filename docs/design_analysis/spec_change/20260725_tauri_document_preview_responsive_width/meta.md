@@ -10,9 +10,9 @@ components:
   - "markdown-viewer-tauri/src/*.test.ts"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "in_progress"
 design_status: "done"
-impl_status: "done"
+impl_status: "draft"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
@@ -58,5 +58,5 @@ related_commits:
 | Phase 0 Requirements | Done (`3aaa5a2`) |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
-| Phase 3 Implementation and docs review | Done (Approved, unresolved findings: 0) |
-| Phase 4 Verification and completion | Pending |
+| Phase 3 Implementation and docs review | Reopened (Phase 4-a Mermaid resize feedback) |
+| Phase 4 Verification and completion | In progress (4-a NG; returned to Phase 3) |

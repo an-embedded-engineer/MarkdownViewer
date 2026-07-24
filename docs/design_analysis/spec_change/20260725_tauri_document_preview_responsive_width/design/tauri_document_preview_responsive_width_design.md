@@ -193,7 +193,8 @@ Preview workspace / pane (available width)
 | `docs/components/tauri_viewer/detail_design.md` | UI layoutと子要素overflow / scaling責務を追記する。 |
 | `docs/components/tauri_viewer/interface_spec.md` | Document Preview表示契約を追加する。 |
 | `docs/rules/development_workflow.md` | 広幅・狭幅・Explorer resizeの手動確認項目を追加する。 |
-| `App.tsx` / Rust / Tauri config | 変更なし。回帰検証のみ。 |
+| `src/App.tsx` | Phase 4-aで検出したMermaidのリサイズ退行に対し、`MarkdownPreview`が渡す`dangerouslySetInnerHTML`値をMarkdown HTML変更時だけ更新する。幅計測、resize listener、再描画処理は追加しない。 |
+| Rust / Tauri config | 変更なし。回帰検証のみ。 |
 
 ## 14. 恒久ドキュメント更新予定
 
@@ -234,7 +235,7 @@ cargo fmt -- --check
 5. windowを760px以下へ狭め、本文が左右14pxを残してpane内へ収まる。
 6. window viewportを760px超に保ったままExplorer separatorを最小・最大へ動かし、Markdown本文とHTML iframeが残りのpreview pane幅へ追従する一方、Markdownの左右gutterは24pxのまま切り替わらない。
 7. Markdown / HTML tabを切り替え、HTML iframeがpane全幅を使い、既存fixture内の文書固有`max-width`は維持される。
-8. Previewの縦scroll、tab切替、Reload、Light / Dark、Mermaid / PlantUML再描画に退行がない。
+8. Previewの縦scroll、tab切替、Reload、Light / Dark、Mermaid / PlantUML再描画に退行がない。特にwindow / Explorer resize後もMermaidがSVG表示を維持し、ソース文字列へ戻らない。
 
 ## 17. リスクとfollow-up
 
@@ -245,5 +246,14 @@ cargo fmt -- --check
 | HTMLも固定上限の影響を受けていると誤認する | Viewer iframeと文書自身のlayoutを設計・恒久docsで分離して記載する。 |
 | CSSだけの変更をunit testで直接検出できない | buildによるCSS処理確認と、複数幅・Explorer resizeを含む手動確認を完了条件にする。 |
 | 将来split viewでpaneが複数になる | pane相対CSSのため各paneの包含blockへ自然に追従する。split view固有のminimum widthはTODO-2026-006で扱う。 |
+| MermaidがReact外で置換したSVGを、window size保存stateの再描画が元HTMLへ戻す | `dangerouslySetInnerHTML`へ渡すobjectをMarkdown HTML単位で安定化し、内容が変わらないApp再描画ではDOMを再注入しない。Mermaid自体のresize再実行やlistenerは追加しない。 |
 
 追加follow-upは現時点で起票しない。Avalonia版へ同様の仕様を反映するかは、既存のTauri先行UX評価とAvalonia水平展開の流れで別途判断する。
+
+## 18. Phase 4-aフィードバックによる設計補足
+
+2026-07-25のユーザー動作確認で、本文幅は期待どおり追従した一方、初期描画済みのMermaidがwindow resize後にソース文字列へ戻ることを確認した。window resize時のlogical size保存が`App`を再描画し、`MarkdownPreview`が毎回新しい`dangerouslySetInnerHTML` objectを渡すことで、MermaidがReact外で生成したSVGを元のMarkdown HTMLで上書きしていた。Mermaid effectの依存値は文書revision / PlantUML結果 / Themeであり、window sizeは含まれないため、その後のSVG化も行われなかった。
+
+修正では、`renderMarkdown`結果を保持する既存`useMemo`に加え、`dangerouslySetInnerHTML` objectも同じHTMLを依存値として`useMemo`で安定化する。これによりwindow size保存やExplorer操作など、Markdown内容を変えない親再描画ではReactがinner HTMLを再設定せず、Mermaid SVGを維持する。Markdown本文、PlantUML結果、選択path、Theme、tab revisionが変わる既存経路では従来どおり新しいHTMLまたはcomponent keyが生成され、Mermaid effectが実行される。
+
+この補足は幅の計算方法を変えず、新しいwidth state、`ResizeObserver`、window listener、Mermaid resize listenerを追加しないため、§8のCSS主導layout方針を維持する。

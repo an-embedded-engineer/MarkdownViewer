@@ -176,6 +176,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - Markdown プレビュー表示
 - `sample_docs/preview_width.md`を開き、preview paneが1028pxを超えるwindow幅でMarkdown本文が固定980pxに止まらず、左右24pxのgutterを残してpane幅へ追従すること
 - `sample_docs/preview_width.md`の横長table、Mermaid、PlantUML、image、codeが拡張後の本文幅を利用し、本文幅を超える場合は既存の要素内横scrollまたは縮小が機能すること
+- `sample_docs/preview_width.md`のMermaidが初期表示後、window幅とExplorer幅を変更してもSVG表示を維持し、diagram source文字列へ戻らないこと
 - window viewportを760px以下へ縮めるとMarkdown左右gutterが14pxになり、760px超のままExplorer resizeでpreview paneだけを狭めた場合は左右gutterが24pxのまま維持されること
 - Markdown / HTML tabとExplorer幅を切り替え、Markdown本文とHTML iframeが残りのpreview pane幅へ追従し、HTML文書自身のlayoutは維持されること
 - `sample_docs/image_link.md` のroot内相対PNG画像が表示されること

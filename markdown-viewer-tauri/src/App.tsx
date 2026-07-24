@@ -1684,13 +1684,17 @@ function MarkdownPreview({
     () => renderMarkdown(markdown, selectedFilePath, plantUmlDiagrams),
     [markdown, plantUmlDiagrams, selectedFilePath],
   );
+  // Mermaid replaces its source nodes with SVG outside React. Keep this prop
+  // stable so unrelated App renders (such as window resize persistence) do not
+  // restore the pre-render Mermaid source HTML.
+  const innerHtml = useMemo(() => ({ __html: html }), [html]);
 
   return (
     <article
       ref={previewRef}
       className="markdown-body"
       onClick={onClick}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={innerHtml}
     />
   );
 }
