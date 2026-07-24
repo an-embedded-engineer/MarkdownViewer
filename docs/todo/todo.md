@@ -1,5 +1,44 @@
 # TODO
 
+## TODO-2026-021 Tauri document preview 横幅の可変化
+
+- status: open
+- workflow: spec-change
+- depends_on: none
+- summary: Tauri版のdocument previewにある固定pxの最大幅を廃止し、window内の利用可能なpreview pane幅に追従させる。
+- purpose: 横幅の広いwindowでMarkdown本文が980px以上に広がらない制約を解消し、横長のtable、Mermaid、PlantUML、imageを利用可能な表示領域で見やすくする。
+- scope:
+  - Tauri版Markdown preview本文の幅を、preview pane幅からresponsiveな左右marginを引いた幅へ変更する。
+  - Markdown / trusted HTMLのViewer側viewportに固定pxの最大幅がないことを確認する。
+  - Markdown内のtable、code block、Mermaid、PlantUML、imageの既存overflow / scaling契約を維持しながら、拡大した本文幅を利用できるようにする。
+  - Tauri Viewer component docsとUI手動確認項目を新しい幅契約へ同期する。
+- non_scope:
+  - Explorer幅変更の最小値、dynamic最大値、操作契約を変更すること。
+  - trusted HTML文書自身がCSSで指定する`width` / `max-width`を上書きすること。
+  - Avalonia版のpreview幅を変更すること。
+  - 横幅設定のユーザー設定化または永続化。
+- affected_components:
+  - `markdown-viewer-tauri/src/App.css`
+  - `markdown-viewer-tauri/src/App.tsx`（DOM変更またはtest hookが必要な場合のみ）
+  - `markdown-viewer-tauri/src/*.test.ts`（幅契約を自動検証できる範囲）
+  - `docs/components/tauri_viewer/README.md`
+  - `docs/components/tauri_viewer/basic_design.md`
+  - `docs/components/tauri_viewer/detail_design.md`
+  - `docs/components/tauri_viewer/interface_spec.md`
+  - `docs/rules/development_workflow.md`
+- compatibility:
+  - document open、tab、Explorer resize、Markdown / HTML切替の操作契約は変更しない。
+  - 狭いwindowでは既存のresponsiveな左右marginを維持する。
+  - HTML iframeはpreview pane全幅を使う既存契約を維持し、sandbox / custom protocol境界を変更しない。
+- completion:
+  - 980pxを超えるpreview paneでMarkdown本文が固定980pxに制限されず、pane幅から左右marginを引いた幅まで拡張される。
+  - 狭幅時も本文がpreview paneからはみ出さず、既存のresponsive marginが維持される。
+  - 横長のtable、Mermaid、PlantUML、imageが拡張後の本文幅を利用でき、必要な要素では既存の横scrollまたは縮小表示が機能する。
+  - trusted HTML iframeがpreview pane全幅へ追従し、HTML文書自身のlayoutとsecurity境界が維持される。
+  - Explorer resize、tab切替、Markdown / HTML切替、preview scrollに退行がない。
+  - `npm run build`、`npm test -- --run`、`cargo check`、`cargo test`が成功する。
+  - 横長のMarkdown / HTML fixtureを用い、通常幅、980px超の幅、狭幅、Explorer resize、Light / Darkを手動確認する。
+
 ## TODO-2026-006 Tauri Split view 導入
 
 - status: open
