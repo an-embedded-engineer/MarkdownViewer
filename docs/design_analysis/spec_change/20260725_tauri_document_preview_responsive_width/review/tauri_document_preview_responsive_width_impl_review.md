@@ -1,14 +1,16 @@
 # TODO-2026-021 Tauri document preview 横幅の可変化 実装・恒久ドキュメントレビュー
 
 **レビュー日**: 2026-07-25
-**再確認日**: 2026-07-25
+**再確認日**: 2026-07-25（Round 1 follow-up）
+**再々確認日**: 2026-07-25（Round 2 / Phase 4-a feedback）
 **対象ドキュメント**: `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/impl/tauri_document_preview_responsive_width_impl.md`
 **承認済み設計**: `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/design/tauri_document_preview_responsive_width_design.md`
 **設計レビュー**: `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/review/tauri_document_preview_responsive_width_design_review.md`（承認済み、未解決指摘 0 件）
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-021
-**レビュー対象コミット**: `9694e2b` (feat: make Tauri preview width responsive)
+**レビュー対象コミット**: `9694e2b` (feat: make Tauri preview width responsive) + `adc1a49` (fix: preserve Mermaid rendering across resize)
 **Round 1 fix コミット**: `64b7b12` (docs: address Tauri preview width implementation review)
-**判定**: **承認 (Approved)**。Phase 4（検証・完了）進行可。ブロッキング指摘 (High / Medium) 0 件。初回検出の改善提案 (Low 1 件) は Round 1 fix (`64b7b12`) と `spec-change-workflow` Phase 3 の documented lifecycle 確認により解消済みと再確認した。**未解決指摘 0 件**。
+**Round 2 / Phase 4-a fix コミット**: `adc1a49` (fix: preserve Mermaid rendering across resize)
+**判定**: **承認 (Approved)**。Phase 4（検証・完了、4-a 再確認）進行可。ブロッキング指摘 (High / Medium) 0 件。初回改善提案 3.1 (Low) は Round 1 (`64b7b12`) で解消済み。Phase 4-a ユーザー確認で検出した Mermaid リサイズ退行は Round 2 (`adc1a49`) の `dangerouslySetInnerHTML` identity 安定化で修正され、react-dom 実装レベルで原因・修正関係を検証し妥当と再確認した。**未解決指摘 0 件**（Phase 4-a 手動再確認の実施のみ Phase 4 で残る）。
 
 ---
 
@@ -132,6 +134,7 @@ ADR 非追加の設計判断（設計 §14 末尾）とも矛盾しない。恒�
 - 本変更は CSS-only の visible layout 変更のため、自動テストで幅を直接検証できない。Phase 4-a では実装記録 §8 / `development_workflow.md` の手動確認（1028px 超拡張・広幅図表・viewport 760px 以下 14px・viewport 760px 超維持の Explorer resize で 24px 維持・HTML iframe 全幅と文書固有 layout・Light / Dark）を漏れなく実施すること。
 - `sample_docs/preview_width.md` の PlantUML 図の描画には `plantuml.jar` 設定が必要。Phase 4-a の PlantUML 確認時は jar path 設定を前提とする（fixture 自体の妥当性には影響しない）。
 - 改善提案 3.1 は Round 1 (`64b7b12`) で `impl_status: in_review` へ正常遷移済み。Phase 3 完了コミットで `impl_status` を `done`、`status` を `implemented` へ更新する（documented lifecycle 手順 10-11 / Phase 3 exit 条件）。
+- Phase 4-a feedback（Mermaid リサイズ退行）の修正は Round 2 (`adc1a49`) で反映済み（詳細は §10-11）。Phase 4-a では、初期 SVG 描画後に window 幅・Explorer 幅を変えても Mermaid が SVG を維持することを `sample_docs/preview_width.md` で再確認すること。
 
 ---
 
@@ -162,3 +165,85 @@ follow-up による新たな齟齬は検出しなかった。受け入れ条件�
 | 3.1 `meta.md` `impl_status` の lifecycle 整合 | Low（改善提案・非ブロッキング） | `64b7b12` で `impl_status` を `draft` → `in_review` へ更新（手順 9）。documented lifecycle 上、`9694e2b` の `draft` はレビュー依頼前の正常状態であり、完了処理で `done` / `implemented` へ遷移する方針を確認 | 解決済み（follow-up 再確認済み、`64b7b12`） |
 
 Round 1 の指摘について、`spec-change-workflow` Phase 3 の documented lifecycle と `64b7b12` の差分が整合し、新たな齟齬を生じさせていないことを確認した。未解決指摘は 0 件であり、総合判定は **承認 (Approved)**。Phase 4（検証・完了）へ進行してよい。
+
+---
+
+## 10. Phase 4-a feedback と Round 2 再レビュー
+
+### 10.1 Phase 4-a フィードバック（Mermaid リサイズ退行）
+
+2026-07-25 のユーザー動作確認で、本文幅と gutter は期待どおり追従した一方、初期描画済みの Mermaid が window resize 後に diagram source 文字列へ戻る退行が検出され、Phase 4-a を NG として Phase 3 へ差し戻した。原因は次のとおり。
+
+- window resize 時の logical size 保存が `App` を再描画する。
+- `MarkdownPreview` が毎回新しい `dangerouslySetInnerHTML` object を渡す。
+- React が Mermaid の React 外 DOM mutation（SVG）を元 Markdown HTML で上書きする。
+- Mermaid effect の依存値に window size がなく、上書き後の再 SVG 化が起きない。
+
+Round 2 fix (`adc1a49`) は `MarkdownPreview` で `renderMarkdown` 結果を保持する既存 `useMemo` に加え、`dangerouslySetInnerHTML` object を `useMemo(() => ({ __html: html }), [html])` で HTML 単位に安定化する。width 計測・resize listener・Mermaid resize 再実行は追加していない。
+
+### 10.2 原因・修正関係の検証（react-dom 実装レベル）
+
+react-dom 19.2.6 の `updateProperties`（`node_modules/react-dom/cjs/react-dom-client.production.js:13898-13904`）は、`<article>` のような一般タグの更新で `nextProps[key] !== lastProps[key]`（**参照比較**）が真のときだけ `setProp` を呼ぶ。`setProp` の `dangerouslySetInnerHTML` 分岐（同 13283-13288 行）は条件なしに `domElement.innerHTML = __html` を実行する。
+
+- **修正前**: `dangerouslySetInnerHTML={{ __html: html }}` は毎レンダーで新しい object literal を生成するため、`html` 文字列が同一でも参照が常に異なり `setProp` が走り、`innerHTML` が再注入されて Mermaid SVG を消去する。→ 報告された退行と一致。
+- **修正後**: `innerHtml = useMemo(() => ({ __html: html }), [html])`。resize では `markdown` / `plantUmlDiagrams` / `selectedFilePath` が不変で `html` useMemo が同一文字列参照を返すため、`innerHtml` も同一 object 参照となり `propKey === lastProp` で `setProp` がスキップされ、`innerHTML` を再設定しない。→ Mermaid SVG が保持される。
+
+原因・修正関係は react-dom 実装レベルで妥当であることを確認した（review 観点 1）。
+
+### 10.3 過剰抑制がないことの確認（review 観点 2-4）
+
+| 観点 | 確認結果 |
+| --- | --- |
+| Markdown 本文 / PlantUML 結果 / selected path 変更で新 HTML 注入（観点 2） | ✓ `html` useMemo の依存 `[markdown, plantUmlDiagrams, selectedFilePath]`（`App.tsx:1683-1686`）が変わると `html` が再計算され `innerHtml` object も新参照になるため、`setProp` が新 HTML を注入する |
+| Theme / tab revision で再描画され更新を止めすぎない（観点 3） | ✓ `MarkdownPreview` は `key={`${activeTab.id}-${theme}-${activeTab.revision}`}`（`App.tsx:1004`）で mount されるため、Theme / revision / tab 変更時は component が remount され、Mermaid effect（依存 `[activeTab?.id, activeTab?.revision, activeTab?.plantUmlDiagrams, theme]`、`App.tsx:852-885`）が再実行される。memo が安定化するのは key 不変（同一 tab・同一 theme・同一 revision）の無関係な App 再描画のみで、過剰抑制はない |
+| resize ごとの Mermaid 再実行 race や新 listener の非追加（観点 4） | ✓ `adc1a49` の `App.tsx` 差分は comment + `useMemo` 1 個 + prop 差し替えの計 6 行のみ。Mermaid effect の依存に window size は追加されておらず、resize listener・`ResizeObserver`・width state・Mermaid 再実行のいずれも導入していない。resize→再描画 race は発生しない |
+
+### 10.4 幅契約・iframe・security・Rust の非変更（review 観点 5）
+
+`adc1a49` の非 doc 変更は `markdown-viewer-tauri/src/App.tsx` のみ（`git show adc1a49 --stat`）。`App.css`（幅契約）、`HtmlPreview` / iframe / `mvhtml` protocol / sandbox / CSP、`explorerPane.ts`、`documentPolicy.ts`、`src-tauri/` はコミット差分に含まれない。§1 で確認した幅契約・HTML iframe 全幅・security 境界は無変更で維持されている。
+
+### 10.5 恒久ドキュメント・設計補足・impl 記録・meta の同期（review 観点 6）
+
+| 文書 | 反映内容 | 実装との一致 |
+| --- | --- | --- |
+| design `§13` / `§16-8` / `§17` / **`§18`（新設）** | 影響範囲表を `src/App.tsx` 変更ありへ更新、手動シナリオ 8 に resize 後 Mermaid SVG 維持を追記、risk 表に Mermaid 上書き行を追加、§18 で原因・修正・width 方針非変更を補足 | ✓ 一致 |
+| `basic_design.md` | `renderMarkdown` / `MarkdownPreview` 行へ、生成 HTML と `dangerouslySetInnerHTML` 値を Markdown 内容が変わるまで安定化する旨を追記 | ✓ 一致 |
+| `detail_design.md` | preview 節へ `MarkdownPreview` の memoize 契約、layout 段落へ resize 後 Mermaid SVG 維持を追記 | ✓ 一致 |
+| `interface_spec.md` | Document Preview 表示へ「描画済み Mermaid は resize 後も SVG 維持」を追加 | ✓ 一致 |
+| `development_workflow.md` | Mermaid SVG が resize でソース文字列へ戻らないことの手動確認項目を追加 | ✓ 一致 |
+| impl 記録 `§2` / `§3` / `§5` / `§7` / `§8` / `§9` | 実装概要・設計差分表（Mermaid 退行解消行追加、JS 計測行更新）・恒久 docs 反映・自動検証根拠・Phase 4-a 手動確認（項目 7 追加）・未解決事項（4-a 再確認 pending）を同期 | ✓ 一致 |
+| `meta.md` | Phase 3 を Reopened（`status: in_progress`、`impl_status: draft`、Phase Status 表更新）へ差し戻し、`related_commits` を更新 | ✓ 一致。Phase 4-a NG による Phase 3 再開の lifecycle 表現として妥当 |
+
+設計補足 §18、恒久ドキュメント、impl 記録、meta の Phase 3 再開状態はいずれも実装（`adc1a49`）と一致する。
+
+### 10.6 自動テスト非追加と手動再確認の妥当性（review 観点 7）
+
+Round 2 fix は React reconciliation（参照比較による `innerHTML` 再注入）と Mermaid の React 外 DOM mutation、window resize state 更新が相互作用する WebView 上の可視挙動である。`mermaid.run` は実ブラウザ API で SVG を生成するため、現行の Node 環境 Vitest（DOM / computed layout / 実 SVG 描画なし）では意味のある自動検証ができない。したがって `sample_docs/preview_width.md` を用いた手動再確認（impl 記録 §8 項目 7、`development_workflow.md`）を完了条件とする判断は妥当である。既存の型・純関数ロジック（documentPolicy / explorerPane）に変更はなく、既存 Vitest 29 件 / Rust 22 件の回帰で十分にカバーされる。
+
+### 10.7 Round 2 自動検証（レビュー側再実行）
+
+実装記録 §7 の主張をレビュー側でも再実行して一致を確認した。
+
+| コマンド | 結果 |
+| --- | --- |
+| `npm run build` | ✓ 成功（既知の chunk size warning のみ） |
+| `npm test -- --run` | ✓ 2 files / 29 tests passed |
+| `cargo check` | ✓ 成功 |
+| `cargo test` | ✓ 22 passed |
+| `cargo fmt -- --check` | ✓ 差分なし |
+
+### 10.8 Round 2 判定
+
+review 観点 1-7 をすべて確認し、ブロッキングとなる齟齬・不整合・過剰抑制・race・想定外変更は検出しなかった。Mermaid リサイズ退行の修正は react-dom 実装レベルで原因・修正関係が妥当で、幅契約・iframe・security・Rust は無変更、恒久ドキュメント・設計補足・impl 記録・meta も実装と一致する。**未解決指摘は 0 件**であり、Round 2 でも **承認 (Approved)** とする。
+
+Phase 4-a の手動再確認（初期 SVG 描画後に window 幅・Explorer 幅を変えても Mermaid が SVG を維持すること、および幅・gutter・HTML iframe・Light/Dark の回帰）を実施し、NG がなければ Phase 3 完了コミットで `impl_status: done` / `status: implemented` へ更新して Phase 4 完了処理へ進むこと。
+
+---
+
+## 11. 指摘対応 Round 2 (Phase 4-a feedback)
+
+| 事象 | severity | 対応 | 状態 |
+| --- | --- | --- | --- |
+| Phase 4-a: 初期描画済み Mermaid が window / Explorer resize 後に diagram source 文字列へ戻る（可視退行） | 中（機能退行だが Phase 4-a で検出・修正済み。設計の幅契約・security は不変） | `adc1a49` で `MarkdownPreview` の `dangerouslySetInnerHTML` object を `useMemo(…, [html])` で identity 安定化し、内容不変の親再描画で `innerHTML` 再注入を防止。width 計測 / listener / Mermaid 再実行は非追加。設計 §18・恒久 docs・impl 記録・meta を同期 | 解決済み（Round 2 再レビュー済み、`adc1a49`。手動再確認は Phase 4-a で実施） |
+
+Round 2 の Phase 4-a feedback 修正について、react-dom 実装レベルの原因・修正検証、過剰抑制・race の非発生、幅契約 / iframe / security / Rust の非変更、恒久ドキュメント・設計補足・impl 記録・meta の一致、自動検証再実行の一致をすべて確認した。新たな齟齬は検出せず、未解決指摘は 0 件。総合判定は **承認 (Approved)**。Phase 4（4-a 手動再確認・完了処理）へ進行してよい。
