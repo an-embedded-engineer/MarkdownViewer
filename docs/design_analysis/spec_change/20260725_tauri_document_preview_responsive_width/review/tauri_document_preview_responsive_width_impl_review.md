@@ -72,7 +72,9 @@ ADR 非追加の設計判断（設計 §14 末尾）とも矛盾しない。恒�
 
 **工程**: Phase 3 完了処理 または Phase 4 完了処理時の meta 更新
 
-**status**: open（非ブロッキング。承認は本改善提案の解決を前提としない）
+**status**: addressed（reviewer follow-up確認待ち）
+
+**対応**: `spec-change-workflow` Phase 3は、レビュー依頼前に`impl_status`を`draft`、レビュー文書作成後の指摘対応中に`in_review`、未解決指摘0件の確認後に`done`へ更新するライフサイクルを明示している。レビュー対象コミット`9694e2b`の`draft`は手順どおりのレビュー依頼前状態であり、他案件の完了済みmetaが`done`であることとも矛盾しない。本レビュー文書作成後の現在状態として`meta.md`を`in_review`へ更新し、reviewer follow-upで未解決0件を確認した後、Phase 3完了コミットで`done`へ更新する。
 
 ---
 

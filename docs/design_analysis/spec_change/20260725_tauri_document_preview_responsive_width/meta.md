@@ -12,7 +12,7 @@ components:
   - "docs/rules/development_workflow.md"
 status: "in_progress"
 design_status: "done"
-impl_status: "draft"
+impl_status: "in_review"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
@@ -22,6 +22,8 @@ related_commits:
   - "92eab1e : Phase 2 review Tauri preview width design"
   - "1d14cd2 : Phase 2 address Tauri preview width design review"
   - "8078b28 : Phase 2 approve Tauri preview width design after follow-up"
+  - "9694e2b : Phase 3 implement responsive Tauri preview width"
+  - "98073a7 : Phase 3 review Tauri preview width implementation"
 ---
 
 # TODO-2026-021 Tauri document preview 横幅の可変化 meta
