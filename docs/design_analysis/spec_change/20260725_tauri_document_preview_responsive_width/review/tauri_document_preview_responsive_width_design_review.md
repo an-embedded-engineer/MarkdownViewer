@@ -1,11 +1,13 @@
 # TODO-2026-021 Tauri document preview 横幅の可変化 設計レビュー
 
 **レビュー日**: 2026-07-25
+**再確認日**: 2026-07-25
 **対象ドキュメント**: `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/design/tauri_document_preview_responsive_width_design.md`
 **対象 meta**: `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-021
 **初回レビュー対象コミット**: `3942be4` (docs: design responsive Tauri preview width)
-**判定**: **承認 (Approved)**。Phase 3 進行可。ブロッキング指摘 (High / Medium) 0 件。改善提案 (Low) 1 件は非ブロッキングで、Phase 3 の恒久ドキュメント更新に折り込めば足りる。
+**Round 1 fix コミット**: `1d14cd2` (docs: address Tauri preview width design review)
+**判定**: **承認 (Approved)**。Phase 3 進行可。ブロッキング指摘 (High / Medium) 0 件。初回検出の改善提案 (Low 1 件) は Round 1 fix (`1d14cd2`) で設計へ反映済みと再確認した。**未解決指摘 0 件**。
 
 ---
 
@@ -59,9 +61,13 @@ design §16-5 は window 幅で狭幅を説明しているため実挙動と一�
 
 **工程**: Phase 3（恒久ドキュメント更新時に明記）
 
-**status**: addressed（reviewer follow-up確認待ち）
+**initial status**: open
 
 **対応**: 設計書§3の完了条件を「window viewportが760px以下」と明確化し、§9.1へ本文widthの基準はpreview pane content box、gutter切替の基準はwindow viewportであり、Explorer resizeや将来のsplit viewによる個別pane幅の変化ではgutterを切り替えないことを追記した。§16-6にも、window viewportを760px超に保ったExplorer resizeでは左右gutterが24pxのまま維持される確認観点を追加した。Phase 3では同じ契約を`detail_design.md`を含む恒久ドキュメントへ反映する。
+
+**確認 (`1d14cd2`)**: `git show 1d14cd2` の design 差分で次の 3 点を再確認した。(1) §3 完了条件表の「狭幅でもpaneからはみ出さない」行が「通常48px、**window viewportが760px以下では**28pxとなる既存inline gutterを維持する」へ更新され、28px gutter の条件が window viewport 760px 以下であることが明確化された。(2) §9.1 UI 契約へ「本文widthの`100%`はpreview pane content box基準だが、gutterを24pxから14pxへ切り替える既存media queryはwindow viewport幅基準である。Explorer resizeや将来のsplit viewで個別paneだけが狭くなってもgutterは切り替えない」という一文が追加され、幅基準（pane content box）と gutter breakpoint 基準（window viewport）の分離、および Explorer resize / split view で gutter を切り替えない契約が明記された。(3) §16-6 手動シナリオが「**window viewportを760px超に保ったまま**Explorer separatorを最小・最大へ動かし…**Markdownの左右gutterは24pxのまま切り替わらない**」へ更新され、指摘した観察観点が手動確認計画へ反映された。いずれも推奨対応と一致し、新たな齟齬・実装不能な契約は検出しなかった。design §16-5（window を 760px 以下へ狭める狭幅確認）との整合も保たれている。
+
+**status**: 解決済み（2026-07-25 再確認、commit `1d14cd2`）
 
 ---
 
@@ -70,7 +76,7 @@ design §16-5 は window 幅で狭幅を説明しているため実挙動と一�
 | `docs/todo/todo.md` TODO-2026-021 完了条件 | 設計書での対応箇所 | 結果 |
 | --- | --- | --- |
 | 980px を超える pane で本文が固定 980px に制限されず、pane 幅から左右 margin を引いた幅まで拡張される | §3 表、§5、§6.1（`min(980px, ...)` 撤去→`calc(100% - 48px)`）、§10（1028px 境界） | ✓ 整合。1028px 境界の算術が正しく、超過幅で 980px 固定を除去する |
-| 狭幅時も本文が pane からはみ出さず、既存 responsive margin が維持される | §3 表、§5、§6.1（48px / 28px gutter 維持）、§11（境界条件） | ✓ 整合。改善提案 3.1 の意味差は挙動を変えず、非対象範囲内 |
+| 狭幅時も本文が pane からはみ出さず、既存 responsive margin が維持される | §3 表、§5、§6.1（48px / 28px gutter 維持）、§9.1（gutter breakpoint = viewport 基準）、§11（境界条件） | ✓ 整合。改善提案 3.1 の意味差は Round 1 (`1d14cd2`) で §3 / §9.1 / §16-6 へ明記され、挙動は既存かつ非対象範囲内 |
 | 横長 table / Mermaid / PlantUML / image が拡張後の本文幅を利用でき、必要時に既存の横 scroll / 縮小が機能する | §6.2、§13、§16-3/4、§17（risk 対応） | ✓ 整合。親幅拡張のみで子要素の `overflow-x` / `max-width` 契約を保持する |
 | trusted HTML iframe が pane 全幅へ追従し、HTML 文書自身の layout と security 境界が維持される | §6.3、§9.2、§10（互換レイヤー非追加）、§17 | ✓ 整合。`.html-preview-frame` 現行契約と fixture `max-width: 900px` 分離が実ソースと一致 |
 | Explorer resize、tab 切替、Markdown / HTML 切替、preview scroll に退行がない | §4.2（非対象）、§8（依存方向）、§16-6/7/8 | ✓ 整合。React state / observer / listener 非追加で CSS layout のみに閉じる |
@@ -99,15 +105,15 @@ design §16-5 は window 幅で狭幅を説明しているため実挙動と一�
 
 ## 6. 対応優先度
 
-| 優先度 | 項目 | 理由 | ブロッキング |
-| --- | --- | --- | --- |
-| 低 | 3.1 狭幅 gutter が pane 幅でなく viewport 幅で切替わる意味差の明記 | 挙動は既存・非対象で機能要求は満たすが、恒久ドキュメントの精度と Phase 4 期待値の明確化に有用 | 否 |
+| 優先度 | 項目 | 理由 | ブロッキング | Round 1 結果 |
+| --- | --- | --- | --- | --- |
+| 低 | 3.1 狭幅 gutter が pane 幅でなく viewport 幅で切替わる意味差の明記 | 挙動は既存・非対象で機能要求は満たすが、恒久ドキュメントの精度と Phase 4 期待値の明確化に有用 | 否 | 解決済み（`1d14cd2`） |
 
 ---
 
 ## 7. 残リスク / Phase 3・Phase 4 での注意点
 
-- 改善提案 3.1 の gutter breakpoint（viewport 760px）と幅基準（pane content box）の意味差は、Phase 3 の `detail_design.md` 追記で明示し、Phase 4 手動シナリオ 6 で「Explorer resize 中も gutter 幅は変わらない」ことを観察する。
+- 改善提案 3.1 は Round 1 (`1d14cd2`) で design §3 / §9.1 / §16-6 へ反映済み。Phase 3 では同じ契約（本文幅 = pane content box 基準 / gutter breakpoint = window viewport 760px 基準 / Explorer resize・split view で gutter 非切替）を `detail_design.md` を含む恒久ドキュメントへ反映し、Phase 4 手動シナリオ 6 で「viewport 760px 超を保った Explorer resize 中も gutter 幅は 24px のまま」であることを観察する。
 - design §4.1 は「横長 table と diagram の目視確認に必要な Markdown fixture を追加する」とするが、fixture ファイル名・格納先は未指定。Phase 3 で `sample_docs/` の既存命名規約に沿って具体化し、§16 の手動シナリオ 1〜4 が参照できる状態にする（設計段階では詳細度として妥当なため指摘化しない）。
 - CSS-only 変更のため自動テストで幅を直接検証できない。§15 の build / Vitest / cargo 一式に加え、§16 の通常幅・1028px 超・狭幅・Explorer resize・Light / Dark を Phase 4 で漏れなく手動確認する。
 
@@ -117,6 +123,24 @@ design §16-5 は window 幅で狭幅を説明しているため実挙動と一�
 
 設計は `.markdown-body` の固定 980px 上限を pane 相対の `calc(100% - 48px)` へ置き換えるという単一の CSS 変更に範囲を正しく限定し、Before / After・1028px 境界・互換記述・採用/不採用判断・子要素 overflow 契約の維持・HTML iframe と文書 layout の分離・CSS-only の自動テスト非追加方針を、いずれも現行実ソースと一致する根拠に基づいて整理している。JavaScript 計測・互換レイヤー・fallback・過剰抽象化を導入しない判断も要求範囲と包含 block 計算の性質に照らして妥当である。
 
-TODO-2026-021 の全完了条件は設計へ追跡可能であり（第 4 節、全行 ✓）、ブロッキングとなる齟齬・不整合・ドキュメント不足は検出しなかった。唯一の指摘は、狭幅 gutter が viewport 幅 760px の media query で切り替わる一方で幅基準が preview pane content box であるという意味差を恒久ドキュメントで明示すべきという Low の改善提案（3.1）であり、挙動そのものは既存かつ非対象範囲で本変更が壊すものではないため、Phase 3 の docs 更新に折り込めば足り、Phase 3 実装をブロックしない。
+TODO-2026-021 の全完了条件は設計へ追跡可能であり（第 4 節、全行 ✓）、ブロッキングとなる齟齬・不整合・ドキュメント不足は検出しなかった。初回検出の唯一の指摘は、狭幅 gutter が viewport 幅 760px の media query で切り替わる一方で幅基準が preview pane content box であるという意味差を恒久ドキュメントで明示すべきという Low の改善提案（3.1）であった。
 
-以上より本設計を **承認 (Approved)** とし、Phase 3（実装・docs 反映）への進行を可とする。ブロッキング未解決指摘は 0 件。Phase 3 では改善提案 3.1 と第 7 節の注意点に留意すること。
+### 再確認結果 (2026-07-25, commit `1d14cd2`)
+
+Round 1 fix (`1d14cd2`) の design 差分を `git show 1d14cd2` で再確認した。
+
+- **3.1 (Low) — 解決済み**: §3 完了条件表で 28px gutter の条件が「window viewport が 760px 以下」と明確化され、§9.1 UI 契約へ「本文 width の `100%` は preview pane content box 基準、gutter を 24px→14px へ切り替える media query は window viewport 幅基準であり、Explorer resize や将来の split view で個別 pane だけが狭くなっても gutter は切り替えない」契約が明記され、§16-6 手動シナリオへ「window viewport を 760px 超に保った Explorer resize では左右 gutter が 24px のまま維持される」観察観点が追加された。3 点とも推奨対応と一致し、design §16-5（window 760px 以下の狭幅確認）とも整合する。
+
+対応による新たな齟齬・実装不能な契約は検出しなかった。受け入れ条件トレース（第 4 節）は全行 ✓ を維持している。
+
+以上より本設計を **承認 (Approved)** とし、Phase 3（実装・docs 反映）への進行を可とする。**未解決指摘は 0 件**。Phase 3 では第 7 節の注意点（3.1 契約の恒久ドキュメント反映、fixture ファイル名の具体化、CSS-only の手動確認）に留意すること。
+
+---
+
+## 9. 指摘対応 Round 1
+
+| 指摘 | severity | 対応 | 状態 |
+| --- | --- | --- | --- |
+| 3.1 狭幅 gutter が pane 幅でなく viewport 幅で切替わる意味差の未明示 | Low（改善提案・非ブロッキング） | §3 で 28px gutter を「window viewport 760px 以下」と明確化、§9.1 で幅基準（pane content box）と gutter breakpoint 基準（window viewport）の分離・Explorer resize/split view で非切替を明記、§16-6 に viewport 760px 超維持時の gutter 非切替の手動確認を追加 | 解決済み（再確認済み、`1d14cd2`） |
+
+Round 1 の指摘について、設計書 (`1d14cd2`) への反映内容が推奨対応と整合し、新たな齟齬を生じさせていないことを確認した。未解決指摘は 0 件であり、総合判定は **承認 (Approved)**。Phase 3（実装）へ進行してよい。
