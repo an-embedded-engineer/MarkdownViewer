@@ -26,6 +26,7 @@
   - `cargo fmt -- --check`, `cargo check`, and 22 Rust tests passed.
   - Design and implementation reviews were approved with no unresolved findings.
   - `diff.zip` generated from `3aaa5a2..7b6dee5` and verified with `unzip -t`.
+  - Merged into `main` with `--no-ff` at `231fd7f` after Phase 4-c approval.
 - Follow-up:
   - No new follow-up item is required. Avalonia width behavior and split view remain outside this TODO.
 

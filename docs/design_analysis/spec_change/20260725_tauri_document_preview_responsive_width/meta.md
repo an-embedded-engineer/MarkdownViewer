@@ -10,7 +10,7 @@ components:
   - "markdown-viewer-tauri/src/*.test.ts"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -30,6 +30,7 @@ related_commits:
   - "87d438a : Phase 3 approve Mermaid resize fix after follow-up"
   - "7b6dee5 : Phase 4-a record Tauri preview width user verification"
   - "ce94a9f : Phase 4-b complete report, diff archive, TODO archive, and history"
+  - "231fd7f : Phase 4-c merge spec-change branch into main with --no-ff"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-021-tauri-document-preview-横幅の可変化"
 ---
 
@@ -64,4 +65,4 @@ source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-021-tauri-document-p
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
 | Phase 3 Implementation and docs review | Done (Round 2 approved, unresolved findings: 0) |
-| Phase 4 Verification and completion | Phase 4-b completion artifacts done; awaiting Phase 4-c merge approval |
+| Phase 4 Verification and completion | Done (merged into `main` at `231fd7f`) |
