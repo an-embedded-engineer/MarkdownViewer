@@ -1,5 +1,34 @@
 # TODO Archive 2026
 
+## TODO-2026-021 Tauri document preview 横幅の可変化
+
+- Status: `done`
+- Category: `spec-change`
+- Created: `2026-07-25`
+- Completed: `2026-07-25`
+- Branch: `spec-change/tauri-document-preview-responsive-width`
+- Design analysis:
+  - `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/`
+- Change report:
+  - `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/change_report.md`
+- Review records:
+  - `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/review/tauri_document_preview_responsive_width_design_review.md`
+  - `docs/design_analysis/spec_change/20260725_tauri_document_preview_responsive_width/review/tauri_document_preview_responsive_width_impl_review.md`
+- Summary:
+  - Removed the fixed 980px maximum from the Tauri Markdown body and made it follow the preview pane width while retaining responsive gutters.
+  - Preserved table, code, Mermaid, PlantUML, image, trusted HTML iframe, Explorer, tab, and security contracts.
+  - Added a wide-content fixture and synchronized Tauri Viewer component docs and manual verification guidance.
+  - Fixed the Phase 4-a Mermaid regression so unrelated window or Explorer resize renders do not replace generated SVG with diagram source.
+- Verification:
+  - User confirmed the responsive Markdown width behaves as expected.
+  - User confirmed Mermaid initial SVG rendering, window resize, Explorer resize, Light / Dark switching, and Reload all work after the follow-up fix.
+  - `npm run build` and 29 frontend tests passed.
+  - `cargo fmt -- --check`, `cargo check`, and 22 Rust tests passed.
+  - Design and implementation reviews were approved with no unresolved findings.
+  - `diff.zip` generated from `3aaa5a2..7b6dee5` and verified with `unzip -t`.
+- Follow-up:
+  - No new follow-up item is required. Avalonia width behavior and split view remain outside this TODO.
+
 ## TODO-2026-013 クロスプラットフォーム環境構築・README 整備
 
 - Status: `done`

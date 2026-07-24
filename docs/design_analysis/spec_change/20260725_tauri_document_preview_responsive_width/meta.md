@@ -13,7 +13,7 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "in_progress"
+completion_status: "done"
 verification_status: "done"
 related_commits:
   - "3aaa5a2 : Phase 0 define TODO-2026-021 preview width scope"
@@ -28,6 +28,8 @@ related_commits:
   - "d9e8ba2 : Phase 3 approve Tauri preview width implementation after follow-up"
   - "adc1a49 : Phase 3 fix Mermaid rendering across resize after Phase 4-a feedback"
   - "87d438a : Phase 3 approve Mermaid resize fix after follow-up"
+  - "7b6dee5 : Phase 4-a record Tauri preview width user verification"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-021-tauri-document-preview-横幅の可変化"
 ---
 
 # TODO-2026-021 Tauri document preview 横幅の可変化 meta
@@ -61,4 +63,4 @@ related_commits:
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
 | Phase 3 Implementation and docs review | Done (Round 2 approved, unresolved findings: 0) |
-| Phase 4 Verification and completion | Phase 4-a Done (user verification accepted); Phase 4-b in progress |
+| Phase 4 Verification and completion | Phase 4-b completion artifacts done; awaiting Phase 4-c merge approval |
