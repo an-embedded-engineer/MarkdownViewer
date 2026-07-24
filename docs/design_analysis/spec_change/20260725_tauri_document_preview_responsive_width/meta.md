@@ -10,9 +10,9 @@ components:
   - "markdown-viewer-tauri/src/*.test.ts"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
-status: "in_progress"
+status: "implemented"
 design_status: "done"
-impl_status: "draft"
+impl_status: "done"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
@@ -26,6 +26,8 @@ related_commits:
   - "98073a7 : Phase 3 review Tauri preview width implementation"
   - "64b7b12 : Phase 3 address Tauri preview width implementation review"
   - "d9e8ba2 : Phase 3 approve Tauri preview width implementation after follow-up"
+  - "adc1a49 : Phase 3 fix Mermaid rendering across resize after Phase 4-a feedback"
+  - "87d438a : Phase 3 approve Mermaid resize fix after follow-up"
 ---
 
 # TODO-2026-021 Tauri document preview 横幅の可変化 meta
@@ -58,5 +60,5 @@ related_commits:
 | Phase 0 Requirements | Done (`3aaa5a2`) |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0) |
-| Phase 3 Implementation and docs review | Reopened (Phase 4-a Mermaid resize feedback) |
-| Phase 4 Verification and completion | In progress (4-a NG; returned to Phase 3) |
+| Phase 3 Implementation and docs review | Done (Round 2 approved, unresolved findings: 0) |
+| Phase 4 Verification and completion | In progress (4-a re-verification pending) |
