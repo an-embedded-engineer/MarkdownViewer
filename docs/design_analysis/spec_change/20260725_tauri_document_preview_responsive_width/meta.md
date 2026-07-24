@@ -12,7 +12,7 @@ components:
   - "docs/rules/development_workflow.md"
 status: "in_progress"
 design_status: "done"
-impl_status: "pending"
+impl_status: "draft"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:

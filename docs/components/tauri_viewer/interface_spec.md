@@ -54,6 +54,14 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - activate buttonとactive tabのclose buttonだけをTabキーのfocus順に含める。非active tabをcloseする場合は、先に矢印キーでactivateしてからclose buttonへ移動する。
 - tab永続化、reorder、pin、split viewは対象外。
 
+## Document Preview 表示
+
+- Markdown本文はpreview pane content boxから左右gutterを引いた幅へ追従し、固定px最大幅を持たない。
+- 通常のMarkdown左右gutterは24pxとする。window viewportが760px以下の場合は既存responsive layoutにより14pxへ切り替える。Explorer resizeなどでpreview paneだけが狭くなってもgutterは切り替えない。
+- Markdown内のtable、code block、Mermaid、PlantUMLは必要時に要素内で横scrollし、imageとPlantUML SVGは本文幅以下へ縮小する。
+- trusted HTML iframeはpreview pane全幅へ追従し、HTML文書自身の`width` / `max-width`とsecurity境界をViewerから変更しない。
+- documentの縦scrollは`.preview-pane`が所有し、app shell全体へscrollを移さない。
+
 ## Error Strip 表示
 
 - `Error`: 代表エラー。エラー発生時のみ表示する。

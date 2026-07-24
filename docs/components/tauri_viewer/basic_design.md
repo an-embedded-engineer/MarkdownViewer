@@ -7,6 +7,7 @@ OS 連携とファイルシステム境界は Rust command / `DocumentStore` へ
 ## 責務
 
 - React: MenuBar dropdown、Settings dialog、Recent Folders、root path strip、幅変更可能なExplorer、TabStrip、Preview、error strip、StatusBar、永続 Theme / window resize queue、tab単位のエラー / loading、Markdown → HTML 変換、document type別preview。
+- CSS layout: Markdown本文はpreview pane content boxから左右gutterを引いた幅とし、固定px最大幅を持たない。trusted HTML iframeはpreview pane全幅を使い、iframe内文書自身のlayoutを上書きしない。
 - TypeScript renderer (`renderMarkdown`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。
 - TypeScript policy (`documentPolicy.ts`): command responseの排他shape、HTML preview URL、opaque-origin messageをpure functionで検証する。
 - TypeScript policy (`explorerPane.ts`): Explorer幅の最小値、workspace実寸に応じたdynamic最大値、clamp、keyboard操作をpure functionで管理する。幅はsession-onlyで永続化しない。
