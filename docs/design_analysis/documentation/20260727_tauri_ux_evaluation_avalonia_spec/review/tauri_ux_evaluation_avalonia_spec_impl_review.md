@@ -111,3 +111,67 @@ Avalonia component docs は、既存の単一 Markdown 実装を current とし�
 - 未解決合計: 3
 
 IR-001 から IR-003 を修正し、評価ラベル、archive の現行追跡先、WBS の work package 対応説明を再確認した後に承認可能とする。
+
+## 6. Follow-up レビュー
+
+### 6.1 確認対象
+
+- 対応 commit: `26fd262` (`docs: address rollout specification review`)
+- 再確認対象:
+  - `docs/components/avalonia_viewer/tauri_ux_rollout_spec.md`
+  - `docs/todo/todo_archive_2026.md`
+  - `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md`
+  - `impl/tauri_ux_evaluation_avalonia_spec_impl.md`
+- 確認日: 2026-07-27
+
+### 6.2 指摘対応結果
+
+#### IR-001: Recent Folders の評価ラベル
+
+- 解決状態: Resolved
+- 確認結果:
+  - Recent Folders の評価が「主要操作 `confirmed`、境界仕様 `specified`」へ分割された。
+  - entry 追加・削除・再オープンだけを確認済みとし、最大 10 件、重複昇格、missing path error、再起動復元は設計・実装レビューで確定しているが個別 PASS を推定しない、と明記された。
+  - 既存 change report のユーザ確認範囲と評価ラベル定義が一致し、Avalonia 担当者が境界シナリオまで実機確認済みと誤認しない表現になった。
+- 判定: 推奨修正を満たしており、解決済みとする。
+
+#### IR-002: TODO-2026-019 archive の現行追跡先
+
+- 解決状態: Resolved
+- 確認結果:
+  - TODO-2026-019 の Follow-up が、旧 TODO-2026-020 は TODO-2026-008 へ統合済みであり、現行 rollout は TODO-2026-008 で追跡する、と明記された。
+  - 同 archive 冒頭の TODO-2026-020 integrated entry と整合し、TODO-2026-019 から現行 active todo へ一意に追跡できる。
+- 判定: 推奨修正を満たしており、解決済みとする。
+
+#### IR-003: WBS の WP-008A / TODO-2026-018 対応説明
+
+- 解決状態: Resolved
+- 確認結果:
+  - WBS の引き継ぎ説明が、WP-001 から WP-010 は TODO-2026-003 から TODO-2026-012、追加 WP-008A は TODO-2026-018 に対応すると明示する形へ更新された。
+  - WP-008A は WP-007 と並行可能で、WP-008 の前提を構成することも併記され、work package 表の直接依存と一致する。
+- 判定: 推奨修正を満たしており、解決済みとする。
+
+### 6.3 新規指摘
+
+新規指摘なし。
+
+### 6.4 再検証結果
+
+- `git diff --check 26fd262^ 26fd262`: 成功。
+- commit `26fd262` の変更対象 5 Markdown files の相対 link target存在確認: 成功。
+- 評価ラベル、TODO-2026-019 archive 案内、WP-008A / TODO-2026-018 対応説明の相互整合: 問題なし。
+- ソース、設定、スクリプト、fixture、runtime asset の変更追加なし。
+
+### 6.5 最終判定
+
+**承認**
+
+IR-001 から IR-003 はすべて解決した。承認済み設計への適合、TODO / WBS の直接依存、3 組の統合 archive、TODO-2026-019 / 021 / 022 の source 追跡、Avalonia component docs の current / planned 分離、確認範囲の保守的な表現、リンク・索引・history、docs-only 境界を Phase 4 へ引き継げる状態である。
+
+### 6.6 最終未解決件数
+
+- Critical: 0
+- High: 0
+- Medium: 0
+- Low: 0
+- 未解決合計: 0
