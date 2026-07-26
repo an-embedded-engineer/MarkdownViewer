@@ -5,13 +5,53 @@
 - status: open
 - workflow: new-feature
 - wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
+- source_report: `docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md`
 - work_package_id: WP-004
 - depends_on: TODO-2026-005, TODO-2026-017
 - summary: Tauri 版に 2 ペイン split view を追加する。
+- target_users:
+  - Tauri 版 Markdown Viewer で同一 root 内の 2 文書を並べ、仕様、設計、図を比較しながら参照する利用者。
+  - Markdown / HTML、Mermaid、PlantUML を左右で同時に確認し、タブ切替による文脈喪失を減らしたい利用者。
+- use_cases:
+  - View メニューから single view と左右 2 ペイン split view を切り替える。
+  - primary / secondary pane でそれぞれ表示対象の open tab を選び、異なる文書を同時に参照する。
+  - active pane を切り替え、Explorer 選択、TabStrip 操作、Reload、Markdown 内リンクを操作対象 pane に反映する。
+  - 各 pane で独立して文書を縦横 scroll し、Markdown、Mermaid、PlantUML、trusted HTML を確認する。
+  - split 表示中に tab を close し、残存 tab または未選択状態へ破綻なく復旧する。
+- scope:
+  - 既存の `OpenDocumentTab[]` を文書データの正本として再利用し、single / split、active pane、pane ごとの active tab を型付き layout state で管理する。
+  - preview workspace を single 時は 1 pane、split 時は左右 2 pane とし、各 pane に tab 選択導線と preview を設ける。
+  - Explorer 選択、tab activate / close、Reload、relative Markdown link、StatusBar / ErrorBanner を active pane と pane ごとの tab state に統合する。
+  - Markdown preview、Mermaid / PlantUML、trusted HTML iframe、anchor、scroll、loading / error、image viewer の DOM ref と非同期結果を pane / tab / revision に対応付け、pane 間の混線を防ぐ。
+  - split on / off、root 変更、tab close 時に pane selection を有効な tab または未選択状態へ正規化する。
+  - Light / Dark、responsive layout、Explorer resize、Settings dialog と既存 MenuBar / StatusBar の操作性を維持する。
+- non_scope:
+  - 3 ペイン以上、上下分割、任意方向・任意数の分割は含めない。
+  - drag and drop による tab の pane 間移動、tab reorder、pin、tab / pane layout の再起動後復元は含めない。
+  - 同一 tab の複製、root 外 document、編集・未保存状態、pane ごとの theme は含めない。
+  - Avalonia 版 split view は TODO-2026-011、Tauri 先行 UX の評価と Avalonia 反映仕様化は TODO-2026-007 で扱う。
+  - Rust command、HTML custom protocol、Tauri capability / CSP の契約変更は、設計で不可避と判明しない限り行わない。
+- integration_points:
+  - `markdown-viewer-tauri/src/App.tsx` の `tabs` / `activeTabId`、`TabStrip`、Explorer 選択、Reload、relative link、Mermaid / PlantUML effect、HTML message policy、image viewer、StatusBar / ErrorBanner。
+  - `markdown-viewer-tauri/src/App.css` の `preview-workspace` / `preview-pane`、TabStrip、左右 2 pane grid、separator、responsive layout、Light / Dark theme。
+  - `markdown-viewer-tauri/src/documentPolicy.ts` と既存 HTML iframe の `tabId + revision` message 検証。pane 識別が必要な場合も security boundary を緩和しない。
+  - `docs/components/tauri_viewer/README.md`、`basic_design.md`、`detail_design.md`、`interface_spec.md` の恒久仕様。
 - completion:
-  - single / split の切替ができる。
-  - primary / secondary に別タブを表示できる。
-  - 各 pane で Markdown preview、Mermaid、PlantUML、scroll、loading/error 表示が破綻しない。
+  - View メニューから single / 左右 2 pane split を切り替えられ、切替後も有効な表示対象と active pane が保たれる。
+  - primary / secondary pane に同一 root 内の異なる open tab を選択して同時表示できる。
+  - Explorer 選択、tab activate、Reload、relative Markdown link は active pane を対象とし、他方の pane selection を意図せず変更しない。
+  - tab close、最後の tab close、root 変更、split off / on 後も各 pane が残存 tab または未選択状態へ一貫して復旧する。
+  - 各 pane で Markdown preview、相対画像、Mermaid、PlantUML、trusted HTML、anchor、独立 scroll、loading / error 表示が破綻せず、非同期結果が他 pane / tab へ混線しない。
+  - split 表示でも HTML iframe の sandbox / CSP / root boundary / external link policy と Markdown の raw HTML 禁止を維持する。
+  - pane 幅変更または window / Explorer resize 後も preview が利用可能な幅へ追従し、Mermaid が source 表示へ戻らず、PlantUML と HTML iframe が不必要に再読み込みされない。
+  - keyboard だけで split toggle、pane / tab 選択、pane 間移動、separator 操作へ到達でき、focus indicator と accessible name / role / state が確認できる。
+  - single view の既存 Multi-tab、Markdown / HTML、image viewer、MenuBar / StatusBar、Settings、Recent Folders の操作が退行しない。
+- success_metrics:
+  - `npm test` と `npm run build` in `markdown-viewer-tauri/` が成功する。
+  - `cargo check` in `markdown-viewer-tauri/src-tauri/` が成功する。
+  - 手動確認で split on / off、左右別文書、active pane 切替、pane ごとの tab 選択 / Reload / link、tab close 復旧、root 変更を確認できる。
+  - 手動確認で Markdown + Markdown、Markdown + HTML、Mermaid + PlantUML の同時表示、各 pane の独立 scroll、loading / error と非同期描画の分離を確認できる。
+  - 手動確認で window / Explorer / pane resize、Light / Dark、keyboard / focus、HTML security boundary、single view 回帰を確認できる。
 
 ## TODO-2026-007 Tauri 先行 UX 評価と Avalonia 反映仕様化
 
