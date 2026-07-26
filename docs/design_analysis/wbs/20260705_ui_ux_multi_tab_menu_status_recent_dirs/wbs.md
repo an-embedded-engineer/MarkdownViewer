@@ -55,4 +55,4 @@ Avalonia 版と Tauri 版を同時に仕様変更しない。先に Tauri 版で
 
 ## 通常 workflow へ引き継ぐ追跡項目
 
-各 work package は `docs/todo/todo.md` の `TODO-2026-003` から `TODO-2026-012` に対応する。
+`WP-001`から`WP-010`は`docs/todo/todo.md`の`TODO-2026-003`から`TODO-2026-012`に対応する。後から追加したtrusted HTMLの`WP-008A`は`TODO-2026-018`に対応し、`WP-007`と並行して`WP-008`の前提を構成する。

@@ -35,7 +35,12 @@
 
 ## 文書検証コマンド
 
-実施結果はPhase 3レビュー反映後に追記する。
+- `git diff --check`: 成功。
+- 変更対象Markdownの相対link target存在確認: 成功。
+- `rg`によるactive dependency内の統合済みTODO-2026-015 / 020 / 024残存確認: 依存としての残存なし。
+- TODO / WBSの直接依存確認: 008 → (009 / 018並行) → 010 → 011 → 012で一致。
+- 変更file拡張子確認: Markdownのみ。
+- Phase 3レビューで指摘された評価ラベル、archive案内、WP-008A対応説明を修正した。
 
 ## docs-only確認
 

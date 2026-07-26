@@ -24,7 +24,7 @@ Avaloniaへの反映区分は次のとおりとする。
 | 機能群 | 評価 | Tauriで確認・確定した内容 | Avalonia反映 |
 | --- | --- | --- | --- |
 | MenuBar / StatusBar | `confirmed` | 操作領域とroot / active document / loading / error表示を分離し、Reload等を現在対象へroutingする | `common`。Window内`Menu`と下部status領域へ`adapted`する |
-| Recent Folders | `confirmed` | 成功したrootを最大10件保持し、重複を先頭へ昇格、削除、再起動復元、missing path errorを扱う | `common`。typed user config serviceへ`adapted`する |
+| Recent Folders | 主要操作`confirmed`、境界仕様`specified` | entry追加・削除・再オープンは確認済み。最大10件、重複昇格、missing path error、再起動復元は設計・実装レビューで確定しているが個別PASSを推定しない | `common`。typed user config serviceへ`adapted`する |
 | Viewer settings | `confirmed` | Theme、logical window size、canonical `plantuml.jar` pathを確認・保存し、Recent Foldersと共存する | `common`。TODO-2026-009でRecent Foldersと同時導入する |
 | Viewer settings Windows保存 | `follow-up` | TauriのWindows atomic replace / Unicode / verbatim pathは未検証 | Tauri TODO-2026-016の課題であり、Avaloniaでは.NETのplatform適合手段を独立検証する |
 | Multi-tab | `confirmed` | root内documentをpathで再利用し、activate / close / Reload / relative linkとasync resultをtab / revisionで守る | `common`。typed Markdown / HTML document modelをViewModelの正本とする |
