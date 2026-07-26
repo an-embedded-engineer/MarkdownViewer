@@ -28,6 +28,7 @@
   - Relative links in all changed Markdown files resolved.
   - All changed files are Markdown documents; no source, config, script, fixture, or runtime asset was changed.
   - No `diff.zip` was created because this was a docs-only workflow.
+  - Merged into `main` with `--no-ff` at `f326ec0` after Phase 4-c approval.
 - Follow-up:
   - Avalonia rollout continues with `TODO-2026-008`, then parallel `TODO-2026-009` / `TODO-2026-018`, followed by `TODO-2026-010`, `TODO-2026-011`, and `TODO-2026-012`.
   - Tauri Split View extensions remain in `TODO-2026-023` and `TODO-2026-025`.

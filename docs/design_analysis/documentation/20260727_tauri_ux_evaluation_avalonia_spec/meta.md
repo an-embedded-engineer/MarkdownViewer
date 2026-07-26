@@ -7,7 +7,7 @@ components:
   - docs/components/tauri_viewer
   - docs/components/avalonia_viewer
   - docs/design_analysis/wbs
-status: implemented
+status: merged
 design_status: done
 impl_status: done
 completion_status: done
@@ -17,6 +17,7 @@ related_commits:
   - 572771b
   - ad49e0c
   - 68eaddf
+  - f326ec0
 ---
 
 # 対象整理

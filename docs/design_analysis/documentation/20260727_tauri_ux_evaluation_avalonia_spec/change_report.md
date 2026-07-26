@@ -73,3 +73,7 @@ Tauri先行実装の完了記録と恒久仕様を評価し、Avaloniaへ反映�
 - Avalonia rollout: TODO-2026-008、並行可能なTODO-2026-009 / 018、TODO-2026-010、TODO-2026-011、TODO-2026-012の順で進める。
 - Tauri Split View追加UX: TODO-2026-023（pane-local tab group / pane間移動）、TODO-2026-025（上下・左右split）で継続する。
 - Tauri Windows settings検証: TODO-2026-016で継続する。
+
+## Phase 4-c
+
+ユーザの最終承認後、`documentation/tauri-ux-evaluation-avalonia-spec`を`main`へ`--no-ff`でマージした。merge commitは`f326ec0`。
