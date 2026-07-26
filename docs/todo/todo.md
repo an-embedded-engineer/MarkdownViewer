@@ -30,7 +30,7 @@
   - Tauri frontend interaction policy testsとMarkdown / UML手動fixture。
 - compatibility:
   - 通常時のMarkdown本文幅、画像縮小、Mermaid / PlantUML描画、要素内scrollを維持する。
-  - 既存のMarkdown link / anchor / tab / Explorer / Reload / Theme操作を退行させない。
+  - 既存のMarkdown link / anchor / tab / Explorer / Reload / Theme操作を維持する。ただしlinked imageの画像領域clickはviewer openを優先し、link自身または隣接するviewer buttonのkeyboard操作でnavigation / viewer openを選択できる契約へ変更する。
   - Rust command、filesystem、asset protocol、trusted HTML iframe / bridge契約は変更しない。
 - permanent_docs:
   - `docs/components/tauri_viewer/README.md`

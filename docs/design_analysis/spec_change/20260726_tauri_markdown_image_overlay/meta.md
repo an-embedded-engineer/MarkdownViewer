@@ -13,12 +13,14 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "draft"
+design_status: "in_review"
 impl_status: "pending"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
   - "d2e9fd5 : Phase 0 define TODO-2026-022 image overlay scope"
+  - "e0b7fe3 : Phase 2 design Tauri Markdown image overlay"
+  - "0c92ca6 : Phase 2 review Tauri Markdown image overlay design"
 ---
 
 # TODO-2026-022 Tauri Markdown画像オーバーレイ表示 meta
@@ -40,7 +42,7 @@ related_commits:
 ## Compatibility
 
 - overlayを開いていない通常時のMarkdown本文幅、画像縮小、Mermaid / PlantUML描画と要素内scrollを維持する。
-- 既存のMarkdown link / anchor、tab、Explorer、Reload、Theme操作を退行させない。
+- 既存のMarkdown link / anchor、tab、Explorer、Reload、Theme操作を維持する。ただしlinked imageの画像領域clickはviewer openを優先し、link自身または隣接するviewer buttonのkeyboard操作でnavigation / viewer openを選択できる契約へ変更する。
 - MermaidがReact外で生成したSVGを不要な再描画でsourceへ戻さない既存契約を維持する。
 - trusted HTML previewのsandbox、custom protocol、typed bridge境界を維持する。
 
@@ -50,6 +52,6 @@ related_commits:
 | --- | --- |
 | Phase 0 Requirements | Done (`d2e9fd5`) |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | Draft |
+| Phase 2 Design review | In review (Round 1 findings: Medium 7 / Low 7) |
 | Phase 3 Implementation and docs review | Pending |
 | Phase 4 Verification and completion | Pending |

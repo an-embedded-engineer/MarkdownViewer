@@ -6,6 +6,7 @@
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-022
 **初回レビュー対象コミット**: `e0b7fe3` (docs: design Tauri Markdown image overlay)
 **判定**: **条件付き差し戻し (Changes Requested)**。設計の骨格（clone 方式、中央基準 transform model、modal 契約、非対象境界）は妥当で方針転換は不要だが、Phase 3 で実装不能または既存挙動を退行させる **Medium 7 件**を設計へ反映してから実装へ進むこと。High 0 件。**未解決指摘 14 件（Medium 7 / Low 7）**。
+**Round 1対応**: 14件を設計・TODO・metaへ反映済み。Claude再確認待ち。
 
 ---
 
@@ -223,6 +224,25 @@ Mermaid の生成 SVG は `id` 付き root、`<defs>` 内の marker、`#<svgId>`
 
 **severity**: Low / **対象工程**: Phase 2 設計修正 / **status**: 未対応
 
+### 3.6 Round 1 指摘対応
+
+| ID | 工程分類 | 対応 | status |
+| --- | --- | --- | --- |
+| 1.1 | design | clone直後にgenerator由来size属性・inline sizeをDOMで正規化し、intrinsic pxを明示する責務へ変更。PlantUML backgroundは生成結果として保持し、Mermaid重複IDは一時的に許容する。 | 対応済み・再確認待ち |
+| 1.2 | design / test | native non-passive wheel listener、ctrl / meta pinch、deltaMode換算、`[-100,100]` clamp、指数factorとpure policy testを定義した。 | 対応済み・再確認待ち |
+| 1.3 | design | request null化後のpassive effect / 0ms deferでinert解除を待ち、`isConnected`確認後にfocus復帰する契約を追加した。 | 対応済み・再確認待ち |
+| 1.4 | design / compatibility | Markdown alt / titleを変更せず、viewer操作説明は描画後の隣接buttonへ分離した。既存fixture tooltip回帰確認も追加した。 | 対応済み・再確認待ち |
+| 1.5 | design / accessibility | 描画前visualへinteractive属性を付けず、描画成功後だけpointer markerとSVG外のkeyboard buttonをDOM adapterが追加する。SVG anchorはlink処理を優先する。 | 対応済み・再確認待ち |
+| 1.6 | design / test | DOM候補読取adapterと`resolveIntrinsicSize` pure policyを分け、viewBox / explicit size / bounds / invalidのtestを追加した。 | 対応済み・再確認待ち |
+| 1.7 | plan / design | linked imageの意図した仕様差分を`todo.md` / `meta.md`へ同期し、恒久interface specと手動scenarioの更新対象にした。 | 対応済み・再確認待ち |
+| 2.1 | design / docs | Tauri Viewer局所契約で既存security判断を変えないためADR非起票と明記した。 | 対応済み・再確認待ち |
+| 2.2 | design / verification | 既存root overflow hidden + fixed backdrop + overscroll containを背景scroll抑止根拠とし、手動確認を追加した。 | 対応済み・再確認待ち |
+| 3.1 | design | 既存frontend policy慣行に合わせ、専用module + 型付きexport関数 + Vitestを採用する例外理由を記録した。 | 対応済み・再確認待ち |
+| 3.2 | design | keyboard triggerをnative buttonへ変更し、Space / Enterの既定activationを利用してcustom keydown重複を除いた。 | 対応済み・再確認待ち |
+| 3.3 | design | Mermaid cloneのIDはrewriteせず、viewer open中の一時重複として許容すると明記した。 | 対応済み・再確認待ち |
+| 3.4 | design / error | valid visualだけをdecorateし、lazy load成功後に再decorate、失敗時はdocument / kind付きconsole warningを1回記録する契約にした。 | 対応済み・再確認待ち |
+| 3.5 | design / test / verification | padding数値、非clamp anchor test、境界button disabled、aria-live 250ms debounce、selection中open抑止、既存PNG再利用、Theme到達不能根拠、revision不変DOM差替えを追記した。 | 対応済み・再確認待ち |
+
 ---
 
 ## 4. 受け入れ条件の追跡性
@@ -251,23 +271,23 @@ Mermaid の生成 SVG は `id` 付き root、`<defs>` 内の marker、`#<svgId>`
 
 ---
 
-## 6. 未解決指摘一覧
+## 6. Round 1対応状況
 
 | ID | severity | 概要 | status |
 | --- | --- | --- | --- |
-| 1.1 | Medium | clone SVG の inline size 指定を CSS では上書きできない | 未対応 |
-| 1.2 | Medium | React `onWheel` は passive 固定で wheel zoom を実装できない | 未対応 |
-| 1.3 | Medium | focus 復帰と `inert` 解除の順序が未定義 | 未対応 |
-| 1.4 | Medium | 既存 Markdown title の上書き | 未対応 |
-| 1.5 | Medium | 描画前 trigger の dead end と accessible name 未定義 | 未対応 |
-| 1.6 | Medium | intrinsic size 解決の自動テスト欠如 | 未対応 |
-| 1.7 | Medium | linked image 仕様差分が todo / meta と不整合 | 未対応 |
-| 2.1 | Low | ADR 要否の判断が未記載 | 未対応 |
-| 2.2 | Low | 背景 scroll 抑止の根拠が未記載 | 未対応 |
-| 3.1 | Low | policy / resolver の配置形式が既存 module 慣行と不一致 | 未対応 |
-| 3.2 | Low | Space の既定動作抑止が未定義 | 未対応 |
-| 3.3 | Low | clone 重複 id の扱い明記 | 未対応 |
-| 3.4 | Low | resolver 拒否時の観測可能な挙動が未定義 | 未対応 |
-| 3.5 | Low | テスト項目・UI 細部の補足（7 項目） | 未対応 |
+| 1.1 | Medium | clone SVG の inline size 指定を CSS では上書きできない | 対応済み・再確認待ち |
+| 1.2 | Medium | React `onWheel` は passive 固定で wheel zoom を実装できない | 対応済み・再確認待ち |
+| 1.3 | Medium | focus 復帰と `inert` 解除の順序が未定義 | 対応済み・再確認待ち |
+| 1.4 | Medium | 既存 Markdown title の上書き | 対応済み・再確認待ち |
+| 1.5 | Medium | 描画前 trigger の dead end と accessible name 未定義 | 対応済み・再確認待ち |
+| 1.6 | Medium | intrinsic size 解決の自動テスト欠如 | 対応済み・再確認待ち |
+| 1.7 | Medium | linked image 仕様差分が todo / meta と不整合 | 対応済み・再確認待ち |
+| 2.1 | Low | ADR 要否の判断が未記載 | 対応済み・再確認待ち |
+| 2.2 | Low | 背景 scroll 抑止の根拠が未記載 | 対応済み・再確認待ち |
+| 3.1 | Low | policy / resolver の配置形式が既存 module 慣行と不一致 | 対応済み・再確認待ち |
+| 3.2 | Low | Space の既定動作抑止が未定義 | 対応済み・再確認待ち |
+| 3.3 | Low | clone 重複 id の扱い明記 | 対応済み・再確認待ち |
+| 3.4 | Low | resolver 拒否時の観測可能な挙動が未定義 | 対応済み・再確認待ち |
+| 3.5 | Low | テスト項目・UI 細部の補足（7 項目） | 対応済み・再確認待ち |
 
-Medium 7 件を設計へ反映し、Low 7 件へ採否を記録したうえで Round 1 fix を提出すること。反映後に再レビューし、未解決 0 件となれば Phase 3 へ進行可とする。
+Medium 7件とLow 7件をRound 1で反映した。Claude再確認で未解決0件または追加指摘を確定する。

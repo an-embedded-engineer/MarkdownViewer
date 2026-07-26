@@ -10,10 +10,10 @@ Tauri版のMarkdown本文はpreview pane幅へ追従し、通常画像とPlantUM
 
 | ID | 要求 | 設計上の対応 |
 | --- | --- | --- |
-| AC-1 | 通常画像、Mermaid、PlantUMLをpointer / keyboardから開ける | 3種のtriggerへ共通data属性、focus、event delegationを付与する |
+| AC-1 | 通常画像、Mermaid、PlantUMLをpointer / keyboardから開ける | 描画完了した3種のvisualをpointer targetにし、keyboard用の隣接buttonをDOM adapterが付与する |
 | AC-2 | 初期fit、zoom、pan、fit/resetで細部へ到達できる | viewport中央基準のtransform modelとpointer captureを使う |
 | AC-3 | 安全な倍率範囲と一貫した複数入力、倍率表示 | fit倍率から800%までclampし、button / wheel / keyを同じpolicyへ集約する |
-| AC-4 | modal close、背景抑止、focus復帰 | `aria-modal`、focus trap、app shellの`inert`、Escape / close / backdrop、trigger復帰を使う |
+| AC-4 | modal close、背景抑止、focus復帰 | `aria-modal`、focus trap、app shellの`inert`、Escape / close / backdrop、origin復帰を使う |
 | AC-5 | Theme / resize / tab / Reload境界で混線しない | requestへtab ID / revisionを保持し、境界変更時に破棄する。resizeはfit/custom mode別に再計算する |
 | AC-6 | 通常表示と既存操作を退行させない | overlay外の既存CSS、Mermaid effect、PlantUML command、link処理を維持する |
 | AC-7 | trusted HTML / Rust境界を変えない | Markdown React DOMだけを対象とし、iframe DOM・protocol・backendは変更しない |
@@ -31,16 +31,16 @@ Tauri版のMarkdown本文はpreview pane幅へ追従し、通常画像とPlantUM
 
 ### 3.2 After
 
-- 通常画像、成功済みMermaid、成功済みPlantUMLを共通のimage viewer triggerとして表現する。
-- trigger activate時はapp shell上へmodal overlayを表示する。
+- 通常画像、成功済みMermaid、成功済みPlantUMLを共通のimage viewer pointer targetと隣接keyboard buttonで表現する。
+- visual clickまたは隣接button activate時はapp shell上へmodal overlayを表示する。
 - viewerは`Zoom out`、倍率表示、`Zoom in`、`Fit`、`100%`、`Close`を提供する。
 - viewport上のwheel / trackpad、drag、keyboardでも同じtransform policyを操作する。
-- overlayを閉じると元triggerへfocusを戻す。元triggerが既にDOMから外れていればactive Markdown previewへ戻す。
+- overlayを閉じると選択visualに対応する隣接buttonへfocusを戻す。buttonが既にDOMから外れていればactive Markdown previewへ戻す。
 - overlayを開いていない時の縮小、要素内scroll、link、anchor挙動は維持する。
 
 ### 3.3 既存linkとの優先順位
 
-画像がMarkdown linkの子である場合、画像自身のclick / Enter / Spaceはviewer openを優先し、eventを`preventDefault`してlink navigationを同時実行しない。画像以外のlink textやlink自身へのkeyboard操作は既存契約を維持する。1入力でoverlayとnavigationを同時発火させないための意図した仕様差分である。
+画像がMarkdown linkの子である場合、画像領域のpointer clickはviewer openを優先し、eventを`preventDefault`してlink navigationを同時実行しない。link自身へのkeyboard操作はnavigation、DOM adapterがlinkの外側へ置く隣接viewer buttonのkeyboard操作はviewer openとなり、利用者が両操作を選択できる。画像以外のlink textは既存契約を維持する。1入力でoverlayとnavigationを同時発火させず、nested interactive contentも作らないための意図した仕様差分である。
 
 ## 4. 対象範囲
 
@@ -48,11 +48,12 @@ Tauri版のMarkdown本文はpreview pane幅へ追従し、通常画像とPlantUM
 
 - `markdown-viewer-tauri/src/App.tsx`
   - image viewer stateとlifecycle調停
-  - Markdown trigger生成、click / key event delegation
+  - Markdown visual decoration、click event delegation
   - `ImageViewerDialog`
 - `markdown-viewer-tauri/src/imageViewer.ts`
   - source解決とintrinsic size判定
   - fit、zoom、pan、resize時のpure transform policy
+  - 描画完了visualのpointer markerとkeyboard用buttonを付与するDOM adapter
 - `markdown-viewer-tauri/src/imageViewer.test.ts`
 - `markdown-viewer-tauri/src/App.css`
 - `sample_docs/image_viewer.md`
@@ -81,7 +82,11 @@ Tauri版のMarkdown本文はpreview pane幅へ追従し、通常画像とPlantUM
 - 通常画像は同じasset URLを参照するだけでbinary dataを複製しない。
 - overlay close時にclone subtreeを破棄すれば、追加memoryの生存期間を限定できる。
 
-clone側にはviewer固有のsizeと`aria-hidden="true"`を設定する。script実行やnetwork URLの再解決を新たに行うsourceは受け付けず、既存Markdown rendererが生成した3種だけをresolverのselector allowlistで扱う。
+clone側にはviewer固有のsizeと`aria-hidden="true"`を設定する。clone直後にgenerator由来の`width` / `height`属性とinline `max-width` / `width` / `height`を除去し、resolverが確定したintrinsic pixel sizeをstyleへ明示する。この正規化はinline styleへCSS specificityで対抗せず、`ImageViewerDialog`のclone前処理として行う。PlantUMLのinline backgroundは図の生成結果として保持し、Dark themeでも白いdiagram canvasとtheme色の周辺viewerを表示する。
+
+Mermaid clone内のroot / marker / style IDは書き換えない。同一document内に一時的な重複IDが存在するが、viewer open中だけであり、内部`url(#...)`とscoped styleを壊すID rewriteより影響が小さいため許容する。
+
+script実行やnetwork URLの再解決を新たに行うsourceは受け付けず、既存Markdown rendererが生成した3種だけをresolverのselector allowlistで扱う。
 
 ### 5.2 中央基準transform model
 
@@ -102,7 +107,7 @@ ImageViewerGeometry
   padding: number
 ```
 
-DOM eventやReact state更新は`App.tsx`、数値計算は`ImageViewerTransformPolicy`のstatic methodへ分離する。invalid dimension、非有限値、0以下の倍率はprogramming errorとして`RangeError`にし、不正値をsilent fallbackで隠さない。
+DOM eventやReact state更新は`App.tsx`、数値計算は`imageViewer.ts`のpure export関数へ分離する。invalid dimension、非有限値、0以下の倍率はprogramming errorとして`RangeError`にし、不正値をsilent fallbackで隠さない。
 
 ### 5.3 Modal overlay
 
@@ -118,7 +123,9 @@ dialogは次を持つ。
 - close button
 - keyboard focus trap
 
-初期focusはviewportへ置き、close後はrequestが保持するtriggerへ戻す。triggerがunmount済みならactive previewへfallbackする。このfallbackはDOM lifecycle上必要なfocus回復だけであり、別の表示経路を残す互換fallbackではない。
+初期focusはviewportへ置き、close後はrequestが保持する隣接buttonへ戻す。close handlerはrequestをnullにするだけとし、focus復帰は次のpassive effectまたは0ms deferでapp shellの`inert`解除後に行う。buttonが`isConnected`ならfocusし、unmount済みならactive previewへfallbackする。このfallbackはDOM lifecycle上必要なfocus回復だけであり、別の表示経路を残す互換fallbackではない。
+
+背景scrollは既存の`html, body, #root { overflow: hidden }`、fixed backdrop、backdropの`overscroll-behavior: contain`により`.preview-pane`へscroll chainを渡さない。追加のbody style書換えは行わない。
 
 Settings dialogは保存中close抑止や初期focus先が異なる。今回共通modal componentへ置き換えると既存設定UIの回帰範囲が広がるため、共通化しない。focus可能要素列挙の小規模重複は許容し、将来3個目のmodalが必要になった時点で独立refactoringを検討する。
 
@@ -126,27 +133,25 @@ Settings dialogは保存中close抑止や初期focus先が異なる。今回共�
 
 ### 6.1 通常画像
 
-Markdown-It image ruleで次を追加する。
+Markdown-It image ruleは既存のrelative resource解決、`loading="lazy"`、alt、著者指定titleを変更しない。`title`をviewer説明で上書き・追記せず、title未指定時も新しいtooltipを付けない。
 
-- `class="image-viewer-trigger"`
-- `data-image-viewer-kind="image"`
-- `role="button"`
-- `tabindex="0"`
-- altを維持し、viewerを開けることを`title`とaccessible labelへ補足する
+描画後のDOM adapterは`img.complete && naturalWidth > 0 && naturalHeight > 0`を満たす画像だけへpointer markerを付け、内容非依存のaccessible labelを持つ隣接buttonを追加する。button labelはaltがあれば`Open image in image viewer: <alt>`、空altなら`Open Markdown image in image viewer`とする。linked imageではbuttonを最も近い`a`の外側へ置き、nested interactive contentを作らない。lazy imageが未loadなら一度だけ`load` / `error`を監視し、load成功後にdecorate、error時はdecorateせずconsoleへ原因を記録する。
 
-既存のrelative resource解決と`loading="lazy"`は維持する。未load、natural size 0、表示size 0の画像はresolverが拒否し、壊れた画像を空viewerで開かない。
+decorationはvisualごとのdata markerでidempotentにし、Appの無関係な再描画やMermaid effect再評価でbuttonを重複追加しない。Markdown HTML差替え / unmount時はeffect cleanupがload listenerとadapter管理buttonを除去し、React外DOMの生存期間をpreview revisionへ限定する。
 
 ### 6.2 Mermaid
 
-fence ruleが生成する`.mermaid` containerへtrigger属性を付ける。`mermaid.run`後もouter containerは残るため、React外のSVG生成と共存できる。resolverはcontainer内の直近`svg`だけを採用し、source textの状態では開かない。
+fence ruleが生成する`.mermaid` source containerへinteractive属性を事前付与しない。`mermaid.run`成功後、`data-processed="true"`とinner SVGを確認してDOM adapterを実行する。adapterはSVG / containerをpointer targetとしてmarkし、内容非依存の`Open Mermaid diagram in image viewer` buttonをSVGの外側へ追加する。source text状態はTab順にもpointer cursor対象にもならない。
 
 ### 6.3 PlantUML
 
-成功結果`result.ok === true`の時だけ、既存`result.html`をtrigger wrapperで囲む。pending / error HTMLにはtrigger属性を付けない。resolverはwrapper内の`.plantuml-diagram > svg`だけを採用する。
+成功結果`result.ok === true`の時だけ、既存`result.html`をviewer候補wrapperで囲む。DOM adapterが`.plantuml-diagram > svg`とvalid sizeを確認した後にpointer markerと`Open PlantUML diagram in image viewer` buttonをSVGの外側へ追加する。pending / error HTMLはdecorateしない。
+
+Mermaid / PlantUML SVG内に`a`がある場合、そのanchor clickはviewer resolverより先に既存link処理へ渡す。diagramの非anchor領域clickと隣接buttonだけがviewerを開くため、SVG linkとviewer操作を両立する。
 
 ### 6.4 Resolver契約
 
-`ImageViewerSourceResolver.resolve(eventTarget, tabId, revision)`はselector allowlistからtriggerとvisualを決定し、次を返す。
+`resolveImageViewerSource(eventTarget, tabId, revision)`はdecorated marker / buttonのselector allowlistからoriginとvisualを決定し、次を返す。
 
 ```text
 ImageViewerRequest
@@ -155,12 +160,14 @@ ImageViewerRequest
   intrinsicWidth: number
   intrinsicHeight: number
   visual: HTMLImageElement | SVGSVGElement
-  trigger: HTMLElement
+  focusOrigin: HTMLButtonElement
   tabId: string
   revision: number
 ```
 
-SVG intrinsic sizeは正の`viewBox.width / height`、次に明示width / height、最後に正のrendered bounding boxの順で決める。通常画像は`naturalWidth / naturalHeight`を正本とする。allowlist外targetは`null`を返し、既存link処理へ渡す。allowlist内だがvisualやsizeが不正な場合も`null`とし、pending / broken visualをviewer対象にしない。
+SVG intrinsic sizeは正の`viewBox.width / height`、次に明示width / height、最後に正のrendered bounding boxの順で決める。通常画像は`naturalWidth / naturalHeight`を正本とする。
+
+DOM adapterは候補値を読む薄い層とし、候補から優先順位・正値検証を行う`resolveIntrinsicSize` pure policyへ渡す。allowlist外targetは`null`を返して既存link処理へ渡す。visualや全size候補が不正ならinteractive decoration自体を付けず、document path / kindを含む`console.warn`を1回記録するため、利用者にdead controlを提示せず開発時の原因追跡性を残す。
 
 ## 7. Zoom仕様
 
@@ -187,10 +194,12 @@ fitScale = min(
 - minimum: 現在geometryの`fitScale`
 - maximum: 8.0（800%）
 - button step: 1.25倍 / 0.8倍
-- wheel / trackpad: `deltaY`の方向を共通zoom factorへ正規化し、1 eventごとに急激なjumpを起こさない
+- wheel / trackpad: native non-passive listenerでdelta量を共通zoom factorへ正規化する
 - 表示倍率: natural sizeを100%とした整数percent
 
-fitより縮小して周囲に無意味な空白を増やす操作は許可しない。800%はSVG文字とraster pixelの双方を確認でき、極端なtransform値を避ける上限として採用する。
+fitより縮小して周囲に無意味な空白を増やす操作は許可しない。800%はSVG文字とraster pixelの双方を確認でき、極端なtransform値を避ける上限として採用する。境界到達時は対応するZoom out / Zoom in buttonをdisabledにする。
+
+wheelはReactのpassive合成eventを使わず、viewport refへ`addEventListener("wheel", handler, { passive: false })`をeffectで登録する。全wheel eventを`preventDefault`し、`ctrlKey || metaKey`を含むtrackpad pinchもimage zoomとして処理してWebView全体のbrowser zoomを防ぐ。`deltaMode`はpixel=1、line=16px、page=viewport heightへ換算し、normalized deltaを`[-100, 100]`へclampした後、`factor = exp(-normalizedDelta * 0.002)`とする。これにより1 eventの変化を約0.82倍から1.22倍へ制限する。listenerはeffect cleanupで必ず解除する。
 
 ### 7.4 Zoom中心
 
@@ -209,6 +218,7 @@ pointer位置zoomでは、zoom前にpointer下にあったimage座標がzoom後�
 - contentが大きい軸は端へpaddingを残した状態まで移動できる。
 - viewportは`touch-action: none`、idle時`grab`、drag中`grabbing`を示す。
 - Arrow keyは48px、Shift+Arrowは160px移動する。
+- viewer paddingは通常24px、window viewport 760px以下は12pxとし、geometry / testも同じ値を使う。
 
 offset上限は次とする。
 
@@ -221,7 +231,7 @@ maxOffsetY = max(0, (intrinsicHeight * scale - availableHeight) / 2)
 
 | Key | 操作 |
 | --- | --- |
-| Enter / Space on trigger | viewerを開く |
+| Enter / Space on adjacent viewer button | native button activationでviewerを開く |
 | `+` / `=` | zoom in |
 | `-` | zoom out |
 | `0` | 100% reset |
@@ -231,15 +241,15 @@ maxOffsetY = max(0, (intrinsicHeight * scale - availableHeight) / 2)
 | Escape | close |
 | Tab / Shift+Tab | dialog内focus loop |
 
-viewportには短いvisible instructionを置き、toolbar buttonは英語labelと`aria-label`を一致させる。倍率`output`は`aria-live="polite"`にするが、pointermove中は倍率が変わらないためpanで過剰通知しない。
+viewportには短いvisible instructionを置き、toolbar buttonは英語labelと`aria-label`を一致させる。倍率のvisible `output`は各eventで更新するが、screen reader用`aria-live="polite"` textはzoom入力停止250ms後にdebounce更新し、wheel中の過剰通知を避ける。
 
 ## 10. Event delegationとstate lifecycle
 
 ### 10.1 Preview event順序
 
-`handlePreviewClick`は最初に`ImageViewerSourceResolver`へ問い合わせる。requestが得られた場合はprevent / stopしてviewerを開き、それ以外は既存anchor処理をそのまま実行する。
+`handlePreviewClick`はanchor targetを先に判定する。SVG内anchorなら既存link処理へ渡し、それ以外は`resolveImageViewerSource`へ問い合わせる。requestが得られ、document selectionがcollapsedならprevent / stopしてviewerを開く。text selection中はviewerを開かない。requestがなければ既存anchor処理をそのまま実行する。
 
-`MarkdownPreview`へ`onKeyDown`を追加し、Enter / Spaceかつtrigger由来の場合だけviewerを開く。その他のkeyは変更しない。
+keyboard openはDOM adapterが追加するnative buttonのclick eventを同じdelegationへ渡す。Space / Enterのscroll抑止とactivationはnative buttonへ委ね、custom `onKeyDown`とsynthetic clickを重複実装しない。
 
 ### 10.2 State所有
 
@@ -253,9 +263,9 @@ viewportには短いvisible instructionを置き、toolbar buttonは英語label�
 - active tab ID変更
 - active tab revision変更
 - document typeがMarkdown以外へ変化
-- triggerまたはvisualがDOMから外れたことをclose時に検出
+- focusOriginまたはvisualがDOMから外れたことをclose時に検出
 
-overlay中はapp shellがinertなため通常のtab / Reload / Theme操作はできない。async completionなど外部state更新でrequestのtab / revisionと不一致になった場合はeffectで閉じる。
+overlay中はapp shellがinertなため通常のtab / Reload / Theme操作はできず、Theme変更でviewerを閉じる分岐は追加しない。async completionなど外部state更新でrequestのtab / revisionと不一致になった場合はeffectで閉じる。PlantUML非同期完了はrevisionを変えずMarkdown DOMを差し替える場合があるが、cloneは独立しているためviewerを継続し、close時にorigin detachを検出してpreviewへfocusを戻す。
 
 ### 10.4 Window resize
 
@@ -271,21 +281,21 @@ overlay中はapp shellがinertなため通常のtab / Reload / Theme操作はで
 ```text
 App
   -> MarkdownPreview event delegation
-  -> ImageViewerSourceResolver (DOM -> typed request)
+  -> imageViewer DOM adapter / source resolver (DOM -> typed request)
   -> ImageViewerDialog (modal lifecycle / DOM clone / input adapter)
-       -> ImageViewerTransformPolicy (pure geometry)
+       -> imageViewer pure policy (geometry / wheel / intrinsic candidates)
 
 Markdown renderer / Mermaid / PlantUML cached HTML
   -> existing rendered DOM
   -> allowlisted clone only
 ```
 
-- `ImageViewerTransformPolicy`: DOMやReactへ依存しない数値policy。
-- `ImageViewerSourceResolver`: Markdown preview DOMの3種allowlistとsize解決だけを担当する。
+- `imageViewer.ts` pure exports: DOMやReactへ依存しないfit / zoom / pan / wheel / intrinsic candidate policy。
+- `imageViewer.ts` DOM adapter exports: Markdown preview DOMの3種allowlist、load後decoration、source候補読取だけを担当する。
 - `ImageViewerDialog`: React lifecycle、focus、ResizeObserver、pointer capture、clone appendを担当する。
 - `App`: active tab / revisionとの整合とopen / closeを調停する。
 
-module直下の新規global計算関数は追加せず、policy / resolver classのstatic methodへ置く。React componentとhook lifecycleはframework contract上module scopeが必要なため、既存`App.tsx`のcomponent形式を継続する。
+`imageViewer.ts`は既存`documentPolicy.ts` / `explorerPane.ts`と同じ「責務名を持つ専用module + 型付きexport関数 + 専用Vitest」とする。export関数はmodule lexical scopeに閉じ、汎用global namespaceへ公開しない。class stateを持たないpure計算をstatic-only classへ包むより既存frontend policy慣行を優先する例外である。React componentとhook lifecycleはframework contract上module scopeが必要なため、既存`App.tsx`のcomponent形式を継続する。
 
 ## 12. 採用しない案
 
@@ -317,15 +327,15 @@ opaque-origin sandbox iframeへ親Reactからアクセスできず、bridge拡�
 
 - 永続data / config変更はなくmigration不要。
 - Rust / TypeScript command model変更なし。
-- 通常時のpreview layoutとimage scalingを維持する。
+- 通常時のpreview layout、image scaling、著者指定image titleを維持する。
 - Mermaid effectの依存条件とstable `dangerouslySetInnerHTML` objectを維持する。
-- PlantUML success HTMLは内側を変更せず、frontend trigger wrapperだけを追加する。
-- external / relative / anchor link処理は画像trigger優先規則以外を維持する。
+- PlantUML success HTMLは内側を変更せず、frontend候補wrapperと描画後decorationだけを追加する。
+- external / relative / anchor link処理は画像領域pointer clickのviewer優先規則以外を維持し、linked imageのanchor keyboard navigationを残す。
 - HTML iframe security contractは変更しない。
 
 ## 14. エラーハンドリング
 
-- resolver対象外、pending、broken image、SVG dimension不明: viewerを開かず既存event処理へ戻す。
+- resolver対象外: 既存event処理へ戻す。pending / broken image / SVG dimension不明: interactive decorationを付けず、load成功時だけ再decorateし、失敗はconsoleへ1回記録する。
 - invalid transform input: `RangeError`としてtestで顕在化し、silent defaultを使わない。
 - clone append前にrequest visualがdisconnect: viewerを閉じ、active previewへfocusを戻す。
 - ResizeObserver / pointer cleanup: effect cleanupでobserver、listener、pointer stateを破棄する。
@@ -343,44 +353,46 @@ opaque-origin sandbox iframeへ親Reactからアクセスできず、bridge拡�
 
 - `.image-viewer-backdrop`: fixed、app全体より上のz-index、theme別半透明背景。
 - `.image-viewer-dialog`: viewport内全域に近いgrid。header / toolbar / canvas / instruction。
-- `.image-viewer-viewport`: overflow hidden、position relative、focus outline、touch-action none。
+- `.image-viewer-viewport`: overflow hidden、overscroll-behavior contain、position relative、focus outline、touch-action none。
 - `.image-viewer-content`: absolute center、transform origin center、max-width解除。
-- cloneされた`img` / `svg`: intrinsic pixel sizeを明示し、Markdown側`max-width: 100%`の影響を受けないviewer固有selectorを使う。
-- trigger: `cursor: zoom-in`とfocus-visible outline。通常のimage sizingは変更しない。
+- cloneされた`img` / `svg`: DOM clone前処理でgenerator由来のinline sizeを正規化し、intrinsic pixel sizeを明示する。
+- decorated visual: `cursor: zoom-in`。隣接viewer button: native focusとfocus-visible outline。通常のimage sizingは変更しない。
 - 760px以下ではtoolbarをwrapし、viewerの操作領域を確保する。
 
 ## 17. 自動テスト
 
 `imageViewer.test.ts`で少なくとも次を検証する。
 
-1. 大画像 / 小画像 / 縦長画像のfit scale。
+1. 大画像 / 小画像 / 縦長画像と24px / 12px paddingのfit scale。
 2. invalid / zero / non-finite geometryが`RangeError`になる。
 3. zoom in / outがfitと800%でclampされる。
 4. center zoomのoffset。
-5. pointer anchor zoomで同じimage座標が維持される。
+5. pan clampが発動しないgeometryでpointer anchor zoomの同一image座標が維持される。
 6. 片軸だけoverflowする場合のpan clamp。
 7. Arrow / drag相当deltaのpan clamp。
 8. 100% resetがcenterとcustom modeを返す。
 9. fit mode resizeは新fit、custom mode resizeはscale保持とoffset clamp。
+10. `deltaMode`別wheel正規化、delta clamp、factor範囲。
+11. intrinsic candidateのviewBox優先、invalid viewBox時width / height、次にbounding box、全候補不正時null。
 
 既存`documentPolicy.test.ts`、`explorerPane.test.ts`も全件実行する。DOM event / focus / cloneは現在jsdom dependencyがないため新規test dependencyを増やさず、TypeScript buildと手動確認で検証する。
 
 ## 18. 手動確認scenario
 
-`sample_docs/image_viewer.md`に通常画像、横長・縦長Mermaid、巨大PlantUMLを配置し、次を確認する。
+`sample_docs/image_viewer.md`に既存`sample_docs/images/avalonia-markdown-viewer-architecture.png`を参照する通常画像、横長・縦長Mermaid、巨大PlantUMLを配置し、次を確認する。新規binary画像資産は追加しない。
 
-1. 3種をclick、Tab移動後Enter / Spaceで開く。
+1. 3種のvisualをclick、隣接viewer buttonへTab移動後Enter / Spaceで開く。描画前Mermaid / pending PlantUMLがTab順へ入らないことも確認する。
 2. 初期fitで全体が見え、倍率が表示される。
 3. toolbar、wheel / trackpad、`+` / `-`でfitから800%まで操作する。
 4. drag、Arrow、Shift+Arrowで四隅と中央へ到達し、端で空白が過剰に露出しない。
 5. `Fit`と`100%`が定義どおりcenterへ戻る。
-6. backdrop、close、Escapeで閉じ、元triggerへfocusが戻る。
-7. Tab / Shift+Tabがdialog外へ出ず、背景Explorer / tab / previewが操作されない。
+6. backdrop、close、Escapeで閉じ、inert解除後に選択visualの隣接buttonへfocusが戻る。
+7. Tab / Shift+Tabがdialog外へ出ず、背景Explorer / tab / previewが操作されない。overlay上のwheelで背後previewがscrollしない。
 8. overlay表示中にwindowを拡大縮小し、fit / custom modeが仕様どおり更新される。
 9. Light / Darkでtoolbar、背景、diagramが読める。
 10. close後にTheme、tab切替、Reloadを行い、再度開いて前回transformが残らない。
-11. 通常text link、anchor、relative Markdown link、画像以外のpreview scrollが退行しない。
-12. trusted HTML fixtureが従来どおり表示され、画像viewer triggerがiframeへ侵入しない。
+11. 通常text link、anchor、relative Markdown link、画像以外のpreview scroll、`sample_docs/image_link.md`の著者指定tooltipが退行しない。linked imageの画像領域clickはviewer、anchor keyboard操作はnavigation、隣接buttonはviewerとなる。
+12. trusted HTML fixtureが従来どおり表示され、画像viewer decorationがiframeへ侵入しない。
 
 ## 19. 検証コマンド
 
@@ -404,15 +416,17 @@ cargo fmt -- --check
 - `docs/tests/README.md`（fixture / test catalogへ追加が必要な場合）
 - `docs/history/`（Phase 4完了記録）
 
+本変更はTauri Viewer局所のfrontend interaction契約であり、既存のiframe sandbox / custom protocol / typed bridge判断を変更しないためADRは起票しない。
+
 ## 21. リスクとfollow-up
 
 | Risk | 対応 |
 | --- | --- |
 | 巨大SVG cloneの一時memory増加 | open中1 cloneだけに限定しcloseで破棄する |
-| Mermaid DOM lifecycleとの競合 | outer triggerを維持し、生成済みinner SVGだけをcloneする |
+| Mermaid DOM lifecycleとの競合 | source containerを維持し、生成成功後だけinner SVGをdecorate / cloneする |
 | drag終了漏れ | pointer captureとup / cancel / lost capture cleanupを使う |
 | zoom後に図を見失う | pointer anchor補正、pan clamp、常設Fit / 100%を提供する |
-| modal focus漏れ | inert、focus trap、trigger復帰を手動scenarioで確認する |
+| modal focus漏れ | inert、focus trap、origin復帰を手動scenarioで確認する |
 | linked imageの操作差分 | viewer優先を明示し、text link経路を回帰確認する |
 | rasterを800%にして粗く見える | raster固有の正常挙動。SVGはvector品質を維持する |
 | HTML画像の要望 | security境界が異なるため、必要時は独立spec-changeとして起票する |
