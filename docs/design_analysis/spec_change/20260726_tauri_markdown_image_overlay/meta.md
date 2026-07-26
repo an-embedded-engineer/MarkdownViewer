@@ -15,20 +15,29 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "pending"
+completion_status: "done"
 verification_status: "done"
 related_commits:
   - "d2e9fd5 : Phase 0 define TODO-2026-022 image overlay scope"
+  - "a3af96c : Phase 1 initialize Tauri image overlay workflow"
   - "e0b7fe3 : Phase 2 design Tauri Markdown image overlay"
   - "0c92ca6 : Phase 2 review Tauri Markdown image overlay design"
   - "19bf862 : Phase 2 address initial design review findings"
   - "1092187 : Phase 2 re-review round 1 fixes"
   - "96ff759 : Phase 2 address round 2 design review finding"
   - "7bcc92b : Phase 2 approve design with unresolved findings 0"
+  - "909f8d7 : Phase 2 complete Tauri image overlay design phase"
   - "ad68ae4 : Phase 3 implement Tauri Markdown image viewer"
   - "ac4ba41 : Phase 3 initial implementation review"
   - "80741cf : Phase 3 address implementation review findings"
   - "56f53ed : Phase 3 approve implementation with unresolved findings 0"
+  - "13761f8 : Phase 3 complete Tauri image viewer implementation phase"
+  - "27ca57c : Phase 4-a fix focus return by activation type"
+  - "4bfc16d : Phase 4-a review activation focus fix"
+  - "c9e519b : Phase 4-a address follow-up focus outline finding"
+  - "cd50464 : Phase 4-a close follow-up review findings"
+  - "64cde48 : Phase 4-a record user verification PASS"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-022-tauri-markdown画像オーバーレイ表示"
 ---
 
 # TODO-2026-022 Tauri Markdown画像オーバーレイ表示 meta
@@ -62,4 +71,4 @@ related_commits:
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0, `7bcc92b`) |
 | Phase 3 Implementation and docs review | Done (Approved, unresolved findings: 0, `56f53ed`) |
-| Phase 4 Verification and completion | Phase 4-a Done (user verification PASS); Phase 4-b pending |
+| Phase 4 Verification and completion | Phase 4-b completion artifacts done; awaiting Phase 4-c merge approval |
