@@ -10,7 +10,7 @@ runtime:
       agent: claude
       provider_session_id: null
       provider_session_state: null
-      prompt_artifact: prompts/phase2_design_review_initial_claude_pointer.md
+      prompt_artifact: prompts/phase3_impl_review_initial_claude_pointer.md
       created_at: 2026-07-26T20:07:24+09:00
       expected_shutdown_check: pane_or_shell_return
       shutdown:
