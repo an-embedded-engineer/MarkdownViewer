@@ -30,7 +30,7 @@
   - `cargo fmt -- --check`, `cargo check`, and 22 Rust tests passed.
   - Design and implementation follow-up reviews were approved with no unresolved findings.
   - `diff.zip` generated from `c023374..f8f6136` and verified with `unzip -t`.
-  - Completion artifacts are ready for Phase 4-c merge approval.
+  - Completion artifacts were committed at `a3acab4` and are ready for Phase 4-c merge approval.
 - Follow-up:
   - `TODO-2026-023` tracks pane-local tab groups.
   - `TODO-2026-024` tracks moving tabs between panes.

@@ -26,6 +26,7 @@ related_commits:
   - "7eb32ea : Phase 3 implementation review approved after re-review"
   - "0dfc91b : Phase 3 complete Tauri split view implementation review"
   - "f8f6136 : Phase 4-a verify Tauri split view and record follow-ups"
+  - "a3acab4 : Phase 4-b complete report, diff archive, TODO archive, and history"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-006-tauri-split-view-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"

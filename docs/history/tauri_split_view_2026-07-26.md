@@ -43,3 +43,4 @@ Tauri版はmulti-tabを備えていたが、表示できるpreviewは1つだけ�
   - `7eb32ea` Phase 3 implementation approval
   - `0dfc91b` Phase 3 complete
   - `f8f6136` Phase 4-a user verification and follow-up TODOs
+  - `a3acab4` Phase 4-b completion artifacts
