@@ -6,9 +6,11 @@
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-022
 **初回レビュー対象コミット**: `e0b7fe3` (docs: design Tauri Markdown image overlay)
 **Round 1 fix コミット**: `19bf862` (docs: address Tauri image overlay design review)
+**Round 2 fix コミット**: `96ff759` (docs: address Tauri image overlay review round 2)
 **再確認日**: 2026-07-26
 **初回判定**: 条件付き差し戻し (Changes Requested)。Medium 7 件 / Low 7 件、High 0 件。
-**Round 2 判定**: **条件付き差し戻し (Changes Requested)**。Round 1 指摘 **14 件はすべてクローズ**（下記 7 章で再確認）。ただし Round 1 で trigger 方式を「visual への `role="button"` 付与」から「DOM adapter による隣接 native button 追加」へ変更した結果、**Markdown 本文へ新規描画される button の表示契約と挿入位置が未定義**という新規 Medium 1 件が生じた。**未解決指摘 1 件（Medium 1 / Low 0）**。これを設計へ反映すれば Phase 3 進行可。
+**Round 2 判定**: 条件付き差し戻し (Changes Requested)。Round 1 指摘 14 件クローズ、新規 Medium 1 件（隣接 viewer button の表示契約）。
+**Round 3 判定 / 最終**: **承認 (Approved)**。Phase 3 進行可。全 3 ラウンドの指摘 **15 件（Medium 8 / Low 7）はすべてクローズ**し、High は通じて 0 件。**未解決指摘 0 件**。9.2 に Phase 3 実装条件を 2 件（`:focus-visible` → `:focus`、`user-select: none`）記録するが、いずれも §16 の CSS 宣言レベルで設計方針の変更を伴わず、Phase 2 承認を妨げない。判定根拠は 9 章を正とする。
 
 ---
 
@@ -38,7 +40,7 @@ TODO-2026-022 (Tauri Markdown 画像オーバーレイ表示) の Phase 2 設計
 
 矛盾のある数式や到達不能な状態遷移は検出しなかった。検出した Medium 7 件は、いずれも「設計文の抽象度では正しいが、この codebase / 依存 library の具体制約に当てると Phase 3 でそのまま実装できない、または既存挙動を静かに変える」種類の欠落である。
 
-> **本文書の読み方**: 以下 1〜6 章は初回レビュー（対象 `e0b7fe3`）の記録であり、当時の指摘内容と根拠を保存する目的でそのまま残す。各指摘の現時点の状態と受け入れ条件・checkpoint の最新判定は **7 章（Round 2 再確認、対象 `19bf862`）** を正とする。
+> **本文書の読み方**: 1〜6 章は初回レビュー（対象 `e0b7fe3`）、7〜8 章は Round 2 再確認（対象 `19bf862`）の記録であり、当時の指摘内容と根拠を保存する目的でそのまま残す。**最終判定と全指摘の最終状態は 9 章（Round 3 再確認、対象 `96ff759`）を正とする。**
 
 ---
 
@@ -60,20 +62,6 @@ inline style は selector の specificity では上書きできない。`.image-
 **severity**: Medium
 **対象工程**: Phase 2 設計修正 → Phase 3 実装
 **status**: 未対応
-
-### 7.2.1 Round 2 指摘対応
-
-設計 §6.1-6.4、§16、§18へ次を反映した。
-
-- buttonは通常時visually-hiddenかつabsolute配置として文書flow / pointer hit testから外し、keyboard focus時だけvisual右上へfixed pillとして可視化する。focus中のscroll / resize追従とdisconnect時のfocus fallbackも定義した。
-- 通常画像は`img`直後、linked imageは`a`直後、Mermaidは`.mermaid`直後、PlantUMLは既存`.plantuml-diagram`直後へ挿入する。diagram専用wrapperは追加せず、既存border / padding / horizontal scroll領域を維持する。
-- visual / buttonへ同じopaque `data-image-viewer-id`を付け、kind markerとactive preview root allowlistを併用して`focusOrigin`を双方向解決する。ID不一致・重複は拒否する。
-- `.markdown-body` typographyを打ち消すbutton CSS reset、focus時のclip解除・可視outline・pointer event契約を定義した。
-- 手動scenarioへfocus pillの可視性と、inline段落の行組みおよびdiagram layoutがdecoration前後で不変であることを追加した。
-
-**status**: 対応済み・再確認待ち
-
----
 
 ### 1.2 wheel zoom が React の `onWheel` では実装できない（passive listener 固定）
 
@@ -354,7 +342,17 @@ Round 1 の 14 件はすべてクローズと判定する。
 
 **severity**: Medium
 **対象工程**: Phase 2 設計修正 → Phase 3 実装
-**status**: 未対応
+**status**: クローズ（Round 3 で再確認。9 章参照）
+
+#### 7.2.1 Round 2 指摘対応（設計側の記録）
+
+設計 §6.1-6.4、§16、§18へ次を反映した。
+
+- buttonは通常時visually-hiddenかつabsolute配置として文書flow / pointer hit testから外し、keyboard focus時だけvisual右上へfixed pillとして可視化する。focus中のscroll / resize追従とdisconnect時のfocus fallbackも定義した。
+- 通常画像は`img`直後、linked imageは`a`直後、Mermaidは`.mermaid`直後、PlantUMLは既存`.plantuml-diagram`直後へ挿入する。diagram専用wrapperは追加せず、既存border / padding / horizontal scroll領域を維持する。
+- visual / buttonへ同じopaque `data-image-viewer-id`を付け、kind markerとactive preview root allowlistを併用して`focusOrigin`を双方向解決する。ID不一致・重複は拒否する。
+- `.markdown-body` typographyを打ち消すbutton CSS reset、focus時のclip解除・可視outline・pointer event契約を定義した。
+- 手動scenarioへfocus pillの可視性と、inline段落の行組みおよびdiagram layoutがdecoration前後で不変であることを追加した。
 
 ### 7.3 受け入れ条件の追跡性（Round 2 時点）
 
@@ -386,6 +384,43 @@ Round 1 の 14 件はすべてクローズと判定する。
 
 | ID | severity | 概要 | status |
 | --- | --- | --- | --- |
-| 7.2 | Medium | 隣接 viewer button の表示契約・挿入位置・visual との対応付けが未定義 | 対応済み・再確認待ち |
+| 7.2 | Medium | 隣接 viewer button の表示契約・挿入位置・visual との対応付けが未定義 | クローズ（Round 3 再確認済み） |
 
-Round 1 指摘14件はクローズ。7.2は設計へ反映済みであり、Claude再確認で未解決0件または追加指摘を確定する。承認時は`meta.md`の`design_status`を`reviewed`、Phase 2行をDoneへ更新すること。
+Round 1 指摘 14 件と Round 2 指摘 1 件はすべてクローズ。最終判定は 9 章を正とする。
+
+---
+
+## 9. Round 3 再確認（`96ff759`）と最終判定
+
+`96ff759` の差分（design §6.1 / 新設 §6.1.1 / §6.2 / §6.3 / §6.4 / §16 / §18、`meta.md`）を取得し、Round 2 指摘 7.2 の 5 観点を実ソースの CSS 契約と突き合わせて検証した。
+
+### 9.1 観点別の検証結果
+
+| 観点 | 設計記述 | 検証結果 |
+| --- | --- | --- |
+| 通常時に本文 flow と pointer 操作へ影響しない | §6.1.1「通常時は共通の visually-hidden CSS（`position: absolute`、1px 四方、clip、負 margin、overflow hidden）で文書 flow と pointer hit test から外す」。§16 で通常状態 `pointer-events: none` | **成立**。offset を指定しない `position: absolute` は静的位置に留まったまま flow から外れるため、inline 画像を含む段落でも reflow を起こさない。`.preview-pane { position: relative }`（`App.css:711-714`）が containing block となり、`.markdown-body` 側に絶対配置を阻害する規則もない。`pointer-events: none` により画像・link の pointer 操作も遮らない |
+| keyboard focus 時に視覚的に識別できる | §6.1.1「`:focus-visible` では `position: fixed` の操作 pill として visual 右上へ重ね、clip / 1px 寸法 / 負 margin を解除し、明瞭な outline と `Open image viewer` の可視文言を表示」。§16 に theme 対応 outline | **成立**（ただし 9.2 の実装条件 1 件）。`.markdown-body` の祖先に `transform` / `filter` / `will-change` は無く（`App.css` 内の `transform` は `.explorer-separator::after` のみ）、`position: fixed` は `.preview-pane { overflow: auto }` の clip を正しく脱出する |
+| kind 別の挿入位置が既存 layout / link / scroll 契約を維持する | §6.1「通常画像は `img` 直後、linked image は画像を含む最も近い `a` の直後（`a` の外側）」、§6.2「`.mermaid` の直後」、§6.3「`.plantuml-diagram` の直後、viewer 専用 wrapper は追加しない」 | **成立**。button が `.mermaid` / `.plantuml-diagram` の外側に出るため、`App.css:840-861` の border / padding / `overflow-x: auto` の内寸に影響しない。Round 2 で指摘した PlantUML の冗長 wrapper も撤去された。`a` の外側配置により nested interactive も回避される。挿入は常に host の**直後**であり `.markdown-body > :first-child { margin-top: 0 }`（`App.css:737-739`）の一致対象が変わることもない |
+| pointer 経路でも非 null の `focusOrigin` を解決できる | §6.1.1「visual へ `data-image-viewer-id` と `data-image-viewer-kind`、button へ同じ `data-image-viewer-id` と `data-image-viewer-trigger`」「pointer target から解決する場合も同一 preview root 内の ID 一致 button を `focusOrigin` に採用」。§6.4「active preview root 配下かつ同じ ID を持つ組だけを受理し、ID 不一致・重複は `null`」 | **成立**。双方向解決が定義され、`ImageViewerRequest.focusOrigin: HTMLButtonElement` を非 null で埋められる。ID は preview revision 内で一意・opaque とされ、tab / revision 跨ぎの誤マッチも塞がれている |
+| typography 継承の打消しと lifecycle の粒度 | §16 に `appearance: none` / `box-sizing` / 明示 font / line-height / margin / padding / border / background / color。§6.1.1 に focus 時 `requestAnimationFrame` 後の `getBoundingClientRect()` 読取、capture phase の preview scroll と window resize 追従、blur / cleanup での listener 除去、visual disconnect 時の button 除去と preview への focus 戻し | **成立**。読取タイミング、追従対象、解除契機、disconnect 時の退避先まで具体化されており、Phase 3 で判断が要る余地はない |
+| 手動 scenario で判定できる | §18-1「対象 visual 右上へ可視 pill と focus outline が出ることを確認して Enter / Space」、§18-11「inline 画像を含む段落の行組み、Mermaid / PlantUML の border・padding・横 scroll 幅が decoration 前後で変わらない」 | **成立**。layout 不変と focus 可視性の双方が観察可能な形になっている |
+
+Round 2 指摘 7.2 はクローズと判定する。
+
+### 9.2 Phase 3 実装条件（非ブロッキング・2 件）
+
+設計判断としては妥当だが、記述どおりに実装すると狭い条件で意図が満たされない箇所が 2 点ある。いずれも §16 の CSS 宣言レベルの話で、設計方針の変更を伴わないため **Phase 2 承認は妨げない**。Phase 3 実装時に満たし、Phase 3 レビューで確認する条件として記録する。
+
+1. **pointer 起点で開いた viewer を close した時、復帰 focus が不可視になり得る**（§5.3 / §6.1.1 / §16）。pill の可視化条件が `:focus-visible` のみのため、「画像を click して開く → Close button を click して閉じる → `focusOrigin` へ programmatic focus」という経路では、直前の操作が pointer であることから `:focus-visible` が一致せず、focus が 1px の clip 済み要素に載ったまま視覚表示が出ない。機能は壊れない（Tab は正しい位置から継続し、Enter で再度開く）が、手動 scenario 6 の「隣接 button へ focus が戻る」が視覚的に判定できなくなる。
+   **満たし方**: 通常状態が `pointer-events: none` である以上、この button が pointer press で focus を得ることは原理的にありえない。したがって可視化条件を `:focus-visible` ではなく **`:focus`** にすれば、keyboard focus と programmatic 復帰 focus の双方で pill が出て、pointer 由来の誤表示は発生しない。§16 の `:focus-visible` を `:focus` に読み替えるだけで足りる。scenario 6 へ「pointer で開いて Close button で閉じた場合も pill が可視になる」を加えると判定条件が閉じる。
+2. **clip された label 文言が本文の copy 対象に混入する**（§6.1.1 / §16）。visually-hidden な button は文字 `Open image viewer` を持つため、画像を含む段落を選択して copy すると本文に無い文字列が混ざる。§13 の「通常時の preview 表示を維持する」に対する軽微な退行で、`.markdown-body` からの text 抽出を伴う操作すべてに影響する。
+   **満たし方**: §16 の button reset へ `user-select: none` を含める。§10.1 の「selection が collapsed でなければ viewer を開かない」規則とも干渉しない。
+
+### 9.3 最終判定
+
+- Round 1 指摘 14 件（Medium 7 / Low 7）: **すべてクローズ**
+- Round 2 指摘 1 件（Medium 1）: **クローズ**
+- Round 3 追加指摘: **0 件**（9.2 の 2 件は Phase 3 実装条件として記録。設計方針の修正を要さない）
+- **未解決の設計指摘 0 件。Phase 2 承認 (Approved)。Phase 3 進行可。**
+
+承認に伴い `meta.md` の `design_status` を `reviewed`、Phase Status の Phase 2 行を `Done` へ更新すること。Phase 3 レビューでは 9.2 の 2 条件と、§18 の手動 scenario 1 / 6 / 11（focus pill の可視性、pointer close 後の復帰 focus、decoration 前後の layout 不変）の実施結果を確認する。
