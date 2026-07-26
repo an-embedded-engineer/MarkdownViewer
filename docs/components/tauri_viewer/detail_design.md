@@ -278,6 +278,15 @@ stop
 
 相対画像は`resolveSiblingPath(activeTab.path, src)`で絶対パスへ解決し、`convertFileSrc`で`asset://` URLへ変換する。`isRelativeResource`で`data:` / `file:` / `http(s)://` / `#anchor` / 絶対パスは対象外とする。
 
+## Markdown image viewer
+
+- `createImageViewerDomAdapter`はactive Markdown previewだけを走査し、load済み通常画像、`data-processed="true"`のMermaid SVG、`.plantuml-diagram > svg`へ同一opaque IDのvisual markerとnative keyboard buttonを付与する。pending / error / invalid sizeは操作対象にしない。
+- keyboard buttonは通常時visually hiddenかつ文書flow外とし、focus時だけ対象visual右上へfixed pillとして表示する。通常画像は`img`直後、linked imageは`a`直後、diagramはcontainer直後へ挿入して既存layoutとnested interactive回避を両立する。
+- `resolveImageViewerSource`はactive preview root内のID一致visual / buttonが各1個の場合だけ`ImageViewerRequest`を返す。SVG内anchorは既存link処理を優先し、linked imageの画像領域clickはviewerを優先する。
+- `ImageViewerDialog`は描画済みvisualを`cloneNode(true)`し、app shellのsiblingに表示する。app shellは`inert`となり、close後はbuttonへfocusを戻す。originがdetach済みの場合だけactive Markdown previewへ戻す。
+- 初期scaleは左右上下padding内へ収まる`min(1, availableWidth / intrinsicWidth, availableHeight / intrinsicHeight)`。下限は現在のfit、上限は8.0。toolbar / wheel / keyboardは同じpolicyを利用し、drag / Arrow keyのpanをbounds内へclampする。
+- viewer stateはtabへ永続化せず、close、tab / revision / document type変更で破棄する。ResizeObserverはfit modeを再fitし、custom modeはscaleを維持してoffsetを再clampする。
+
 ## Multi-tab処理
 
 - `OpenDocumentTab`はdocumentType、Markdown sourceまたはHTML preview URL、revision、loadState、error、PlantUML結果を保持する。

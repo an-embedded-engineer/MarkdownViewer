@@ -14,7 +14,7 @@ components:
   - "docs/rules/development_workflow.md"
 status: "in_progress"
 design_status: "done"
-impl_status: "pending"
+impl_status: "draft"
 completion_status: "pending"
 verification_status: "pending"
 related_commits:
@@ -57,5 +57,5 @@ related_commits:
 | Phase 0 Requirements | Done (`d2e9fd5`) |
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0, `7bcc92b`) |
-| Phase 3 Implementation and docs review | Pending |
+| Phase 3 Implementation and docs review | Draft (implementation and automated verification complete) |
 | Phase 4 Verification and completion | Pending |
