@@ -31,6 +31,7 @@ Tauri 版では MenuBar / StatusBar、Recent Folders、Multi-tab、Viewer settin
 - Tauri component docs: `docs/components/tauri_viewer/`
 - Tauri 先行案件の `change_report.md`、設計、ユーザ確認記録
 - `docs/todo/todo_archive_2026.md`
+- `TODO-2026-019`（Explorer UX）、`TODO-2026-021`（responsive preview）、`TODO-2026-022`（image viewer）の完了記録
 - UI/UX 調査・WBS: `docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/` と `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/`
 - 共通 architecture / rules / ADR index
 
@@ -147,6 +148,21 @@ TODO-2026-010 と TODO-2026-011 は統合しない。
 
 TODO-2026-012 は TODO-2026-011 完了後に実施する。統合後の依存は推移的に満たされるため、統合済み ID を dependency に残さない。Tauri TODO-2026-023 / 025 は baseline 完了条件へ含めず、完了していれば採否を、未完なら follow-up 状態を最終同期へ記録する。
 
+### 6.7 更新後の直接依存
+
+active todo と WBS は次の直接依存へ同期する。TODO-2026-009 と TODO-2026-018 は TODO-2026-008 後に並行でき、TODO-2026-010 は両方の完了を待つ。
+
+| TODO | 直接依存 | 理由 |
+| --- | --- | --- |
+| TODO-2026-008 | TODO-2026-007 | 評価済み shell / Explorer 契約を受け取る |
+| TODO-2026-009 | TODO-2026-008 | Menu / Settings の配置先と shell を前提にする |
+| TODO-2026-018 | TODO-2026-008 | Explorer と preview host の基盤を前提にする |
+| TODO-2026-010 | TODO-2026-009, TODO-2026-018 | app settings と typed Markdown / HTML document model の両方を tab state に取り込む |
+| TODO-2026-011 | TODO-2026-010 | 安定した single-pane tab collection を pane-local selection / runtime へ拡張する |
+| TODO-2026-012 | TODO-2026-011 | 推移的に全 Avalonia rollout を完了した後で最終同期する |
+
+TODO-2026-015 / 020 / 024 は統合後の active dependency に残さない。
+
 ## 7. 更新後の推奨実行順序
 
 1. TODO-2026-008 Avalonia shell / Explorer UX foundation
@@ -159,6 +175,8 @@ Tauri follow-up は別系列とする。
 
 1. TODO-2026-023 pane-local tab group / pane 間移動
 2. TODO-2026-025 上下・左右 split orientation
+
+TODO-2026-019 / 021 / 022 はすべて完了済みである。TODO-2026-019 は TODO-2026-020 統合判断の直接 source、TODO-2026-021 / 022 は評価範囲を補う source reference として TODO-2026-007 / WP-005 に記録する。後二者は当初の baseline gate ではなく、完了後に追加された評価資料であるため dependency には追加しない。
 
 ## 8. 恒久文書の更新方針
 
@@ -185,6 +203,7 @@ Tauri component docs は現行実装と一致しており、評価結果は本 t
 - `rg` で TODO-2026-024 / 020 / 015 の参照元を列挙し、統合先または archive への説明が必要か確認する。
 - WBS の WP-006 / WP-007 を統合後の scope に更新し、旧 WP-009 までの ID は安易に採番し直さない。
 - `depends_on` に archive 済み統合 IDを残さない。
+- TODO-2026-007 / WP-005 から TODO-2026-019 / 021 / 022 の評価根拠を追跡できることを確認する。
 - `Tauri先行 UX`、`common specification`、`stack adaptation`、`baseline` の用語を統一する。
 - 現行実装と planned contract を同じ時制で書かない。
 - docs-only のため `diff.zip` を作成しない。
@@ -206,5 +225,6 @@ Tauri component docs は現行実装と一致しており、評価結果は本 t
 - Avalonia の共通仕様、stack 差分、未検証事項が component docs から参照できる。
 - TODO-2026-023 / 024、008 / 020、009 / 015 の統合判断が todo / archive / WBS で整合する。
 - TODO-2026-018 → 010 → 011 の依存順と、Tauri follow-up が Avalonia baseline をブロックしない方針が明確になる。
+- TODO / WBS の直接依存が 6.7 の表と一致し、TODO-2026-015 / 020 / 024 が active dependency に残らない。
 - レビュー指摘が解消され、リンク・索引・重複・archive・history の整合確認が完了する。
 - ソース変更と `diff.zip` が存在しない。
