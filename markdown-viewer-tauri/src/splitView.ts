@@ -172,6 +172,9 @@ export function getSplitPaneWidthBounds(
     return null;
   }
   const available = workspaceWidth - splitSeparatorWidth;
+  if (available < 2) {
+    return null;
+  }
   const min = Math.min(preferredPaneMinimumWidth, Math.floor(available / 2));
   return { min, max: available - min, available };
 }

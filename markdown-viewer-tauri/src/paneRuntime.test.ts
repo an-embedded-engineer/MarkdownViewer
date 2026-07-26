@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   isPanePreviewStatusCurrent,
   isPaneResultCurrent,
+  isPaneSelectionCurrent,
+  isTabRevisionCurrent,
   resolvePaneTabPresentationState,
   type PanePreviewStatus,
 } from "./paneRuntime";
@@ -15,6 +17,14 @@ const status = (phase: PanePreviewStatus["phase"]): PanePreviewStatus => ({
 });
 
 describe("pane runtime guard", () => {
+  it("keeps pane selection and tab revision checks independent", () => {
+    const state = createInitialSplitViewState("a");
+    expect(isPaneSelectionCurrent("primary", "a", state)).toBe(true);
+    expect(isPaneSelectionCurrent("primary", "b", state)).toBe(false);
+    expect(isTabRevisionCurrent("a", 1, [{ id: "a", revision: 1 }])).toBe(true);
+    expect(isTabRevisionCurrent("a", 2, [{ id: "a", revision: 1 }])).toBe(false);
+  });
+
   it("accepts only the current pane, tab, and revision", () => {
     const state = createInitialSplitViewState("a");
     expect(

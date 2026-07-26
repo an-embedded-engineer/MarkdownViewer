@@ -42,6 +42,8 @@ import {
 import {
   isPanePreviewStatusCurrent,
   isPaneResultCurrent,
+  isPaneSelectionCurrent,
+  isTabRevisionCurrent,
   resolvePaneTabPresentationState,
   type PanePreviewPhase,
   type PanePreviewStatus,
@@ -631,8 +633,11 @@ function App() {
           errorMessage: null,
           plantUmlDiagrams: [],
         }));
-        setPanePreviewStatus("primary", null);
-        setPanePreviewStatus("secondary", null);
+        for (const paneId of ["primary", "secondary"] as const) {
+          if (getPaneState(splitViewRef.current, paneId).activeTabId === activeTab.id) {
+            setPanePreviewStatus(paneId, null);
+          }
+        }
         void loadTab(activeTab.id, activeTab.path, revision);
       }
     } catch (error) {
@@ -646,7 +651,6 @@ function App() {
     const existing = tabsRef.current.find((tab) => tab.path === filePath);
     if (existing) {
       applySplitView({ type: "select-tab", paneId, tabId: existing.id, anchor });
-      setPanePreviewStatus(paneId, null);
       return;
     }
 
@@ -759,7 +763,6 @@ function App() {
 
   function activateTab(paneId: PaneId, tabId: string) {
     applySplitView({ type: "select-tab", paneId, tabId });
-    setPanePreviewStatus(paneId, null);
   }
 
   function closeTab(paneId: PaneId, tabId: string): string | null {
@@ -1292,6 +1295,12 @@ function App() {
                     tabsRef.current,
                   )
                 }
+                isSelectionCurrent={(paneId, tabId) =>
+                  isPaneSelectionCurrent(paneId, tabId, splitViewRef.current)
+                }
+                isRevisionCurrent={(tabId, revision) =>
+                  isTabRevisionCurrent(tabId, revision, tabsRef.current)
+                }
                 enqueueMermaid={enqueueMermaidTask}
               />
               {splitViewState.mode === "split" && splitWidthBounds && primaryPaneWidth !== null ? (
@@ -1339,6 +1348,12 @@ function App() {
                       splitViewRef.current,
                       tabsRef.current,
                     )
+                  }
+                  isSelectionCurrent={(paneId, tabId) =>
+                    isPaneSelectionCurrent(paneId, tabId, splitViewRef.current)
+                  }
+                  isRevisionCurrent={(tabId, revision) =>
+                    isTabRevisionCurrent(tabId, revision, tabsRef.current)
                   }
                   enqueueMermaid={enqueueMermaidTask}
                 />
@@ -2144,6 +2159,8 @@ type DocumentPaneProps = {
   onConsumeNavigation: (paneId: PaneId, tabId: string, anchor: string) => void;
   onOpenExternal: (paneId: PaneId, tabId: string, revision: number, href: string) => void;
   isCurrent: (paneId: PaneId, tabId: string, revision: number) => boolean;
+  isSelectionCurrent: (paneId: PaneId, tabId: string) => boolean;
+  isRevisionCurrent: (tabId: string, revision: number) => boolean;
   enqueueMermaid: (task: () => Promise<void>) => Promise<void>;
 };
 
@@ -2163,17 +2180,25 @@ function DocumentPane({
   onConsumeNavigation,
   onOpenExternal,
   isCurrent,
+  isSelectionCurrent,
+  isRevisionCurrent,
   enqueueMermaid,
 }: DocumentPaneProps) {
   const pane = getPaneState(splitViewState, paneId);
   const selectedTab = tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
   const previewRef = useRef<HTMLElement>(null);
-  const previewPaneRef = useRef<HTMLDivElement>(null);
+  const paneRegionRef = useRef<HTMLElement>(null);
+  const hasMarkdownPreview =
+    selectedTab?.documentType === "markdown" && selectedTab.sourceText !== null;
+  const registerMarkdownPreview = (element: HTMLElement | null) => {
+    previewRef.current = element;
+    onPreviewElement(paneId, element ?? paneRegionRef.current);
+  };
 
   useEffect(() => {
-    onPreviewElement(paneId, previewRef.current ?? previewPaneRef.current);
+    onPreviewElement(paneId, previewRef.current ?? paneRegionRef.current);
     return () => onPreviewElement(paneId, null);
-  }, [paneId, selectedTab?.id, selectedTab?.revision]);
+  }, [paneId, selectedTab?.id, selectedTab?.revision, hasMarkdownPreview]);
 
   useEffect(() => {
     const tab = selectedTab;
@@ -2290,6 +2315,7 @@ function DocumentPane({
 
   return (
     <section
+      ref={paneRegionRef}
       className="document-pane"
       id={`document-pane-${paneId}`}
       role="region"
@@ -2309,7 +2335,6 @@ function DocumentPane({
         onClose={onCloseTab}
       />
       <div
-        ref={previewPaneRef}
         className="preview-pane"
         id={`document-preview-${paneId}`}
         role="tabpanel"
@@ -2321,7 +2346,7 @@ function DocumentPane({
             markdown={selectedTab.sourceText}
             plantUmlDiagrams={selectedTab.plantUmlDiagrams}
             selectedFilePath={selectedTab.path}
-            previewRef={previewRef}
+            previewRef={registerMarkdownPreview}
             onClick={(event) =>
               previewRef.current && onPreviewClick(paneId, selectedTab, previewRef.current, event)
             }
@@ -2334,6 +2359,8 @@ function DocumentPane({
             revision={selectedTab.revision}
             previewUrl={selectedTab.previewUrl}
             isCurrent={isCurrent}
+            isSelectionCurrent={isSelectionCurrent}
+            isRevisionCurrent={isRevisionCurrent}
             onActivity={onActivatePane}
             onLoading={(currentPaneId, tabId, revision) =>
               onPreviewStatus(currentPaneId, tabId, revision, "loading-html")
@@ -2610,7 +2637,7 @@ type MarkdownPreviewProps = {
   markdown: string;
   plantUmlDiagrams: PlantUmlDiagramResult[];
   selectedFilePath: string;
-  previewRef: React.RefObject<HTMLElement | null>;
+  previewRef: React.RefCallback<HTMLElement>;
   onClick: (event: React.MouseEvent<HTMLElement>) => void;
 };
 
@@ -2647,6 +2674,8 @@ type HtmlPreviewProps = {
   revision: number;
   previewUrl: string;
   isCurrent: (paneId: PaneId, tabId: string, revision: number) => boolean;
+  isSelectionCurrent: (paneId: PaneId, tabId: string) => boolean;
+  isRevisionCurrent: (tabId: string, revision: number) => boolean;
   onActivity: (paneId: PaneId) => void;
   onLoading: (paneId: PaneId, tabId: string, revision: number) => void;
   onReady: (paneId: PaneId, tabId: string, revision: number) => void;
@@ -2660,6 +2689,8 @@ function HtmlPreview({
   revision,
   previewUrl,
   isCurrent,
+  isSelectionCurrent,
+  isRevisionCurrent,
   onActivity,
   onLoading,
   onReady,
@@ -2702,8 +2733,8 @@ function HtmlPreview({
       const decision = evaluateHtmlBridgeMessage(event.data, {
         sourceMatches: event.source === iframeRef.current?.contentWindow,
         origin: event.origin,
-        tabMatches: isCurrent(paneId, tabId, revision),
-        revisionMatches: isCurrent(paneId, tabId, revision),
+        tabMatches: isSelectionCurrent(paneId, tabId),
+        revisionMatches: isRevisionCurrent(tabId, revision),
         readyAccepted,
         hasTransientUserActivation: navigator.userActivation?.isActive === true,
         duplicateExternalOpen,

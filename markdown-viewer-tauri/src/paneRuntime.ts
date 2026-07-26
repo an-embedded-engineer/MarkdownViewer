@@ -30,20 +30,33 @@ export type TabPresentationInput = TabIdentity & {
   loadState: SharedTabLoadState;
 };
 
+export function isPaneSelectionCurrent(
+  paneId: PaneId,
+  tabId: string,
+  splitViewState: SplitViewState,
+): boolean {
+  if (paneId === "secondary" && splitViewState.mode !== "split") {
+    return false;
+  }
+  return getPaneState(splitViewState, paneId).activeTabId === tabId;
+}
+
+export function isTabRevisionCurrent(
+  tabId: string,
+  revision: number,
+  tabIdentities: TabIdentity[],
+): boolean {
+  return tabIdentities.some((tab) => tab.id === tabId && tab.revision === revision);
+}
+
 export function isPaneResultCurrent(
   captured: PaneResultIdentity,
   splitViewState: SplitViewState,
   tabIdentities: TabIdentity[],
 ): boolean {
-  if (captured.paneId === "secondary" && splitViewState.mode !== "split") {
-    return false;
-  }
-  const pane = getPaneState(splitViewState, captured.paneId);
   return (
-    pane.activeTabId === captured.tabId &&
-    tabIdentities.some(
-      (tab) => tab.id === captured.tabId && tab.revision === captured.revision,
-    )
+    isPaneSelectionCurrent(captured.paneId, captured.tabId, splitViewState) &&
+    isTabRevisionCurrent(captured.tabId, captured.revision, tabIdentities)
   );
 }
 

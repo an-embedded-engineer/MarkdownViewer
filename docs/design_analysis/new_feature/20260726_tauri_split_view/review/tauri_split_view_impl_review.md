@@ -230,3 +230,18 @@ Phase 3 実装は、承認済み設計の中核構造をほぼ忠実に実装し
 受け入れ条件トレース（第 4 節）は 11 行中 9 行が ✓、2 行が指摘 1.1 / 3.1 に起因する △（条件付き）である。
 
 以上より本 Phase 3 実装を **要修正 (Changes Requested)** とし、指摘 1.1 の修正後に再レビューを行うこととする。**未解決指摘は 4 件（Medium 1 / Low 3）**。
+
+---
+
+## 10. 指摘対応 Round 1
+
+初回レビュー4件をすべてPhase 3実装へ反映した。設計変更はなく、実装記録へ対応内容と再検証結果を追記した。以下のstatusは実装担当による対応状態であり、最終判定はfollow-up reviewで確定する。
+
+| 指摘 | severity / 工程 | 対応 | status |
+| --- | --- | --- | --- |
+| 1.1 preview要素登録とfocus復帰 | Medium / impl | `DocumentPane`のMarkdown previewをcallback refでlive登録し、非Markdown時は`tabIndex={-1}`を持つpane regionへfallback。loading完了・theme remount・unmountに追従する | 対応済み（再レビュー待ち） |
+| 3.1 pane status過剰clear | Low / impl | 既存tab再選択と`activateTab`の無条件clearを削除。Reloadは対象tabを選択中のpaneだけをclearし、同一tab両pane表示は両方clearする | 対応済み（再レビュー待ち） |
+| 3.2 極小幅ratio境界 | Low / impl + test | available幅2px未満でboundsを`null`に縮退。workspace 7pxでbounds / Home / pointer policyがno-opとなるtestを追加 | 対応済み（再レビュー待ち） |
+| 3.3 HTML bridge判定の縮退 | Low / impl + test | pane選択とtab revisionを独立pure functionへ分離し、stale guardは両者を合成、bridge contextは個別に配線。独立判定testを追加 | 対応済み（再レビュー待ち） |
+
+対応後の確認は`npm test -- --run`が5 files / 71 tests成功、`npm run build`が成功（既存large chunk warningのみ）。実装担当側の未分類・未対応項目は0件。

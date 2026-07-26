@@ -58,7 +58,7 @@ Rust command、custom protocol、Tauri capability、CSP、settings schemaは変�
 
 | コマンド | 結果 |
 | --- | --- |
-| `cd markdown-viewer-tauri && npm test -- --run` | 成功。5 files / 70 tests passed |
+| `cd markdown-viewer-tauri && npm test -- --run` | 成功。5 files / 71 tests passed（Phase 3 review対応後） |
 | `cd markdown-viewer-tauri && npm run build` | 成功。TypeScript compile / Vite production build完了。既存のlarge chunk warningのみ |
 | `cd markdown-viewer-tauri/src-tauri && cargo check` | 成功 |
 | `cd markdown-viewer-tauri/src-tauri && cargo test` | 成功。22 tests passed、失敗0 |
@@ -76,3 +76,16 @@ Rust command、custom protocol、Tauri capability、CSP、settings schemaは変�
 - single modeのMulti-tab、Explorer resize、Settings、Recent Foldersの回帰。
 
 詳細matrixは`docs/rules/development_workflow.md`および設計書第19節を参照する。
+
+## 7. Phase 3実装レビュー対応
+
+初回実装レビューのMedium 1件、Low 3件をすべてPhase 3で修正した。
+
+| 指摘 | 分類 | 対応 |
+| --- | --- | --- |
+| 1.1 preview focus復帰先が読み込み前の要素で固定 | impl / Medium | Markdown previewのcallback refでlive DOMを登録し、読み込み中・HTML・未選択時はfocus可能な`document-pane-${paneId}` regionへfallbackする。loadingからloadedへの遷移とthemeによるremountの双方で登録先を更新する |
+| 3.1 pane statusの過剰clear | impl / Low | 同一tab再選択時のclearを廃止し、Reloadではrevisionを更新するtabを選択中のpaneだけをclearする。同一tabを両paneで表示中なら両方をclearする |
+| 3.2 極小幅でratio 0 / 1を生成 | impl + test / Low | separatorを除く利用可能幅が2px未満ならwidth boundsを`null`とし、separator操作を描画・実行しない。7px workspaceのbounds / keyboard / pointer policy境界testを追加した |
+| 3.3 HTML bridgeのtab / revision判定が同一述語 | impl + test / Low | `isPaneSelectionCurrent`と`isTabRevisionCurrent`を独立pure policyとして公開し、`isPaneResultCurrent`を両者の合成へ変更。HTML bridge contextへ各述語を個別配線した |
+
+対応後に`npm test -- --run`（5 files / 71 tests）と`npm run build`を再実行し、いずれも成功した。設計契約と恒久ドキュメントの変更は不要で、実装の適合修正として閉じている。

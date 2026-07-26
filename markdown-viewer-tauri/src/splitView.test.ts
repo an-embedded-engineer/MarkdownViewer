@@ -178,6 +178,11 @@ describe("split pane width policy", () => {
     expect(getSplitPaneWidthBounds(null)).toBeNull();
     expect(getSplitPaneWidthBounds(Number.NaN)).toBeNull();
     expect(getSplitPaneWidthBounds(splitSeparatorWidth)).toBeNull();
+    expect(getSplitPaneWidthBounds(splitSeparatorWidth + 1)).toBeNull();
+    expect(getSplitRatioForKey("Home", initialSplitRatio, splitSeparatorWidth + 1)).toBeNull();
+    expect(
+      getRequestedRatioForPrimaryWidth(0, splitSeparatorWidth + 1, initialSplitRatio),
+    ).toBe(initialSplitRatio);
   });
 
   it("uses preferred minimums in a normal workspace", () => {
