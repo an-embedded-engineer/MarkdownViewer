@@ -12,9 +12,12 @@
 **再レビュー判定**: 承認 (Approved)。初回指摘 5 件（Medium 2 / Low 3）はすべてクローズ、新規指摘 0 件。
 **Phase 4-a 追加レビュー コミット**: `27ca57c` (fix: restore image viewer focus by activation type)
 **Phase 4-a 追加レビュー日**: 2026-07-26
-**Phase 4-a 追加レビュー判定 / 最新**: **承認 (Approved)。Phase 4-a ユーザー再確認へ進行可**。activation 分岐の修正は指摘された UX 問題の根本原因に対応しており、keyboard / screen reader 経路の focus 復帰も維持されている。**ブロッキング指摘 0 件（High / Medium なし）**、**未解決指摘 2 件（いずれも Low、再確認セッション内で観察・適用できる範囲）**。判定根拠は 9 章を正とする。
+**Phase 4-a 追加レビュー判定**: 承認 (Approved)。ブロッキング 0 件、Low 2 件（9.3.1 / 9.3.2）。
+**follow-up 確認コミット**: `c9e519b` (fix: suppress preview focus outline after image viewer)
+**follow-up 確認日**: 2026-07-26
+**最新判定**: **承認 (Approved)。Phase 4-a ユーザー再確認へ進行可**。全 4 ラウンドの実装レビュー指摘 **7 件（Medium 2 / Low 5）はすべてクローズ**し、High は通じて 0 件。**未解決指摘 0 件**。判定根拠は 9 章（とくに 9.6）を正とする。
 
-> **本文書の読み方**: 1〜6 章は初回レビュー（対象 `ad68ae4`）、7 章は実装 Agent の対応記録、8 章は再レビュー（対象 `80741cf`）の記録であり、いずれも当時の内容を保存する目的で残す。**最新の判定と未解決状況は 9 章（Phase 4-a 追加レビュー、対象 `27ca57c`）を正とする。**
+> **本文書の読み方**: 1〜6 章は初回レビュー（対象 `ad68ae4`）、7 章は実装 Agent の対応記録、8 章は再レビュー（対象 `80741cf`）の記録であり、いずれも当時の内容を保存する目的で残す。9 章は Phase 4-a 追加レビュー（対象 `27ca57c`）とその follow-up であり、**最新の判定と未解決状況は 9.6 を正とする。**
 
 ---
 
@@ -279,7 +282,7 @@ Close button の click や backdrop click で閉じた場合は直前操作が p
 
 **severity**: Low（機能影響なし。engine 依存の表示のみ。ただし再確認で NG になれば往復が 1 回増えるため、再確認前の適用を推奨する）
 **対象工程**: Phase 3 相当の追加修正（CSS 1 規則）+ Phase 4-a 観察項目
-**status**: 未対応
+**status**: クローズ（`c9e519b`。9.6 参照）
 
 #### 9.3.2 `imageViewer.ts` の責務記述に activation policy が未反映
 
@@ -294,9 +297,9 @@ Close button の click や backdrop click で閉じた場合は直前操作が p
 
 **severity**: Low
 **対象工程**: Phase 3 相当の docs 修正
-**status**: 未対応
+**status**: クローズ（`c9e519b`。9.6 参照）
 
-### 9.4 判定
+### 9.4 判定（`27ca57c` 時点。最新は 9.6）
 
 - Phase 4-a フィードバック対応の修正内容: **承認**。指定された 6 観点すべてで期待どおりの実装を確認した。activation を pure policy として切り出した設計も既存の module 慣行と整合し、keyboard / AT 経路の復帰 focus を保ったまま pointer 経路の余計な UI を消せている。
 - **ブロッキング指摘 0 件（High 0 / Medium 0）。未解決指摘 2 件（Low 2）。**
@@ -313,3 +316,46 @@ Close button の click や backdrop click で閉じた場合は直前操作が p
 | --- | --- | --- |
 | 9.3.1 | programmatic focus専用の`.markdown-body`へ`:focus { outline: none }`を追加した。設計§18、development workflow、Phase 4-a検証記録へpointer + Escapeの観察項目を反映した | 対応済み・再レビュー待ち |
 | 9.3.2 | `docs/components/tauri_viewer/README.md`と`basic_design.md`の`imageViewer.ts`責務へactivation policyを追記した | 対応済み・再レビュー待ち |
+
+---
+
+### 9.6 follow-up 確認（`c9e519b`）と最終判定
+
+`c9e519b` の差分（`App.css` 1 規則、恒久 docs 2 件、設計 §18-6、`development_workflow.md`、impl 記録、Phase 4-a 検証記録）を検証し、3 つの検証コマンドを再実行した。
+
+#### 9.6.1 検証コマンド
+
+| command | 実行結果 | 実装 Agent 報告との一致 |
+| --- | --- | --- |
+| `cd markdown-viewer-tauri && npm test -- --run` | Pass。3 files / 42 tests（増減なし） | 一致 |
+| `cd markdown-viewer-tauri && npm run build` | Pass。既存 chunk size warning のみ | 一致 |
+| `cd markdown-viewer-tauri/src-tauri && cargo check` | Pass | 一致 |
+
+CSS は `App.tsx` から import され build 対象に含まれるため、`npm run build` の Pass をもって構文・取り込みの妥当性も確認できている。TypeScript / Rust に差分がないため test 件数が据え置きなのも想定どおりで、「局所 CSS・docs 修正で既存検証結果に影響しない」という実装 Agent の判断は妥当である。
+
+#### 9.6.2 指摘別のクローズ判定
+
+| ID | 修正 | 再確認結果 | status |
+| --- | --- | --- | --- |
+| 9.3.1 | `.markdown-body:focus { outline: none }`（`App.css:997-999`） | **クローズ**。(a) `:focus-visible` ではなく `:focus` を使っているため、UA 側が `:focus` / `:focus-visible` のどちらで既定 outline を描く engine でも抑止でき、指摘した engine 差の不確実性ごと解消している。(b) author origin の宣言は UA origin より常に優先されるため、specificity に依存せず確実に効く。(c) `.markdown-body` は `tabIndex={-1}` で Tab 順に入らず programmatic focus 専用の受け皿であるため、WCAG 2.4.7 が求める「keyboard operable な UI component の focus 可視化」には該当せず、keyboard 操作性の損失はない（skip link / route change container と同じ確立されたパターン）。(d) セレクタは article 自身のみで子孫へ継承されないため、`.markdown-body .image-viewer-trigger:focus` の pill 可視化（`App.css:1023`）や本文内 link の focus 表示には影響しない。設計 §18-6、`development_workflow.md:186`、Phase 4-a 検証記録の観察項目も pointer + Close / Escape の両手段を含む形へ更新済み |
+| 9.3.2 | `README.md:71` を「fit / zoom / pan / wheel / intrinsic size / activation policy」、`basic_design.md:14` を「…/ intrinsic size / activation 判定」へ更新 | **クローズ**。`imageViewer.ts` の pure policy export 6 種が責務記述に揃った。`basic_design.md:71` の依存図行（`transform policy / Markdown DOM source resolver`）は指摘時に「齟齬は無いが揃えるなら同時に」とした任意項目であり、未更新でも記述の正しさは保たれている |
+
+**補足（指摘ではない）**: 設計 §16「CSS 方針」は viewer 固有要素の CSS 契約を列挙する節で、今回追加した `.markdown-body:focus` は preview container 側の規則にあたる。挙動としては §3.2 / §5.3 の focus 復帰契約と §18-6 の観察項目でカバーされており、文書上の欠落はない。将来 §16 を触る機会があれば 1 行添えてもよい程度の任意事項として記録しておく。
+
+#### 9.6.3 最終判定
+
+- 初回レビュー指摘 5 件（Medium 2 / Low 3）: すべてクローズ（`80741cf`）
+- Phase 4-a 追加レビュー指摘 2 件（Low 2）: すべてクローズ（`c9e519b`）
+- follow-up 確認での新規指摘: **0 件**
+- **未解決指摘 0 件。High / Medium 0 件。Phase 3 相当の実装レビューは全ラウンド承認。**
+- **Phase 4-a ユーザー再確認へ進行可。**
+
+再確認では `development_workflow.md:183-188` の image viewer 項目と設計 §18 の 12 scenario を実施し、とくに次を判定して `verification/phase4a_user_verification.md` へ結果を追記すること。
+
+1. pointer で開き、**Close button と Escape の双方**で閉じた場合に、`Open image viewer` pill も Markdown 本文全体の outline も表示されないこと（9.3.1 の実機確認。Escape 経路が本命）。
+2. Tab で button へ移動して Enter / Space で開き、Close button と Escape の双方で閉じた場合に、いずれも同じ button へ focus が戻り pill が可視になること。
+3. 画面外の画像に対応する button へ Tab 移動した時、対象画像が表示領域へ入り pill がその右上へ出ること（8 章 1.2 の実機確認）。
+4. 横 scroll 済み Mermaid / PlantUML の button へ focus した時、container 内部の横 scroll 位置が巻き戻らないこと。
+5. screen reader で zoom した際、倍率通知が入力停止後に 1 回だけ行われること（8 章 1.1 の実機確認）。
+
+再確認が PASS した場合は `meta.md` の `verification_status` を `done`、Phase 4 行を完了状態へ更新して Phase 4-b（完了処理）へ進める。
