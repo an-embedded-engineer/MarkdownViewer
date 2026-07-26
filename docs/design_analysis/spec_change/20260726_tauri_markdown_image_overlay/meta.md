@@ -12,7 +12,7 @@ components:
   - "sample_docs"
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -37,6 +37,8 @@ related_commits:
   - "c9e519b : Phase 4-a address follow-up focus outline finding"
   - "cd50464 : Phase 4-a close follow-up review findings"
   - "64cde48 : Phase 4-a record user verification PASS"
+  - "004ba5f : Phase 4-b complete report, diff archive, TODO archive, and history"
+  - "555568d : Phase 4-c merge spec-change branch into main with --no-ff"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-022-tauri-markdown画像オーバーレイ表示"
 ---
 
@@ -71,4 +73,4 @@ source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-022-tauri-markdown�
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0, `7bcc92b`) |
 | Phase 3 Implementation and docs review | Done (Approved, unresolved findings: 0, `56f53ed`) |
-| Phase 4 Verification and completion | Phase 4-b completion artifacts done; awaiting Phase 4-c merge approval |
+| Phase 4 Verification and completion | Done (merged into `main` at `555568d`) |

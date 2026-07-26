@@ -89,3 +89,7 @@ Rust command、filesystem、asset protocol、trusted HTML iframe / bridgeには�
 
 - 今回のscopeに対する未解決事項はなく、新しいfollow-upは作成しない。
 - Avalonia版、trusted HTML iframe内画像、download、別window、transform永続化は今回のscope外として別workflowで扱う。
+
+## Phase 4-c
+
+ユーザーの最終承認後、`spec-change/tauri-markdown-image-overlay`を`main`へ`--no-ff`でマージした。merge commitは`555568d`。

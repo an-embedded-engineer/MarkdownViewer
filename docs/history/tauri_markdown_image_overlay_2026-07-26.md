@@ -32,3 +32,5 @@ Tauri版ではMarkdown画像とUMLがpreview pane幅へ縮小されるため、�
   - `27ca57c` Phase 4-a activation-specific focus fix
   - `cd50464` Phase 4-a follow-up review approval
   - `64cde48` Phase 4-a user verification
+  - `004ba5f` Phase 4-b completion artifacts
+  - `555568d` Phase 4-c merge into `main`

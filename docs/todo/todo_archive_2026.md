@@ -26,6 +26,7 @@
   - `cargo fmt -- --check`, `cargo check`, and 22 Rust tests passed.
   - Design and all implementation review rounds were approved with no unresolved findings.
   - `diff.zip` generated from `d2e9fd5..64cde48` and verified with `unzip -t`.
+  - Merged into `main` with `--no-ff` at `555568d` after Phase 4-c approval.
 - Follow-up:
   - No new follow-up item is required. Avalonia support, trusted HTML images, download, separate windows, and transform persistence remain outside this TODO.
 
