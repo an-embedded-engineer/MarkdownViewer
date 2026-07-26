@@ -16,7 +16,7 @@ status: "implemented"
 design_status: "done"
 impl_status: "done"
 completion_status: "pending"
-verification_status: "pending"
+verification_status: "in_progress"
 related_commits:
   - "d2e9fd5 : Phase 0 define TODO-2026-022 image overlay scope"
   - "e0b7fe3 : Phase 2 design Tauri Markdown image overlay"
@@ -62,4 +62,4 @@ related_commits:
 | Phase 1 Branch and meta | Done |
 | Phase 2 Design review | Done (Approved, unresolved findings: 0, `7bcc92b`) |
 | Phase 3 Implementation and docs review | Done (Approved, unresolved findings: 0, `56f53ed`) |
-| Phase 4 Verification and completion | Pending |
+| Phase 4 Verification and completion | In progress (Phase 4-a feedback fix) |

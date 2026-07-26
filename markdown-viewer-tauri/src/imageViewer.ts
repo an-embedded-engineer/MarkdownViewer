@@ -36,6 +36,11 @@ export type IntrinsicSizeCandidates = {
 };
 
 export type ImageViewerSourceKind = "image" | "mermaid" | "plantuml";
+export type ImageViewerActivation = "pointer" | "keyboard";
+
+export function getImageViewerActivation(clickDetail: number): ImageViewerActivation {
+  return clickDetail === 0 ? "keyboard" : "pointer";
+}
 
 export type ImageViewerRequest = {
   kind: ImageViewerSourceKind;
@@ -44,6 +49,7 @@ export type ImageViewerRequest = {
   intrinsicHeight: number;
   visual: HTMLImageElement | SVGSVGElement;
   focusOrigin: HTMLButtonElement;
+  activation: ImageViewerActivation;
   tabId: string;
   revision: number;
 };
@@ -493,6 +499,7 @@ export function resolveImageViewerSource(
   root: HTMLElement,
   tabId: string,
   revision: number,
+  activation: ImageViewerActivation,
 ): ImageViewerRequest | null {
   if (!(eventTarget instanceof Element) || !root.contains(eventTarget)) {
     return null;
@@ -535,6 +542,7 @@ export function resolveImageViewerSource(
     intrinsicHeight: size.height,
     visual,
     focusOrigin,
+    activation,
     tabId,
     revision,
   };

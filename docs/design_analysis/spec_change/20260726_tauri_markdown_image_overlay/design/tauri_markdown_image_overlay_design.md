@@ -35,7 +35,7 @@ Tauri版のMarkdown本文はpreview pane幅へ追従し、通常画像とPlantUM
 - visual clickまたは隣接button activate時はapp shell上へmodal overlayを表示する。
 - viewerは`Zoom out`、倍率表示、`Zoom in`、`Fit`、`100%`、`Close`を提供する。
 - viewport上のwheel / trackpad、drag、keyboardでも同じtransform policyを操作する。
-- overlayを閉じると選択visualに対応する隣接buttonへfocusを戻す。buttonが既にDOMから外れていればactive Markdown previewへ戻す。
+- overlayを閉じるとkeyboard起点では選択visualに対応する隣接button、pointer起点ではactive Markdown previewへfocusを戻す。復帰先が既にDOMから外れていればactive Markdown previewへ戻す。
 - overlayを開いていない時の縮小、要素内scroll、link、anchor挙動は維持する。
 
 ### 3.3 既存linkとの優先順位
@@ -123,7 +123,7 @@ dialogは次を持つ。
 - close button
 - keyboard focus trap
 
-初期focusはviewportへ置き、close後はrequestが保持する隣接buttonへ戻す。close handlerはrequestをnullにするだけとし、focus復帰は次のpassive effectまたは0ms deferでapp shellの`inert`解除後に行う。buttonが`isConnected`ならfocusし、unmount済みならactive previewへfallbackする。このfallbackはDOM lifecycle上必要なfocus回復だけであり、別の表示経路を残す互換fallbackではない。
+初期focusはviewportへ置く。requestはclick eventの`detail`からkeyboard activation（0）とpointer activation（正値）を区別する。close後はkeyboard起点ならrequestが保持する隣接button、pointer起点ならactive previewへ戻す。focus復帰は0ms deferでapp shellの`inert`解除後に行い、復帰先が`isConnected`でなければactive previewへfallbackする。このfallbackはDOM lifecycle上必要なfocus回復だけであり、別の表示経路を残す互換fallbackではない。
 
 背景scrollは既存の`html, body, #root { overflow: hidden }`、fixed backdrop、backdropの`overscroll-behavior: contain`により`.preview-pane`へscroll chainを渡さない。追加のbody style書換えは行わない。
 
@@ -169,6 +169,7 @@ ImageViewerRequest
   intrinsicHeight: number
   visual: HTMLImageElement | SVGSVGElement
   focusOrigin: HTMLButtonElement
+  activation: "pointer" | "keyboard"
   tabId: string
   revision: number
 ```
@@ -396,7 +397,7 @@ opaque-origin sandbox iframeへ親Reactからアクセスできず、bridge拡�
 3. toolbar、wheel / trackpad、`+` / `-`でfitから800%まで操作する。
 4. drag、Arrow、Shift+Arrowで四隅と中央へ到達し、端で空白が過剰に露出しない。
 5. `Fit`と`100%`が定義どおりcenterへ戻る。
-6. backdrop、close、Escapeで閉じ、inert解除後に選択visualの隣接buttonへfocusが戻る。pointerでvisualを開きClose buttonで閉じた場合も、復帰先pillが可視になる。
+6. backdrop、close、Escapeで閉じ、inert解除後にkeyboard起点なら選択visualの隣接buttonへfocusが戻りpillが可視になる。pointerでvisualを開いた場合はactive previewへfocusが戻り、keyboard専用pillは表示されない。
 7. Tab / Shift+Tabがdialog外へ出ず、背景Explorer / tab / previewが操作されない。overlay上のwheelで背後previewがscrollしない。
 8. overlay表示中にwindowを拡大縮小し、fit / custom modeが仕様どおり更新される。
 9. Light / Darkでtoolbar、背景、diagramが読める。

@@ -25,6 +25,7 @@ import {
   createImageViewerDomAdapter,
   createImageViewerFitTransform,
   createImageViewerResetTransform,
+  getImageViewerActivation,
   getImageViewerFitScale,
   getImageViewerWheelFactor,
   imageViewerButtonZoomInFactor,
@@ -149,7 +150,7 @@ function App() {
   const fileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const tabsRef = useRef<OpenDocumentTab[]>([]);
   const nextTabIdRef = useRef(1);
-  const imageViewerFocusOriginRef = useRef<HTMLButtonElement | null>(null);
+  const imageViewerFocusReturnRef = useRef<HTMLElement | null>(null);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const explorerWidth = clampExplorerWidth(requestedExplorerWidth, workspaceWidth);
@@ -615,7 +616,10 @@ function App() {
 
   function closeImageViewer() {
     if (imageViewerRequest) {
-      imageViewerFocusOriginRef.current = imageViewerRequest.focusOrigin;
+      imageViewerFocusReturnRef.current =
+        imageViewerRequest.activation === "keyboard"
+          ? imageViewerRequest.focusOrigin
+          : previewRef.current;
     }
     setImageViewerRequest(null);
   }
@@ -638,6 +642,7 @@ function App() {
         previewRef.current,
         activeTab.id,
         activeTab.revision,
+        getImageViewerActivation(event.detail),
       );
       if (request) {
         const selection = window.getSelection();
@@ -963,14 +968,14 @@ function App() {
   }, [activeTab?.id, activeTab?.revision, activeTab?.documentType, imageViewerRequest]);
 
   useEffect(() => {
-    if (imageViewerRequest || !imageViewerFocusOriginRef.current) {
+    if (imageViewerRequest || !imageViewerFocusReturnRef.current) {
       return;
     }
-    const focusOrigin = imageViewerFocusOriginRef.current;
-    imageViewerFocusOriginRef.current = null;
+    const focusReturn = imageViewerFocusReturnRef.current;
+    imageViewerFocusReturnRef.current = null;
     const timer = window.setTimeout(() => {
-      if (focusOrigin.isConnected) {
-        focusOrigin.focus();
+      if (focusReturn.isConnected) {
+        focusReturn.focus();
       } else {
         previewRef.current?.focus();
       }

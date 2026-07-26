@@ -71,7 +71,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - 初期表示と`Fit`はvisual全体をpadding 24px（window viewport 760px以下は12px）内へ収め、100%を超えて拡大しない。zoom範囲は現在のfit倍率から800%。`100%`はnatural size、offset 0へ戻す。
 - `Zoom out` / `Zoom in`、wheel / trackpad、`+` / `-`を提供する。wheelはpointer位置、それ以外はviewport中央をzoom中心とする。現在倍率を整数percentで表示する。
 - primary pointer drag、Arrow 48px、Shift+Arrow 160pxでpanする。visualがviewportより小さい軸は中央へ固定し、大きい軸は各端へ到達可能な範囲へclampする。
-- `Escape`、Close、backdrop clickで閉じ、起点buttonへfocusを戻す。Tab / Shift+Tabはdialog内でloopし、表示中の背景UIは`inert`となる。
+- `Escape`、Close、backdrop clickで閉じる。keyboard起点では起点buttonへfocusを戻し、pointer起点ではactive previewへfocusを戻してkeyboard専用pillを表示しない。Tab / Shift+Tabはdialog内でloopし、表示中の背景UIは`inert`となる。
 - 通常時の画像縮小、diagram containerのborder / padding / horizontal scroll、Markdown title、本文の行組みを変更しない。transform stateはclose / tab / Reloadを跨いで保持しない。
 
 ## Error Strip 表示

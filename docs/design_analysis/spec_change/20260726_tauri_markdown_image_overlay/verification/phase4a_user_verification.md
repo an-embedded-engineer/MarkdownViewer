@@ -1,0 +1,23 @@
+# Phase 4-a ユーザー動作確認
+
+## 確認日
+
+2026-07-26
+
+## 初回確認結果
+
+ユーザーがTauri版アプリを起動し、次を実機で確認した。
+
+| 観点 | 結果 |
+| --- | --- |
+| 通常画像、Mermaid、PlantUMLでcursorが拡大表示へ変わる | PASS |
+| visual clickでImage Viewerがoverlay表示される | PASS |
+| button、mouse、keyboardでzoom / panできる | PASS |
+| Close buttonまたはEscapeでviewerを閉じられる | PASS |
+| viewer close後のfocus復帰表示 | NG。pointer起点でも右上へ`Open image viewer` pillが表示され、用途が分かりにくい |
+
+## 判断と対応
+
+`Open image viewer`はTab移動で利用するkeyboard用native buttonであり、keyboard起点のclose後にfocusを戻して表示すること自体は必要である。一方、pointer起点でも同buttonへfocusを戻す必要はなく、通常のマウス操作へkeyboard専用UIが突然現れる原因になっていた。
+
+Phase 4-aを一度NGとしてPhase 3相当へ戻し、activationをpointer / keyboardに分ける。close後はkeyboard起点だけ隣接buttonへ戻し、pointer起点はactive previewへ戻す。修正・自動検証・追加レビュー後に、該当2経路のユーザー再確認を依頼する。

@@ -3,6 +3,7 @@ import {
   clampImageViewerTransform,
   createImageViewerFitTransform,
   createImageViewerResetTransform,
+  getImageViewerActivation,
   getImageViewerFitScale,
   getImageViewerPanBounds,
   getImageViewerWheelFactor,
@@ -158,5 +159,13 @@ describe("image viewer intrinsic size policy", () => {
       }),
     ).toEqual({ width: 200, height: 100 });
     expect(resolveIntrinsicSize({ bounds: { width: 0, height: 0 } })).toBeNull();
+  });
+});
+
+describe("image viewer activation policy", () => {
+  it("distinguishes keyboard-generated clicks from pointer clicks", () => {
+    expect(getImageViewerActivation(0)).toBe("keyboard");
+    expect(getImageViewerActivation(1)).toBe("pointer");
+    expect(getImageViewerActivation(2)).toBe("pointer");
   });
 });

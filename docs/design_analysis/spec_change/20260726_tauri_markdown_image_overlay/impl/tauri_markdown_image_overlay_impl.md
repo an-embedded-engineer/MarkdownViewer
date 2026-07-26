@@ -75,3 +75,9 @@ Tauri版Markdown preview内の通常画像、描画済みMermaid SVG、描画済
 
 - 実装上の未解決事項はない。
 - GUIのLight / Dark、trackpad、window resize、focus復帰、layout非退行はPhase 4-aで手動確認する。
+
+## 8. Phase 4-a フィードバック対応
+
+ユーザー実機確認で、pointerからviewerを開いて閉じた後にもkeyboard用`Open image viewer` pillがfocus復帰によって表示され、用途が分かりにくいことを確認した。pure policy `getImageViewerActivation`がclick eventの`detail`からactivationを区別し、keyboard起点だけ隣接buttonへ、pointer起点ではactive previewへfocusを戻すよう修正した。これによりTab / Enter / Space経路の復帰focusを維持しつつ、通常のマウス操作後にはpillを表示しない。
+
+修正後は`npm test -- --run`が3 files / 42 tests Pass、`npm run build`がPass（既存chunk size warningのみ）、`cargo check`がPass。
