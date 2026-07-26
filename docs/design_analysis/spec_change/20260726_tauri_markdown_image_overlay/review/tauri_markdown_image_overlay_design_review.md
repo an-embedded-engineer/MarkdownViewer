@@ -5,8 +5,10 @@
 **対象 meta**: `docs/design_analysis/spec_change/20260726_tauri_markdown_image_overlay/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-022
 **初回レビュー対象コミット**: `e0b7fe3` (docs: design Tauri Markdown image overlay)
-**判定**: **条件付き差し戻し (Changes Requested)**。設計の骨格（clone 方式、中央基準 transform model、modal 契約、非対象境界）は妥当で方針転換は不要だが、Phase 3 で実装不能または既存挙動を退行させる **Medium 7 件**を設計へ反映してから実装へ進むこと。High 0 件。**未解決指摘 14 件（Medium 7 / Low 7）**。
-**Round 1対応**: 14件を設計・TODO・metaへ反映済み。Claude再確認待ち。
+**Round 1 fix コミット**: `19bf862` (docs: address Tauri image overlay design review)
+**再確認日**: 2026-07-26
+**初回判定**: 条件付き差し戻し (Changes Requested)。Medium 7 件 / Low 7 件、High 0 件。
+**Round 2 判定**: **条件付き差し戻し (Changes Requested)**。Round 1 指摘 **14 件はすべてクローズ**（下記 7 章で再確認）。ただし Round 1 で trigger 方式を「visual への `role="button"` 付与」から「DOM adapter による隣接 native button 追加」へ変更した結果、**Markdown 本文へ新規描画される button の表示契約と挿入位置が未定義**という新規 Medium 1 件が生じた。**未解決指摘 1 件（Medium 1 / Low 0）**。これを設計へ反映すれば Phase 3 進行可。
 
 ---
 
@@ -35,6 +37,8 @@ TODO-2026-022 (Tauri Markdown 画像オーバーレイ表示) の Phase 2 設計
 ### 総評
 
 矛盾のある数式や到達不能な状態遷移は検出しなかった。検出した Medium 7 件は、いずれも「設計文の抽象度では正しいが、この codebase / 依存 library の具体制約に当てると Phase 3 でそのまま実装できない、または既存挙動を静かに変える」種類の欠落である。
+
+> **本文書の読み方**: 以下 1〜6 章は初回レビュー（対象 `e0b7fe3`）の記録であり、当時の指摘内容と根拠を保存する目的でそのまま残す。各指摘の現時点の状態と受け入れ条件・checkpoint の最新判定は **7 章（Round 2 再確認、対象 `19bf862`）** を正とする。
 
 ---
 
@@ -291,3 +295,85 @@ Mermaid の生成 SVG は `id` 付き root、`<defs>` 内の marker、`#<svgId>`
 | 3.5 | Low | テスト項目・UI 細部の補足（7 項目） | 対応済み・再確認待ち |
 
 Medium 7件とLow 7件をRound 1で反映した。Claude再確認で未解決0件または追加指摘を確定する。
+
+---
+
+## 7. Round 2 再確認（`19bf862`）
+
+`19bf862` の差分（design 118 行、`meta.md`、`docs/todo/todo.md`、review 文書）を取得し、Round 1 の 14 件それぞれについて「設計文へ反映されたか」「反映内容が実ソース・依存 library の制約と整合するか」「AC / 完了条件・恒久 docs 更新対象と矛盾しないか」を再検証した。
+
+### 7.1 Round 1 指摘のクローズ判定
+
+| ID | 反映箇所 | 再確認結果 | status |
+| --- | --- | --- | --- |
+| 1.1 | design §5.1 / §16 | 「clone 直後に generator 由来の `width` / `height` 属性と inline `max-width` / `width` / `height` を除去し、intrinsic pixel size を style へ明示。CSS specificity で対抗せず `ImageViewerDialog` の clone 前処理として行う」と明記。指摘した実体（mermaid `calculateSvgSizeAttrs` の inline style、PlantUML の inline `style`）へ正しく対処している。PlantUML の inline `background` を生成結果として保持し Dark theme でも白い diagram canvas を許容する判断も、手動 scenario 9 の判定基準として成立する。 | クローズ |
+| 1.2 | design §7.3 / §17-10 | 「React の passive 合成 event を使わず viewport ref へ `addEventListener("wheel", handler, { passive: false })` を effect 登録」「全 wheel を `preventDefault`」「`ctrlKey \|\| metaKey` の pinch も image zoom として処理」「`deltaMode` を pixel=1 / line=16px / page=viewport height へ換算」「normalized delta を `[-100, 100]` へ clamp し `factor = exp(-normalizedDelta * 0.002)`」「cleanup で解除」を定義。factor 範囲は `exp(±0.2)` = 0.8187〜1.2214 で本文の「約 0.82〜1.22 倍」と一致し、符号も scroll down = zoom out で正しい。pure test も追加済み。 | クローズ |
+| 1.3 | design §5.3 | 「close handler は request を null にするだけ、focus 復帰は次の passive effect または 0ms defer で `inert` 解除後」「`isConnected` 確認後に focus、unmount 済みなら preview へ fallback」と明記。既存 `closeSettings`（`App.tsx:372-376`）と同じ回避策に揃っている。手動 scenario 6 も「inert 解除後に focus が戻る」へ更新済み。 | クローズ |
+| 1.4 | design §6.1 / §13 / §18-11 | image rule は relative resource 解決・`loading="lazy"`・alt・著者指定 title を一切変更しない方針へ変更。「title 未指定時も新しい tooltip を付けない」まで明示され、viewer 操作説明は隣接 button の accessible label へ分離された。`sample_docs/image_link.md` の tooltip 非退行が手動 scenario へ入っている。 | クローズ |
+| 1.5 | design §6.1-6.3 / §18-1 | 描画前 visual へ interactive 属性を付けない方針へ変更。Mermaid は `data-processed="true"` と inner SVG を確認後、PlantUML は `.plantuml-diagram > svg` と valid size を確認後にのみ decorate する。accessible label は内容非依存の固定文言（`Open Mermaid diagram in image viewer` 等）で定義され、SVG 内 `a` は link 処理を優先して nested interactive を作らない。手動 scenario 1 に「描画前 Mermaid / pending PlantUML が Tab 順へ入らない」確認が入っている。指摘の 3 論点すべてに対処済み。 | クローズ |
+| 1.6 | design §6.4 / §11 / §17-11 | 「DOM adapter は候補値を読む薄い層、優先順位・正値検証は `resolveIntrinsicSize` pure policy」へ分離。test 11 が viewBox 優先 / invalid viewBox 時の explicit size / bounding box / 全候補不正で null の 4 分岐を網羅する。 | クローズ |
+| 1.7 | `docs/todo/todo.md` / `meta.md` / design §3.3 / §13 | 両文書の compatibility が「維持する。ただし linked image の画像領域 click は viewer open を優先し、link 自身または隣接 viewer button の keyboard 操作で navigation / viewer open を選択できる契約へ変更する」へ同期済み。設計 §3.3 も同内容で、隣接 button を `a` の外側へ置くことで keyboard からは両操作が選べる形になっており、初回指摘時より退行幅が小さい。手動 scenario 11 で回帰確認対象。 | クローズ |
+| 2.1 | design §20 末尾 | ADR 非起票の判断と根拠（Tauri Viewer 局所の frontend interaction 契約であり既存 security 判断を変えない）を明記。 | クローズ |
+| 2.2 | design §5.3 / §16 / §18-7 | 既存 `html, body, #root { overflow: hidden }` + fixed backdrop + `overscroll-behavior: contain` を根拠として明記し、「追加の body style 書換えは行わない」と過剰実装も抑止。手動 scenario 7 へ wheel 確認を追加。 | クローズ |
+| 3.1 | design §5.2 / §11 | `imageViewer.ts` を既存 `documentPolicy.ts` / `explorerPane.ts` と同じ「専用 module + 型付き export 関数 + 専用 Vitest」に統一し、static-only class を採らない理由を記録。§5.2 の記述も `ImageViewerTransformPolicy` から差し替え済みで、旧 class 名は設計文に残っていない。 | クローズ |
+| 3.2 | design §9 / §10.1 | keyboard 経路を native `button` へ移したことで Space / Enter の既定 activation と scroll 抑止が browser 側の責務になり、custom `onKeyDown` と synthetic click の重複実装が不要になった。指摘より筋の良い解法。 | クローズ |
+| 3.3 | design §5.1 | 「Mermaid clone 内の root / marker / style ID は書き換えない。viewer open 中の一時的な重複を許容する」と明記。ID rewrite で scoped style を壊す事故を先に打ち消せている。 | クローズ |
+| 3.4 | design §6.4 / §14 | invalid visual は decoration 自体を付けず、lazy image は `load` / `error` を一度監視して成功時のみ decorate、失敗は document path / kind 付き `console.warn` を 1 回記録。dead control を提示しない方針と原因追跡性が両立している。 | クローズ |
+| 3.5 | design §7.3 / §8 / §9 / §10.1 / §10.3 / §17 / §18 | padding 24px（760px 以下 12px）、test 5 の非 clamp 前提、境界での Zoom in / out disabled、`aria-live` の 250ms debounce、selection 非 collapsed 時の open 抑止、既存 PNG 再利用と新規 binary 非追加、Theme 到達不能の根拠、revision 不変の PlantUML 非同期 DOM 差替えを viewer 継続として扱う旨、いずれも反映済み。7 項目すべて対処。 | クローズ |
+
+Round 1 の 14 件はすべてクローズと判定する。
+
+### 7.2 [Medium] 隣接 viewer button の表示契約と挿入位置が未定義（新規）
+
+**ドキュメント記載**: 「内容非依存のaccessible labelを持つ隣接buttonを追加する」(design §6.1)、「buttonをSVGの外側へ追加する」(§6.2 / §6.3)、「linked imageではbuttonを最も近い`a`の外側へ置き」(§6.1)、「decorated visual: `cursor: zoom-in`。隣接viewer button: native focusとfocus-visible outline」(§16)。
+
+**差異**: Round 1 の方式変更により、**Markdown 本文 DOM へ新しい可視要素になり得る `<button>` が挿入される**ようになった。にもかかわらず、設計はその button の *label 文言と挿入対象の親* しか定めておらず、**既定の描画状態（常時可視か、focus されるまで視覚的に隠すか）、寸法、配置方式、本文 layout への影響**が §6 にも §16 にも書かれていない。ここが未定のまま Phase 3 に入ると、次のいずれに転んでも設計と実装が食い違う。
+
+- **常時可視にした場合**: すべての画像・Mermaid・PlantUML の隣に操作 button が並ぶ。design §13 の「通常時の preview layout を維持する」と AC-6 に真正面から抵触する。とくに文中 inline 画像（`![x](y)` を文章の途中に置いた場合）では inline button が text flow へ割り込み、本文の行組みが変わる。
+- **視覚的に隠す場合**: `.markdown-body` 配下の sr-only 相当 CSS と `:focus-visible` での可視化を設計で決めておく必要がある。隠したまま focus 可能にすると、Tab で focus は当たるのに視覚的な focus 表示が出ない状態になり得る（§16 が謳う focus-visible outline が clip された領域に描かれる）。復帰 focus（§5.3）も見えない要素へ戻ることになり、手動 scenario 6 の判定ができない。
+
+副次的に、次の 3 点も同じ箇所で確定させないと実装がぶれる。
+
+1. **kind ごとの挿入位置**: §6.1 は「linked image では `a` の外側」とだけ定め、通常画像・Mermaid・PlantUML については「SVG の外側」としか書かれていない。`.mermaid` container の内側か直後か、PlantUML は §6.3 の「viewer 候補 wrapper」の内側か直後かで、`.markdown-body .mermaid` / `.plantuml-diagram`（`App.css:840-861`）の border / padding 内に button が入るか外に出るかが変わる。あわせて、その候補 wrapper が button の host として必要なのか（adapter の selector は `.plantuml-diagram > svg` であり wrapper なしでも成功 HTML だけを識別できる）も明記したい。
+2. **visual ↔ button の対応付け**: §6.4 の `ImageViewerRequest.focusOrigin` は非 null の `HTMLButtonElement` である。pointer click は visual から解決されるため、adapter が両者を結ぶ data marker（`data-image-viewer-id` 等）を定義しないと resolver が `focusOrigin` を埋められない。
+3. **`.markdown-body` typography の継承**: 挿入 button は本文 article の子になるため、本文 font / line-height / margin を継承する。viewer 用 button の独立した CSS reset が要る。
+
+**推奨対応**: §6.1 と §16 へ、(a) 既定の描画状態（推奨は「視覚的に隠し、focus 時のみ visual に重ねる形で可視化して本文 reflow を起こさない」）、(b) 3 kind それぞれの挿入位置と PlantUML 候補 wrapper の要否、(c) visual ↔ button を結ぶ data marker、(d) `.markdown-body` 継承を打ち消す CSS を追記する。手動 scenario へ「隣接 button へ Tab した時に可視な focus 表示が出る」「inline 画像を含む段落の行組みが decoration 前後で変わらない」を追加する。
+
+**severity**: Medium
+**対象工程**: Phase 2 設計修正 → Phase 3 実装
+**status**: 未対応
+
+### 7.3 受け入れ条件の追跡性（Round 2 時点）
+
+| TODO-2026-022 completion | 設計対応 | 判定 |
+| --- | --- | --- |
+| 3 種を pointer click / keyboard から overlay で開ける | §6.1-6.4、§9、§10.1 | 追跡可。描画完了 visual の pointer click と native button の keyboard activation で両経路が定義された。button の描画契約のみ 7.2 |
+| 初期 fit から拡大縮小 pan fit/reset、四隅と中央へ到達 | §7.1-7.4、§8 | 追跡可。数式検証済み、padding 値も確定 |
+| 安全な下限上限、button / wheel / keyboard の一貫性、倍率表示 | §7.3、§9 | 追跡可。wheel が実装可能な形（非 passive listener + deltaMode 換算 + 指数 factor）で定義され、境界 disabled と `aria-live` debounce も確定 |
+| Escape / close / backdrop で閉じ、背景 scroll・操作抑止、起点へ focus 復帰 | §5.3、§10.3、§16 | 追跡可。inert 解除後の deferred focus と背景 scroll 抑止根拠が明記された。focus 復帰先 button の可視性のみ 7.2 |
+| Light/Dark・resize・tab 切替・Reload で state 混線せず、通常表示と link が非退行 | §10.3、§10.4、§13、§18 | 追跡可。Theme 到達不能の根拠、revision 不変 DOM 差替え、著者指定 title 維持、linked image 仕様差分の todo / meta 同期まで揃った。本文 layout 非退行のみ 7.2 |
+| trusted HTML iframe / Rust backend に変更がない | §4.2、§12.6、§13、§18-12 | 追跡可 |
+| `npm test -- --run` / `npm run build` / `cargo check` と手動確認記録 | §17（11 項目）、§18（12 項目）、§19 | 追跡可。wheel 正規化と intrinsic candidate が自動テストへ入り、pure policy の網羅性が確保された |
+
+### 7.4 レビュー checkpoint 対応（Round 2 時点）
+
+| checkpoint | 結果 |
+| --- | --- |
+| 1. 仕様整合 | 解消。linked image の仕様差分が todo / meta / design で一致し、著者指定 title も維持契約になった |
+| 2. 設計品質 | 解消。`imageViewer.ts` が既存 frontend policy module 慣行へ揃い、pure policy / DOM adapter / dialog / App の責務境界が明示された |
+| 3. 安全性・保守性 | 解消。invalid visual を decorate しない方針、`console.warn` による追跡性、clone ID 非 rewrite、silent fallback 排除が揃った |
+| 4. パフォーマンス | 問題なし。wheel の指数 factor と delta clamp が加わり、入力量に対する挙動が有界になった |
+| 5. 互換性・回帰 | 7.2 のみ。本文へ挿入する button の描画契約が未定のため「通常時 layout 維持」の検証条件が確定しない |
+| 6. テスト | 解消。pure policy テストが 9 → 11 項目となり、wheel 正規化と intrinsic candidate の分岐を網羅する |
+| 7. ドキュメント | 解消。ADR 非起票の判断、恒久 docs 更新対象、todo / meta 同期が揃った。承認時に `meta.md` の Phase 2 行更新が残る |
+
+---
+
+## 8. Round 2 未解決指摘一覧
+
+| ID | severity | 概要 | status |
+| --- | --- | --- | --- |
+| 7.2 | Medium | 隣接 viewer button の表示契約・挿入位置・visual との対応付けが未定義 | 未対応 |
+
+Round 1 指摘 14 件はクローズ。7.2 を設計へ反映すれば未解決 0 件となり Phase 2 承認・Phase 3 進行可とする。承認時は `meta.md` の `design_status` を `reviewed`、Phase 2 行を Done へ更新すること。
