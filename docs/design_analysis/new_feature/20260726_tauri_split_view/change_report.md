@@ -88,4 +88,4 @@ Rust command、custom protocol、Tauri capability、CSP、settings schemaは変�
 
 ## Phase 4-c
 
-`new-feature/tauri-split-view`から`main`へのmergeは、ユーザーの最終承認待ちである。
+ユーザーの最終承認後、`new-feature/tauri-split-view`を`main`へ`--no-ff`でマージした。merge commitは`834cc75`。

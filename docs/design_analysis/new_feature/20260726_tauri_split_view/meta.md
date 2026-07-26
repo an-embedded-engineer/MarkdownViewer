@@ -12,7 +12,7 @@ components:
   - "markdown-viewer-tauri/src/paneRuntime.ts"
   - "markdown-viewer-tauri/src/documentPolicy.ts"
   - "docs/components/tauri_viewer"
-status: "done"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -27,6 +27,7 @@ related_commits:
   - "0dfc91b : Phase 3 complete Tauri split view implementation review"
   - "f8f6136 : Phase 4-a verify Tauri split view and record follow-ups"
   - "a3acab4 : Phase 4-b complete report, diff archive, TODO archive, and history"
+  - "834cc75 : Phase 4-c merge Tauri split view into main with --no-ff"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-006-tauri-split-view-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
@@ -68,4 +69,4 @@ follow_up:
 | Phase 3 Implementation and docs review | Done (approved by re-review, 4 findings resolved, 0 unresolved; `7eb32ea`) |
 | Phase 4-a User verification | Done (user accepted split toggle and independent file preview in both panes; automated verification passed) |
 | Phase 4-b Completion | Done (change report, diff archive, TODO archive, history, and follow-ups prepared) |
-| Phase 4-c Merge | Awaiting user approval |
+| Phase 4-c Merge | Done (merged into `main` at `834cc75`) |
