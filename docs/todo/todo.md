@@ -42,23 +42,6 @@
   - Markdown / HTML / Mermaid / PlantUMLが上下・左右の利用可能領域へ追従し、不必要に再読み込みされない。
   - `npm test`、`npm run build`、`cargo check`が成功する。
 
-## TODO-2026-007 Tauri 先行 UX 評価と Avalonia 反映仕様化
-
-- status: in_progress
-- workflow: documentation
-- wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
-- work_package_id: WP-005
-- depends_on: TODO-2026-003, TODO-2026-004, TODO-2026-005, TODO-2026-006, TODO-2026-014, TODO-2026-017
-- source_todos: TODO-2026-019, TODO-2026-021, TODO-2026-022
-- summary: Tauri 先行実装の UX 評価を行い、Avalonia へ適用する確定仕様を文書化する。
-- completion:
-  - MenuBar、StatusBar、Recent Folders、TabStrip、split view、設定確認・変更 UI と設定永続化の評価結果が文書化される。
-  - Tauri版HTML形式仕様書表示の操作性、resource表示、外部link、安全性を評価し、Avaloniaへ反映する共通仕様とstack差分を確定する。
-  - Explorer UX、responsive preview、image viewerを追加評価資料として整理し、Avalonia baselineへの採否を明記する。
-  - Avalonia 反映時の共通仕様と stack 差分方針が明確になる。
-  - Tauri Split View follow-upとAvalonia追随todoの統合・分割・直接依存がtodo / WBS / archiveで整合する。
-  - 未解決 UI 調整が必要な場合は todo 化される。
-
 ## TODO-2026-018 Avalonia HTML形式仕様書表示対応
 
 - status: open

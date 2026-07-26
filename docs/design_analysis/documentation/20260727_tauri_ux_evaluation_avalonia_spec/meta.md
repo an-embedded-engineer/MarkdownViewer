@@ -7,11 +7,15 @@ components:
   - docs/components/tauri_viewer
   - docs/components/avalonia_viewer
   - docs/design_analysis/wbs
-status: draft
+status: implemented
 design_status: done
 impl_status: done
-completion_status: in_progress
-related_commits: []
+completion_status: done
+related_commits:
+  - 7677f7a
+  - 675c0e5
+  - 572771b
+  - ad49e0c
 ---
 
 # 対象整理
