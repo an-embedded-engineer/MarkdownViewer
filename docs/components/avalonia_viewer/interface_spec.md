@@ -1,5 +1,7 @@
 # Avalonia Viewer インターフェース仕様
 
+> 現在実装済みのinterfaceを記述する。Menu / Status、Explorer resize、Settings / Recent Folders、trusted HTML、Multi-tab、Split Viewのtarget contractは[tauri_ux_rollout_spec.md](tauri_ux_rollout_spec.md)にplanned仕様として分離する。
+
 ## ユーザー操作
 
 - Open Folder: Markdownルートを選択する。

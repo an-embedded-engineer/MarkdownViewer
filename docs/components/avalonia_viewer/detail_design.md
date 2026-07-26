@@ -1,5 +1,7 @@
 # Avalonia Viewer 詳細設計
 
+> 現在の実装を記述する。Tauri先行UXから導出したplanned state / service / NativeWebView境界とwork item所有範囲は[tauri_ux_rollout_spec.md](tauri_ux_rollout_spec.md)を参照する。
+
 ## 状態管理
 
 `MainWindowViewModel` が以下を保持する。
