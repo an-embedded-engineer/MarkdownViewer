@@ -183,7 +183,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - `sample_docs/image_viewer.md`で通常画像、描画済みMermaid、描画済みPlantUMLをclick / keyboardからviewerへ開けること
 - 画面外の画像に対応するviewer buttonへTab移動した時、対象画像が表示領域へ入り、pillがその右上へずれずに表示されること
 - image viewerの初期fit、最大800% zoom、wheel / trackpad、drag / Arrow pan、Fit / 100%、Escape / Close / backdrop、focus trapと復帰focusを確認すること
-- pointerでimage viewerを開いて閉じた場合はkeyboard用`Open image viewer` pillが表示されず、Tab移動したbuttonから開いて閉じた場合だけ同buttonへfocusが戻ること
+- pointerでimage viewerを開いてClose / Escapeで閉じた場合はkeyboard用`Open image viewer` pillやMarkdown本文全体のoutlineが表示されず、Tab移動したbuttonから開いてClose / Escapeで閉じた場合だけ同buttonへfocusが戻ること
 - image viewerを閉じた通常表示でinline画像段落の行組み、diagramのborder / padding / horizontal scroll、linked image / SVG anchor操作が退行しないこと
 - Mermaid 描画
 - Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること

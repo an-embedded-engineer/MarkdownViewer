@@ -994,6 +994,10 @@ button {
   height: auto;
 }
 
+.markdown-body:focus {
+  outline: none;
+}
+
 .markdown-body [data-image-viewer-target] {
   cursor: zoom-in;
 }

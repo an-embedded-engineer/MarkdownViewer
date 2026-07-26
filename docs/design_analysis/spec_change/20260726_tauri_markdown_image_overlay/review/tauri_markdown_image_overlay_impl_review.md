@@ -306,3 +306,10 @@ Close button の click や backdrop click で閉じた場合は直前操作が p
 
 1. pointer で開き **Escape** で閉じた場合に、本文全体へ outline が出ないこと（9.3.1）。
 2. Tab で button へ移動して Enter / Space で開き、Escape と Close button の双方で閉じた場合に、いずれも同じ button へ focus が戻り pill が可視になること（keyboard 経路の close 手段差の確認）。
+
+### 9.5 実装Agent対応（追加レビューfollow-up）
+
+| ID | 対応 | status |
+| --- | --- | --- |
+| 9.3.1 | programmatic focus専用の`.markdown-body`へ`:focus { outline: none }`を追加した。設計§18、development workflow、Phase 4-a検証記録へpointer + Escapeの観察項目を反映した | 対応済み・再レビュー待ち |
+| 9.3.2 | `docs/components/tauri_viewer/README.md`と`basic_design.md`の`imageViewer.ts`責務へactivation policyを追記した | 対応済み・再レビュー待ち |

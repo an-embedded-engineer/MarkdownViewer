@@ -11,7 +11,7 @@ OS 連携とファイルシステム境界は Rust command / `DocumentStore` へ
 - TypeScript renderer (`renderMarkdown` / `MarkdownPreview`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。MermaidがReact外で置換したSVGを保持するため、生成HTMLと`dangerouslySetInnerHTML`値はMarkdown内容が変わるまで安定化する。
 - TypeScript policy (`documentPolicy.ts`): command responseの排他shape、HTML preview URL、opaque-origin messageをpure functionで検証する。
 - TypeScript policy (`explorerPane.ts`): Explorer幅の最小値、workspace実寸に応じたdynamic最大値、clamp、keyboard操作をpure functionで管理する。幅はsession-onlyで永続化しない。
-- TypeScript policy / DOM adapter (`imageViewer.ts`): image viewerのfit / zoom / pan / wheel / intrinsic size計算をpure functionへ集約し、Markdown preview内で描画が完了した通常画像、Mermaid SVG、PlantUML SVGだけをtyped requestへ解決する。
+- TypeScript policy / DOM adapter (`imageViewer.ts`): image viewerのfit / zoom / pan / wheel / intrinsic size / activation判定をpure functionへ集約し、Markdown preview内で描画が完了した通常画像、Mermaid SVG、PlantUML SVGだけをtyped requestへ解決する。
 - Rust: canonical current root、Markdown / HTML open、`mvhtml` resource配信、PlantUML レンダリング、Recent Folders / Viewer settings の app config JSON 永続化。
 - Tauri config: dialog / opener / asset protocol の権限管理とshell CSP。HTML protocol originをcapability remote URLへ追加しない。
 

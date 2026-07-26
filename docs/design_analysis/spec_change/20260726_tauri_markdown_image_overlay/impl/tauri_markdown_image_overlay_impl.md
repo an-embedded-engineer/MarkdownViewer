@@ -81,3 +81,5 @@ Tauri版Markdown preview内の通常画像、描画済みMermaid SVG、描画済
 ユーザー実機確認で、pointerからviewerを開いて閉じた後にもkeyboard用`Open image viewer` pillがfocus復帰によって表示され、用途が分かりにくいことを確認した。pure policy `getImageViewerActivation`がclick eventの`detail`からactivationを区別し、keyboard起点だけ隣接buttonへ、pointer起点ではactive previewへfocusを戻すよう修正した。これによりTab / Enter / Space経路の復帰focusを維持しつつ、通常のマウス操作後にはpillを表示しない。
 
 修正後は`npm test -- --run`が3 files / 42 tests Pass、`npm run build`がPass（既存chunk size warningのみ）、`cargo check`がPass。
+
+追加レビューのLow 2件も採用し、programmatic focus専用の`.markdown-body`へ`outline: none`を指定してpointer起点をEscapeで閉じた場合の本文全体outlineを防止した。また、`README.md`と`basic_design.md`の`imageViewer.ts`責務へactivation policyを追記した。

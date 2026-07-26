@@ -21,3 +21,8 @@
 `Open image viewer`はTab移動で利用するkeyboard用native buttonであり、keyboard起点のclose後にfocusを戻して表示すること自体は必要である。一方、pointer起点でも同buttonへfocusを戻す必要はなく、通常のマウス操作へkeyboard専用UIが突然現れる原因になっていた。
 
 Phase 4-aを一度NGとしてPhase 3相当へ戻し、activationをpointer / keyboardに分ける。close後はkeyboard起点だけ隣接buttonへ戻し、pointer起点はactive previewへ戻す。修正・自動検証・追加レビュー後に、該当2経路のユーザー再確認を依頼する。
+
+追加レビューで、pointer起点をEscapeで閉じるとengineによってprogrammatic focus先のMarkdown本文全体へoutlineが出る可能性が指摘された。再確認前に`.markdown-body:focus { outline: none }`を追加し、次の再確認対象へ含める。
+
+- pointerで開き、Close / Escapeで閉じてもpillと本文全体outlineが表示されない。
+- Tabで`Open image viewer` buttonへ移動し、Enter / Spaceで開いてClose / Escapeで閉じると同buttonへfocusが戻る。

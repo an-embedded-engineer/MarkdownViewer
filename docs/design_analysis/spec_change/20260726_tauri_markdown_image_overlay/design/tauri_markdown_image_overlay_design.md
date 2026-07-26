@@ -397,7 +397,7 @@ opaque-origin sandbox iframeへ親Reactからアクセスできず、bridge拡�
 3. toolbar、wheel / trackpad、`+` / `-`でfitから800%まで操作する。
 4. drag、Arrow、Shift+Arrowで四隅と中央へ到達し、端で空白が過剰に露出しない。
 5. `Fit`と`100%`が定義どおりcenterへ戻る。
-6. backdrop、close、Escapeで閉じ、inert解除後にkeyboard起点なら選択visualの隣接buttonへfocusが戻りpillが可視になる。pointerでvisualを開いた場合はactive previewへfocusが戻り、keyboard専用pillは表示されない。
+6. backdrop、close、Escapeで閉じ、inert解除後にkeyboard起点なら選択visualの隣接buttonへfocusが戻りpillが可視になる。pointerでvisualを開いた場合はactive previewへfocusが戻り、keyboard専用pillとprogrammatic focus受け皿の本文outlineは表示されない。
 7. Tab / Shift+Tabがdialog外へ出ず、背景Explorer / tab / previewが操作されない。overlay上のwheelで背後previewがscrollしない。
 8. overlay表示中にwindowを拡大縮小し、fit / custom modeが仕様どおり更新される。
 9. Light / Darkでtoolbar、背景、diagramが読める。
