@@ -83,4 +83,9 @@ Avalonia/
 - 基本設計: [basic_design.md](basic_design.md)
 - 詳細設計: [detail_design.md](detail_design.md)
 - インターフェース仕様: [interface_spec.md](interface_spec.md)
+- Tauri先行UXのAvalonia反映仕様（planned）: [tauri_ux_rollout_spec.md](tauri_ux_rollout_spec.md)
 - 既知課題: [issues.md](issues.md)
+
+## Planned rollout
+
+Tauri先行UXは`TODO-2026-008`から`TODO-2026-012`で段階反映する。現在実装とtarget contractを混同しないため、共通仕様、Avalonia固有の適応、未検証事項、直接依存は[反映仕様](tauri_ux_rollout_spec.md)を正とする。

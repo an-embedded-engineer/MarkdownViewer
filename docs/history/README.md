@@ -24,4 +24,5 @@
 - Tauri document preview 横幅の可変化: `docs/history/tauri_document_preview_responsive_width_2026-07-25.md`
 - Tauri Markdown画像オーバーレイ表示: `docs/history/tauri_markdown_image_overlay_2026-07-26.md`
 - Tauri Split view 導入: `docs/history/tauri_split_view_2026-07-26.md`
+- Tauri先行UX評価・Avalonia反映仕様化: `docs/history/tauri_ux_evaluation_avalonia_spec_2026-07-27.md`
 - 大きな仕様変更、採用判断、publish方式の変更が発生した場合に履歴文書を追加する。

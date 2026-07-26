@@ -4,6 +4,10 @@
 
 MVVM 構成で UI 状態と処理を分離する。Markdown 変換やファイル走査は Service へ寄せ、ViewModel は操作の調停と表示状態の管理に集中する。Markdown プレビューは `NativeWebView` 上で HTML を表示し、Mermaid と PlantUML はそれぞれクライアント JS と外部 Java プロセスへ委譲する。
 
+## Planned UX rollout
+
+Tauri先行評価を受けたMenu / Status、Explorer、typed settings、trusted HTML、Multi-tab、左右2pane Split Viewは段階導入する。共通UX outcome、Avaloniaの責務境界、導入順序は[tauri_ux_rollout_spec.md](tauri_ux_rollout_spec.md)を正とする。現在の単一Markdown実装を説明する以下の設計と、未実装のtarget contractを混在させない。
+
 ## 責務
 
 - View: レイアウト、バインディング、WebView ホスト、StorageProvider 経由のフォルダ選択。

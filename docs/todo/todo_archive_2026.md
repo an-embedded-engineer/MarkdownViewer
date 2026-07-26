@@ -1,5 +1,73 @@
 # TODO Archive 2026
 
+## TODO-2026-007 Tauri 先行 UX 評価と Avalonia 反映仕様化
+
+- Status: `done`
+- Category: `documentation`
+- Created: `2026-07-05`
+- Completed: `2026-07-27`
+- Branch: `documentation/tauri-ux-evaluation-avalonia-spec`
+- WBS:
+  - `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
+- Work package: `WP-005`
+- Depends on: `TODO-2026-003`, `TODO-2026-004`, `TODO-2026-005`, `TODO-2026-006`, `TODO-2026-014`, `TODO-2026-017`
+- Additional evaluation sources: `TODO-2026-019`, `TODO-2026-021`, `TODO-2026-022`
+- Design analysis:
+  - `docs/design_analysis/documentation/20260727_tauri_ux_evaluation_avalonia_spec/`
+- Rollout specification:
+  - `docs/components/avalonia_viewer/tauri_ux_rollout_spec.md`
+- Summary:
+  - Tauri先行UXを`confirmed` / `specified` / `follow-up`に分け、Avaloniaへ反映する共通outcome、stack適応、Tauri固有方式、deferred事項を確定した。
+  - TODO-2026-023へ024、TODO-2026-008へ020、TODO-2026-009へ015を統合し、元IDを`integrated`記録としてarchiveへ残した。
+  - Avalonia rolloutを`008 → (009 / 018並行) → 010 → 011 → 012`へ整理し、trusted HTMLをMulti-tabより先に置いた。
+  - Tauriのpane-local tab group / pane間移動と上下splitは、Avaloniaの左右2pane baselineをブロックしない方針とした。
+- Verification:
+  - User approved the documentation and docs-only result on `2026-07-27`.
+  - Design and implementation follow-up reviews were approved with no unresolved findings.
+  - `git diff --check main...HEAD` passed.
+  - Relative links in all changed Markdown files resolved.
+  - All changed files are Markdown documents; no source, config, script, fixture, or runtime asset was changed.
+  - No `diff.zip` was created because this was a docs-only workflow.
+- Follow-up:
+  - Avalonia rollout continues with `TODO-2026-008`, then parallel `TODO-2026-009` / `TODO-2026-018`, followed by `TODO-2026-010`, `TODO-2026-011`, and `TODO-2026-012`.
+  - Tauri Split View extensions remain in `TODO-2026-023` and `TODO-2026-025`.
+
+## TODO-2026-024 Tauri pane間tab移動
+
+- Status: `integrated`
+- Category: `new-feature`
+- Integrated: `2026-07-27`
+- Integrated into: `TODO-2026-023 Tauri pane-local tab group / pane 間移動`
+- Depends on: `TODO-2026-023`（統合前）
+- Summary:
+  - pane-local tab ownershipとpane間移動は、ordered tab IDs、active fallback、focus、pane runtime identityを同じtyped transitionで変更するため、1つのwork itemへ統合した。
+  - 明示的なpane間移動、移動元 / 移動先の復旧、keyboard到達性の完了条件はTODO-2026-023へ移管した。
+  - drag and drop、reorder / pinは統合後も非対象である。
+
+## TODO-2026-020 Avalonia Explorer ツリーペイン UX 水平展開
+
+- Status: `integrated`
+- Category: `spec-change`
+- Integrated: `2026-07-27`
+- Integrated into: `TODO-2026-008 Avalonia shell / Explorer UX foundation`
+- Source: `TODO-2026-019 Tauri Explorer ツリーペイン UX 改善`
+- Summary:
+  - MenuBar / StatusBarとExplorer / Preview境界はいずれも`MainWindow` shell layoutを変更するため、後続workspaceの基盤としてまとめた。
+  - GridSplitter、必要時のExplorer横scroll、directory / Markdown / HTML / image icon、keyboard / accessibility outcomeをTODO-2026-008へ移管した。
+  - Tauriと内部実装を共通化せず、AvaloniaのXAML / TreeView境界へ適応する方針は維持する。
+
+## TODO-2026-015 Avalonia Viewer 設定永続化と設定 UI 水平展開
+
+- Status: `integrated`
+- Category: `new-feature`
+- Integrated: `2026-07-27`
+- Integrated into: `TODO-2026-009 Avalonia app settings / Recent Folders`
+- Depends on: `TODO-2026-007`, `TODO-2026-009`（統合前）
+- Summary:
+  - Recent Folders、Theme、logical window size、PlantUML jar pathは同じtyped user config、startup load、保存失敗、schema更新を共有するため、1つのwork itemへ統合した。
+  - Settings UI、現在値確認、保存、再起動復元、Recent Foldersとの共存はTODO-2026-009へ移管した。
+  - Avaloniaの自然なService / ViewModel / XAML境界へ適応する方針は維持する。
+
 ## TODO-2026-006 Tauri Split view 導入
 
 - Status: `done`
@@ -379,4 +447,4 @@
   - `diff.zip` generated from `dc4fc398..c9a0153` and verified with `unzip -t`.
   - Completion artifacts are ready for Phase 4-c merge approval.
 - Follow-up:
-  - `TODO-2026-020` tracks the Avalonia Explorer UX rollout using GridSplitter / TreeView-specific design.
+  - Avalonia Explorer UX rolloutは、旧`TODO-2026-020`を統合した`TODO-2026-008`で追跡する。
