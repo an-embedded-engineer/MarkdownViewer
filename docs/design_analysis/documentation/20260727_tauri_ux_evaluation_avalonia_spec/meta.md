@@ -8,7 +8,7 @@ components:
   - docs/components/avalonia_viewer
   - docs/design_analysis/wbs
 status: draft
-design_status: in_review
+design_status: done
 impl_status: not_started
 completion_status: not_started
 related_commits: []
