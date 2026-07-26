@@ -145,7 +145,7 @@ adapterはpreview revision内で一意なopaque IDを発行し、visualへ`data-
 
 buttonはactivation hostの直後に置くが、通常時は共通のvisually-hidden CSS（`position: absolute`、1px四方、clip、負margin、overflow hidden）で文書flowとpointer hit testから外す。これによりinline画像を含む段落を含め、decoration前後で本文の行組み、diagramのborder / padding、横scroll幅を変えない。
 
-buttonがkeyboard focusを受けた時だけ、DOM adapterは`requestAnimationFrame`後にvisualと`.preview-pane`の`getBoundingClientRect()`を読み、viewport内へclampしたvisual右上座標をCSS custom propertyへ設定する。`:focus-visible`ではbuttonを`position: fixed`の操作pillとしてvisual右上へ重ね、clip / 1px寸法 / 負marginを解除し、明瞭なoutlineと`Open image viewer`の可視文言を表示する。focus中だけcapture phaseのpreview scrollとwindow resizeを監視して座標を更新し、blur / cleanupでlistenerを除去する。visualが既にdisconnectならbuttonを除去してactive previewへfocusを戻す。通常時は`pointer-events: none`、focus可視時だけ`pointer-events: auto`とするため、画像やlinkのpointer操作を遮らない。
+buttonがkeyboardまたはprogrammatic focusを受けた時だけ、DOM adapterは`requestAnimationFrame`後にvisualと`.preview-pane`の`getBoundingClientRect()`を読み、viewport内へclampしたvisual右上座標をCSS custom propertyへ設定する。`:focus`ではbuttonを`position: fixed`の操作pillとしてvisual右上へ重ね、clip / 1px寸法 / 負marginを解除し、明瞭なoutlineと`Open image viewer`の可視文言を表示する。通常状態は`pointer-events: none`なのでpointer press由来の不要なfocus表示は発生せず、pointer起点でviewerを開いてcloseした後のprogrammatic focusも可視になる。focus中だけcapture phaseのpreview scrollとwindow resizeを監視して座標を更新し、blur / cleanupでlistenerを除去する。visualが既にdisconnectならbuttonを除去してactive previewへfocusを戻す。focus時だけ`pointer-events: auto`とするため、通常時の画像やlinkのpointer操作を遮らない。
 
 ### 6.2 Mermaid
 
@@ -365,8 +365,8 @@ opaque-origin sandbox iframeへ親Reactからアクセスできず、bridge拡�
 - `.image-viewer-content`: absolute center、transform origin center、max-width解除。
 - cloneされた`img` / `svg`: DOM clone前処理でgenerator由来のinline sizeを正規化し、intrinsic pixel sizeを明示する。
 - decorated visual: `cursor: zoom-in`。通常のimage sizingは変更しない。
-- 隣接viewer buttonの通常状態: `.markdown-body`のtypography継承を打ち消すため`appearance: none`、`box-sizing: border-box`、明示font / line-height / margin / padding / border / background / colorを設定し、visually-hidden + non-reflow + `pointer-events: none`とする。
-- 隣接viewer buttonの`:focus-visible`: visual右上のclamp済み座標へfixed配置した可視pillへ切り替え、1px以上のtheme対応outlineを出す。clip、overflow、寸法、marginを通常値へ戻し、`pointer-events: auto`とする。diagram containerのoverflowには入れない。
+- 隣接viewer buttonの通常状態: `.markdown-body`のtypography継承を打ち消すため`appearance: none`、`box-sizing: border-box`、明示font / line-height / margin / padding / border / background / colorを設定し、visually-hidden + non-reflow + `pointer-events: none` + `user-select: none`とする。`user-select: none`により非表示の操作文言が本文copyへ混入するのを防ぐ。
+- 隣接viewer buttonの`:focus`: visual右上のclamp済み座標へfixed配置した可視pillへ切り替え、1px以上のtheme対応outlineを出す。clip、overflow、寸法、marginを通常値へ戻し、`pointer-events: auto`とする。diagram containerのoverflowには入れない。
 - 760px以下ではtoolbarをwrapし、viewerの操作領域を確保する。
 
 ## 17. 自動テスト
@@ -396,7 +396,7 @@ opaque-origin sandbox iframeへ親Reactからアクセスできず、bridge拡�
 3. toolbar、wheel / trackpad、`+` / `-`でfitから800%まで操作する。
 4. drag、Arrow、Shift+Arrowで四隅と中央へ到達し、端で空白が過剰に露出しない。
 5. `Fit`と`100%`が定義どおりcenterへ戻る。
-6. backdrop、close、Escapeで閉じ、inert解除後に選択visualの隣接buttonへfocusが戻る。
+6. backdrop、close、Escapeで閉じ、inert解除後に選択visualの隣接buttonへfocusが戻る。pointerでvisualを開きClose buttonで閉じた場合も、復帰先pillが可視になる。
 7. Tab / Shift+Tabがdialog外へ出ず、背景Explorer / tab / previewが操作されない。overlay上のwheelで背後previewがscrollしない。
 8. overlay表示中にwindowを拡大縮小し、fit / custom modeが仕様どおり更新される。
 9. Light / Darkでtoolbar、背景、diagramが読める。

@@ -13,7 +13,7 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "in_review"
+design_status: "done"
 impl_status: "pending"
 completion_status: "pending"
 verification_status: "pending"
@@ -23,6 +23,8 @@ related_commits:
   - "0c92ca6 : Phase 2 review Tauri Markdown image overlay design"
   - "19bf862 : Phase 2 address initial design review findings"
   - "1092187 : Phase 2 re-review round 1 fixes"
+  - "96ff759 : Phase 2 address round 2 design review finding"
+  - "7bcc92b : Phase 2 approve design with unresolved findings 0"
 ---
 
 # TODO-2026-022 Tauri Markdown画像オーバーレイ表示 meta
@@ -54,6 +56,6 @@ related_commits:
 | --- | --- |
 | Phase 0 Requirements | Done (`d2e9fd5`) |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | In review (Round 2 finding: Medium 1) |
+| Phase 2 Design review | Done (Approved, unresolved findings: 0, `7bcc92b`) |
 | Phase 3 Implementation and docs review | Pending |
 | Phase 4 Verification and completion | Pending |
