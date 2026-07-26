@@ -14,7 +14,7 @@ components:
   - "docs/components/tauri_viewer"
 status: "in_progress"
 design_status: "done"
-impl_status: "draft"
+impl_status: "done"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -24,6 +24,10 @@ related_commits:
   - "5aebaa9 : Phase 2 design review (changes requested)"
   - "dd0dead : Phase 2 address Tauri split view design review"
   - "68f1fa5 : Phase 2 design review approved after re-review"
+  - "810f0c3 : Phase 3 implement Tauri split view"
+  - "60ba906 : Phase 3 implementation review (changes requested)"
+  - "c8f5272 : Phase 3 address implementation review findings"
+  - "7eb32ea : Phase 3 implementation review approved after re-review"
 source_todo_path: "docs/todo/todo.md#todo-2026-006-tauri-split-view-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
@@ -59,5 +63,5 @@ follow_up:
 | Phase 0 Requirements | Done (`c023374`) |
 | Phase 1 Branch and meta | Done (`09d57dc`) |
 | Phase 2 Design review | Done (approved by re-review, 9 findings resolved, 0 unresolved; `68f1fa5`) |
-| Phase 3 Implementation and docs review | Draft implementation complete; review pending |
+| Phase 3 Implementation and docs review | Done (approved by re-review, 4 findings resolved, 0 unresolved; `7eb32ea`) |
 | Phase 4 Verification and completion | Not started |
