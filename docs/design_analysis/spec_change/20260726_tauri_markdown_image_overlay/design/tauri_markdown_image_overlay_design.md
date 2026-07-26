@@ -135,7 +135,7 @@ Settings dialogは保存中close抑止や初期focus先が異なる。今回共�
 
 Markdown-It image ruleは既存のrelative resource解決、`loading="lazy"`、alt、著者指定titleを変更しない。`title`をviewer説明で上書き・追記せず、title未指定時も新しいtooltipを付けない。
 
-描画後のDOM adapterは`img.complete && naturalWidth > 0 && naturalHeight > 0`を満たす画像だけへpointer markerを付け、内容非依存のaccessible labelを持つ隣接buttonを追加する。button labelはaltがあれば`Open image in image viewer: <alt>`、空altなら`Open Markdown image in image viewer`とする。通常画像は`img`をactivation hostとし、その直後へbuttonを挿入する。linked imageは画像を含む最も近い`a`をactivation hostとし、その直後（`a`の外側）へbuttonを挿入してnested interactive contentを作らない。lazy imageが未loadなら一度だけ`load` / `error`を監視し、load成功後にdecorate、error時はdecorateせずconsoleへ原因を記録する。
+描画後のDOM adapterは`img.complete && naturalWidth > 0 && naturalHeight > 0`を満たす画像だけへpointer markerを付け、隣接buttonを追加する。buttonの可視labelは`Open image viewer`、accessible nameはaltがあれば`Open image viewer: <alt>`、空altなら`Open image viewer: Markdown image`とし、可視labelを先頭に含める。内容名は操作名と分けてdata markerへ保持し、dialog titleには内容名だけを渡す。通常画像は`img`をactivation hostとし、その直後へbuttonを挿入する。linked imageは画像を含む最も近い`a`をactivation hostとし、その直後（`a`の外側）へbuttonを挿入してnested interactive contentを作らない。lazy imageが未loadなら一度だけ`load` / `error`を監視し、load成功後にdecorate、error時はdecorateせずconsoleへ原因を記録する。
 
 decorationはvisualごとのdata markerでidempotentにし、Appの無関係な再描画やMermaid effect再評価でbuttonを重複追加しない。Markdown HTML差替え / unmount時はeffect cleanupがload listenerとadapter管理buttonを除去し、React外DOMの生存期間をpreview revisionへ限定する。
 
@@ -145,15 +145,15 @@ adapterはpreview revision内で一意なopaque IDを発行し、visualへ`data-
 
 buttonはactivation hostの直後に置くが、通常時は共通のvisually-hidden CSS（`position: absolute`、1px四方、clip、負margin、overflow hidden）で文書flowとpointer hit testから外す。これによりinline画像を含む段落を含め、decoration前後で本文の行組み、diagramのborder / padding、横scroll幅を変えない。
 
-buttonがkeyboardまたはprogrammatic focusを受けた時だけ、DOM adapterは`requestAnimationFrame`後にvisualと`.preview-pane`の`getBoundingClientRect()`を読み、viewport内へclampしたvisual右上座標をCSS custom propertyへ設定する。`:focus`ではbuttonを`position: fixed`の操作pillとしてvisual右上へ重ね、clip / 1px寸法 / 負marginを解除し、明瞭なoutlineと`Open image viewer`の可視文言を表示する。通常状態は`pointer-events: none`なのでpointer press由来の不要なfocus表示は発生せず、pointer起点でviewerを開いてcloseした後のprogrammatic focusも可視になる。focus中だけcapture phaseのpreview scrollとwindow resizeを監視して座標を更新し、blur / cleanupでlistenerを除去する。visualが既にdisconnectならbuttonを除去してactive previewへfocusを戻す。focus時だけ`pointer-events: auto`とするため、通常時の画像やlinkのpointer操作を遮らない。
+buttonがkeyboardまたはprogrammatic focusを受けた時だけ、DOM adapterはvisualを`scrollIntoView({ block: "nearest", inline: "nearest" })`で表示領域へ入れ、visualと`.preview-pane`の`getBoundingClientRect()`を同期的に読んで、viewport内へclampしたvisual右上座標をCSS custom propertyへ設定する。その後のscroll / resize追従は`requestAnimationFrame`で更新する。`:focus`ではbuttonを`position: fixed`の操作pillとしてvisual右上へ重ね、clip / 1px寸法 / 負marginを解除し、明瞭なoutlineと`Open image viewer`の可視文言を表示する。通常状態は`pointer-events: none`なのでpointer press由来の不要なfocus表示は発生せず、pointer起点でviewerを開いてcloseした後のprogrammatic focusも可視になる。focus中だけcapture phaseのpreview scrollとwindow resizeを監視して座標を更新し、blur / cleanupでlistenerを除去する。visualが既にdisconnectならbuttonを除去してactive previewへfocusを戻す。focus時だけ`pointer-events: auto`とするため、通常時の画像やlinkのpointer操作を遮らない。
 
 ### 6.2 Mermaid
 
-fence ruleが生成する`.mermaid` source containerへinteractive属性を事前付与しない。`mermaid.run`成功後、`data-processed="true"`とinner SVGを確認してDOM adapterを実行する。adapterはinner SVGをvisual、`.mermaid`をactivation host / pointer targetとしてmarkし、内容非依存の`Open Mermaid diagram in image viewer` buttonを`.mermaid`の直後へ追加する。buttonをcontainer内へ入れないため、既存border / padding / horizontal scroll領域を変えない。source text状態はTab順にもpointer cursor対象にもならない。
+fence ruleが生成する`.mermaid` source containerへinteractive属性を事前付与しない。`mermaid.run`成功後、`data-processed="true"`とinner SVGを確認してDOM adapterを実行する。adapterはinner SVGをvisual、`.mermaid`をactivation host / pointer targetとしてmarkし、`Open image viewer: Mermaid diagram` buttonを`.mermaid`の直後へ追加する。buttonをcontainer内へ入れないため、既存border / padding / horizontal scroll領域を変えない。source text状態はTab順にもpointer cursor対象にもならない。
 
 ### 6.3 PlantUML
 
-成功結果`result.ok === true`が返す既存`.plantuml-diagram`をそのままactivation host / pointer targetとし、viewer専用wrapperは追加しない。DOM adapterが`.plantuml-diagram > svg`とvalid sizeを確認した後にpointer markerを付け、`Open PlantUML diagram in image viewer` buttonを`.plantuml-diagram`の直後へ追加する。buttonをcontainer内へ入れないため、既存border / padding / horizontal scroll領域を変えない。pending / error HTMLはdecorateしない。
+成功結果`result.ok === true`が返す既存`.plantuml-diagram`をそのままactivation host / pointer targetとし、viewer専用wrapperは追加しない。DOM adapterが`.plantuml-diagram > svg`とvalid sizeを確認した後にpointer markerを付け、`Open image viewer: PlantUML diagram` buttonを`.plantuml-diagram`の直後へ追加する。buttonをcontainer内へ入れないため、既存border / padding / horizontal scroll領域を変えない。pending / error HTMLはdecorateしない。
 
 Mermaid / PlantUML SVG内に`a`がある場合、そのanchor clickはviewer resolverより先に既存link処理へ渡す。diagramの非anchor領域clickと隣接buttonだけがviewerを開くため、SVG linkとviewer操作を両立する。
 
@@ -391,7 +391,7 @@ opaque-origin sandbox iframeへ親Reactからアクセスできず、bridge拡�
 
 `sample_docs/image_viewer.md`に既存`sample_docs/images/avalonia-markdown-viewer-architecture.png`を参照する通常画像、横長・縦長Mermaid、巨大PlantUMLを配置し、次を確認する。新規binary画像資産は追加しない。
 
-1. 3種のvisualをclick、隣接viewer buttonへTab移動し、対象visual右上へ可視pillとfocus outlineが出ることを確認してEnter / Spaceで開く。描画前Mermaid / pending PlantUMLがTab順へ入らないことも確認する。
+1. 3種のvisualをclick、隣接viewer buttonへTab移動し、対象visual右上へ可視pillとfocus outlineが出ることを確認してEnter / Spaceで開く。画面外の画像に対応するbuttonへTab移動した場合も対象画像が表示領域へ入り、pillが同一frameからその右上へ出ることを確認する。描画前Mermaid / pending PlantUMLがTab順へ入らないことも確認する。
 2. 初期fitで全体が見え、倍率が表示される。
 3. toolbar、wheel / trackpad、`+` / `-`でfitから800%まで操作する。
 4. drag、Arrow、Shift+Arrowで四隅と中央へ到達し、端で空白が過剰に露出しない。

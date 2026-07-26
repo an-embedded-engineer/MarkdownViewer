@@ -19,6 +19,8 @@ Tauri版Markdown preview内の通常画像、描画済みMermaid SVG、描画済
 | §10 lifecycle | `App` effects | tab ID / revision / document type不一致でcloseし、transformはdialog内部だけに保持する。revision不変DOM差替え中はclone表示を継続する |
 | §16 CSS | `App.css` | theme対応backdrop / dialog、viewer viewport、non-reflow trigger、focus pill、toolbar wrap、focus outlineを追加した |
 
+実装レビュー対応として、倍率の可視`output`は`aria-live="off"`として250ms debounceのlive regionだけが通知するようにした。keyboard buttonはfocus時に対象visualを表示領域へ入れてpill座標を同期設定する。buttonの操作labelとdialogの内容名も分離し、accessible nameが可視labelを先頭に含む形へ統一した。
+
 ## 3. 互換性と境界
 
 - Markdown image ruleのrelative resource、`loading="lazy"`、alt、著者指定titleは変更していない。
@@ -33,10 +35,11 @@ Tauri版Markdown preview内の通常画像、描画済みMermaid SVG、描画済
 
 `imageViewer.test.ts`へ次のpolicy testを追加した。
 
-- 大小・狭幅geometryのfit
+- 大小・狭幅・縦長geometryのfit
 - invalid / zero / non-finite値の拒否
 - fit〜800% zoom clamp
 - pointer anchor座標維持
+- viewport中央zoom時の非zero offset更新
 - axis別pan boundsとdrag / keyboard delta clamp
 - 100% reset
 - fit / custom mode resize
@@ -53,7 +56,7 @@ Tauri版Markdown preview内の通常画像、描画済みMermaid SVG、描画済
 
 | command | result |
 | --- | --- |
-| `cd markdown-viewer-tauri && npm test -- --run` | Pass。3 files / 40 tests |
+| `cd markdown-viewer-tauri && npm test -- --run` | Pass。3 files / 41 tests |
 | `cd markdown-viewer-tauri && npm run build` | Pass。TypeScript compile / Vite production build成功。既存のchunk size warningのみ |
 | `cd markdown-viewer-tauri/src-tauri && cargo check` | Pass |
 
@@ -66,6 +69,7 @@ Tauri版Markdown preview内の通常画像、描画済みMermaid SVG、描画済
 - `docs/components/tauri_viewer/detail_design.md`: decoration、resolver、modal、transform、lifecycle契約を追加。
 - `docs/components/tauri_viewer/interface_spec.md`: 対象visual、入力、zoom / pan、modal / focus、互換契約を追加。
 - `docs/rules/development_workflow.md`: 専用fixtureによる手動確認項目を追加。
+- `docs/tests/README.md`: Manual UI checkの対象領域へMarkdown image viewerを追加。
 
 ## 7. 未解決事項
 

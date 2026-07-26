@@ -181,6 +181,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - Markdown / HTML tabとExplorer幅を切り替え、Markdown本文とHTML iframeが残りのpreview pane幅へ追従し、HTML文書自身のlayoutは維持されること
 - `sample_docs/image_link.md` のroot内相対PNG画像が表示されること
 - `sample_docs/image_viewer.md`で通常画像、描画済みMermaid、描画済みPlantUMLをclick / keyboardからviewerへ開けること
+- 画面外の画像に対応するviewer buttonへTab移動した時、対象画像が表示領域へ入り、pillがその右上へずれずに表示されること
 - image viewerの初期fit、最大800% zoom、wheel / trackpad、drag / Arrow pan、Fit / 100%、Escape / Close / backdrop、focus trapと復帰focusを確認すること
 - image viewerを閉じた通常表示でinline画像段落の行組み、diagramのborder / padding / horizontal scroll、linked image / SVG anchor操作が退行しないこと
 - Mermaid 描画

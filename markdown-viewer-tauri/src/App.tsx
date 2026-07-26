@@ -1167,6 +1167,12 @@ type ImageViewerDragState = {
 };
 
 function ImageViewerDialog({ request, onClose }: ImageViewerDialogProps) {
+  const sourceLabel =
+    request.kind === "image"
+      ? "Image"
+      : request.kind === "mermaid"
+        ? "Mermaid diagram"
+        : "PlantUML diagram";
   const dialogRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -1374,7 +1380,8 @@ function ImageViewerDialog({ request, onClose }: ImageViewerDialogProps) {
       >
         <header className="image-viewer-header">
           <h2 id="image-viewer-title">
-            {request.kind === "image" ? "Image" : request.kind === "mermaid" ? "Mermaid diagram" : "PlantUML diagram"}: {request.accessibleName}
+            {sourceLabel}
+            {request.accessibleName === sourceLabel ? "" : `: ${request.accessibleName}`}
           </h2>
           <button type="button" aria-label="Close image viewer" onClick={onClose}>
             Close
@@ -1389,7 +1396,9 @@ function ImageViewerDialog({ request, onClose }: ImageViewerDialogProps) {
           >
             Zoom out
           </button>
-          <output aria-label="Current zoom">{percentage}%</output>
+          <output aria-label="Current zoom" aria-live="off">
+            {percentage}%
+          </output>
           <button
             type="button"
             aria-label="Zoom in"

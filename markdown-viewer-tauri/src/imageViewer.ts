@@ -278,6 +278,7 @@ function setTriggerPosition(
 function createViewerButton(
   id: string,
   label: string,
+  contentName: string,
   visual: HTMLImageElement | SVGSVGElement,
   previewPane: HTMLElement,
   fallbackRoot: HTMLElement,
@@ -287,6 +288,7 @@ function createViewerButton(
   button.className = "image-viewer-trigger";
   button.dataset.imageViewerId = id;
   button.dataset.imageViewerTrigger = "true";
+  button.dataset.imageViewerName = contentName;
   button.setAttribute("aria-label", label);
   button.textContent = "Open image viewer";
 
@@ -301,6 +303,12 @@ function createViewerButton(
     });
   };
   const startTracking = () => {
+    if (!visual.isConnected) {
+      setTriggerPosition(button, visual, previewPane, fallbackRoot);
+      return;
+    }
+    visual.scrollIntoView({ block: "nearest", inline: "nearest" });
+    setTriggerPosition(button, visual, previewPane, fallbackRoot);
     update();
     previewPane.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);
@@ -349,7 +357,7 @@ export function createImageViewerDomAdapter(
     visual: HTMLImageElement | SVGSVGElement,
     target: HTMLElement,
     host: HTMLElement,
-    accessibleName: string,
+    contentName: string,
   ) => {
     if (disposed || visual.dataset.imageViewerId) {
       return;
@@ -370,7 +378,14 @@ export function createImageViewerDomAdapter(
     visual.dataset.imageViewerKind = kind;
     target.dataset.imageViewerId = id;
     target.dataset.imageViewerTarget = "true";
-    const button = createViewerButton(id, accessibleName, visual, previewPane, root);
+    const button = createViewerButton(
+      id,
+      `Open image viewer: ${contentName}`,
+      contentName,
+      visual,
+      previewPane,
+      root,
+    );
     host.insertAdjacentElement("afterend", button);
     managedVisuals.add(visual);
     managedTargets.add(target);
@@ -420,16 +435,14 @@ export function createImageViewerDomAdapter(
         return;
       }
       const anchor = image.closest<HTMLAnchorElement>("a");
-      const label = image.alt
-        ? `Open image in image viewer: ${image.alt}`
-        : "Open Markdown image in image viewer";
-      decorate("image", image, image, anchor ?? image, label);
+      const contentName = image.alt || "Markdown image";
+      decorate("image", image, image, anchor ?? image, contentName);
     });
 
     root.querySelectorAll<HTMLElement>('.mermaid[data-processed="true"]').forEach((container) => {
       const svg = container.querySelector<SVGSVGElement>(":scope > svg");
       if (svg) {
-        decorate("mermaid", svg, container, container, "Open Mermaid diagram in image viewer");
+        decorate("mermaid", svg, container, container, "Mermaid diagram");
       }
     });
 
@@ -441,7 +454,7 @@ export function createImageViewerDomAdapter(
           svg,
           container,
           container,
-          "Open PlantUML diagram in image viewer",
+          "PlantUML diagram",
         );
       }
     });
@@ -517,7 +530,7 @@ export function resolveImageViewerSource(
   }
   return {
     kind,
-    accessibleName: focusOrigin.getAttribute("aria-label") ?? "Open image viewer",
+    accessibleName: focusOrigin.dataset.imageViewerName ?? "Image",
     intrinsicWidth: size.width,
     intrinsicHeight: size.height,
     visual,

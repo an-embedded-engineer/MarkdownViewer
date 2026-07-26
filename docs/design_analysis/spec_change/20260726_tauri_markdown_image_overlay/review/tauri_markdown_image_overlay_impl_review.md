@@ -170,3 +170,19 @@ Phase 2 レビュー §9.2 の実装条件 2 件（`:focus` 可視化、`user-se
 | 3.2 | Low | 設計 §17 の縦長 fit と center zoom offset のテストが未実装 | Phase 3 テスト | 未対応 |
 
 **未解決 5 件（Medium 2 / Low 3）。Phase 3 は未承認。** Medium 2 件を修正し、Low 3 件へ対応または採否理由を記録したうえで再レビューすること。Medium 2 件はいずれも局所修正（`aria-live="off"` の付与、`startTracking` での同期配置と `scrollIntoView`）で、設計変更を伴わない。修正後は `npm test -- --run` / `npm run build` を再実行し、impl 記録 §5 の結果と 1.2 に対応する手動確認項目を更新すること。
+
+---
+
+## 7. 実装Agent対応（再レビュー依頼）
+
+2026-07-26に全5件を採用し、次のとおり修正した。判定・未解決件数の更新は再レビューに委ねる。
+
+| ID | 対応 | status |
+| --- | --- | --- |
+| 1.1 | 可視`output`へ`aria-live="off"`を付与し、250ms debounceの`.image-viewer-live`だけを通知経路にした | 対応済み・再レビュー待ち |
+| 1.2 | focus handlerで接続状態を確認し、`scrollIntoView({ block: "nearest", inline: "nearest" })`後にpill座標を同期設定してからrAF追従を開始した。設計§18とdevelopment workflowへ画面外visualのscenarioを追加した | 対応済み・再レビュー待ち |
+| 2.1 | `docs/tests/README.md`のManual UI checkへMarkdown image viewerを追加した | 対応済み・再レビュー待ち |
+| 3.1 | 操作labelと内容名をdata markerで分離した。button accessible nameを可視label `Open image viewer`で始め、dialog titleは内容名だけを組み立てるようにした | 対応済み・再レビュー待ち |
+| 3.2 | 縦長geometryのheight制約fitと、非zero offsetからのcenter zoomを追加した。既存fit期待値も厳密値`0.595`へ修正した | 対応済み・再レビュー待ち |
+
+修正後の検証結果は`npm test -- --run`が3 files / 41 tests Pass、`npm run build`がPass（既存chunk size warningのみ）、`cargo check`がPass。

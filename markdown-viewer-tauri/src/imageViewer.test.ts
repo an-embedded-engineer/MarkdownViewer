@@ -23,13 +23,16 @@ const geometry: ImageViewerGeometry = {
 
 describe("image viewer transform policy", () => {
   it("fits large, small, and narrow-screen images without enlarging above 100%", () => {
-    expect(getImageViewerFitScale(geometry)).toBeCloseTo(0.595555556);
+    expect(getImageViewerFitScale(geometry)).toBe(0.595);
     expect(
       getImageViewerFitScale({ ...geometry, intrinsicWidth: 400, intrinsicHeight: 300 }),
     ).toBe(1);
     expect(
       getImageViewerFitScale({ ...geometry, viewportWidth: 360, padding: 12 }),
     ).toBeCloseTo(0.21);
+    expect(
+      getImageViewerFitScale({ ...geometry, intrinsicWidth: 600, intrinsicHeight: 2000 }),
+    ).toBe(0.326);
   });
 
   it("rejects invalid geometry and transform values", () => {
@@ -62,6 +65,17 @@ describe("image viewer transform policy", () => {
     const next = zoomImageViewerTransform(current, roomy, 1.25, anchor);
     expect((anchor.x - next.offsetX) / next.scale).toBeCloseTo(before.x);
     expect((anchor.y - next.offsetY) / next.scale).toBeCloseTo(before.y);
+  });
+
+  it("scales a non-zero offset around the viewport center", () => {
+    const roomy = { ...geometry, intrinsicWidth: 3000, intrinsicHeight: 2000 };
+    const next = zoomImageViewerTransform(
+      { scale: 1, offsetX: 100, offsetY: -60, mode: "custom" },
+      roomy,
+      1.25,
+    );
+    expect(next.offsetX).toBe(125);
+    expect(next.offsetY).toBe(-75);
   });
 
   it("clamps only the overflowing pan axis", () => {

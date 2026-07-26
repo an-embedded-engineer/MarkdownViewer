@@ -23,7 +23,7 @@ MarkdownViewer/
 
 - Build check: コンパイル、型チェック、Rust check。
 - Automated unit: document response / bridge policy、root / path / MIME / protocol response / bridge injection。
-- Manual UI check: フォルダ選択、Markdown / trusted HTML表示、relative resource、Mermaid / PlantUML、sandbox / CSP、テーマ切替、Reload。
+- Manual UI check: フォルダ選択、Markdown / trusted HTML表示、relative resource、Mermaid / PlantUML、Markdown image viewer（zoom / pan / focus / layout非退行）、sandbox / CSP、テーマ切替、Reload。
 - Publish smoke check: `publish/` 配下の `.app` 起動確認。
 
 ## 実行方法
