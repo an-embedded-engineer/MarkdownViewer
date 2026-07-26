@@ -11,13 +11,15 @@ components:
   - "markdown-viewer-tauri/src/documentPolicy.ts"
   - "docs/components/tauri_viewer"
 status: "in_progress"
-design_status: "draft"
+design_status: "in_review"
 impl_status: "not_started"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
   - "c023374 : Phase 0 define TODO-2026-006 split view scope"
   - "09d57dc : Phase 1 initialize Tauri split view workflow"
+  - "10948dc : Phase 2 draft Tauri split view design"
+  - "5aebaa9 : Phase 2 design review (changes requested)"
 source_todo_path: "docs/todo/todo.md#todo-2026-006-tauri-split-view-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
@@ -52,6 +54,6 @@ follow_up:
 | --- | --- |
 | Phase 0 Requirements | Done (`c023374`) |
 | Phase 1 Branch and meta | Done (`09d57dc`) |
-| Phase 2 Design review | Draft |
+| Phase 2 Design review | In review (initial review changes requested, 9 findings addressed pending re-review) |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4 Verification and completion | Not started |

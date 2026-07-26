@@ -31,7 +31,9 @@ Low 指摘は DOM ID 改名の波及先、security 根拠記述の精度、Merma
 
 **severity**: Medium（ブロッキング）
 **工程**: Phase 2（設計修正）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: 設計§7.3 / §8.2を更新し、active paneが未選択ならprimary既存selectionを維持し、primaryも未選択かつopen tabありの場合だけ先頭tabへfallbackする規則へ確定した。空pane / 空collectionはthrow対象外とし、ordered tab IDsを`disable-split` actionへ渡す。unit testと手動確認へactive secondary未選択ケースを追加した。
 
 **ドキュメント記載**: §8.2「1. active paneのselectionとpending navigationをprimaryへ引き継ぐ。2. secondaryをclearする。3. mode=`single`、activePaneId=`primary`。」§7.3 `disable-split`「active paneのselectionをprimaryへ移し、active paneをprimaryにする。」§18.1 test「split off時にactive secondary selectionをprimaryへ引継ぐ。」
 
@@ -51,7 +53,9 @@ Low 指摘は DOM ID 改名の波及先、security 根拠記述の精度、Merma
 
 **severity**: Medium（ブロッキング）
 **工程**: Phase 2（設計修正）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: 設計§7.2 / §9.3 / §9.5 / §14を更新し、各TabStripがshared `loadState`と自paneの`PanePreviewStatus`だけを合成する優先規則を定義した。同一HTML tabの片pane timeoutは当該paneのTabStripだけ`Error`とし、合成policyを`paneRuntime.ts` / `paneRuntime.test.ts`へ置く。
 
 **ドキュメント記載**: §11「`open_document`がvalidated `previewUrl`を返した時点でshared tabのdocument loadを`ready`にし、iframe mount後の`loading-html` / ready / timeoutはpane runtimeだけで管理する。旧`markHtmlReady` / `markHtmlError`によるglobal tab更新は削除する。」§5.3、§7.2、§9.3。
 
@@ -73,7 +77,9 @@ Low 指摘は DOM ID 改名の波及先、security 根拠記述の精度、Merma
 
 **severity**: Medium（ブロッキング）
 **工程**: Phase 2（設計修正。テスト設計と責務配置）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: pane runtime guardを`paneRuntime.ts`のpure function `isPaneResultCurrent`へ分離し、TabStrip state合成とstale status判定も同moduleへ集約する設計へ変更した。§9.5と§18.1へ、pane/tab/revision一致、pane/tab切替、Reload、close、split off、同一tab両paneの自動testを追加した。DOM `isConnected`確認だけをReact effect側へ残す。
 
 **ドキュメント記載**: §5.4「実行前後に DOM connection と pane/tab/revision を再確認し、stale task は結果を適用しない。」§7.2「callback適用時は `paneId + tabId + revision` と現在selectionを照合する。」§10.1-4、§11、§14「closed / reloadedタブのasync完了 | pane + tab + revision guardでignore」。§9.4「`splitView.ts` は split state transition、adjacent tab選択、width policy、keyboard policy」。§18.1 の test 一覧。§20 リスク表「close / root / Reloadのstate race | 軽減策: pure transition、tab revision、**pane guard test**」。
 
@@ -99,7 +105,9 @@ Low 指摘は DOM ID 改名の波及先、security 根拠記述の精度、Merma
 
 **severity**: Low
 **工程**: Phase 2（設計追記）または Phase 3（実装時に反映）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: 設計§9.3へDocumentPane region / tabpanel / tabのpane-scoped IDを定義した。split separatorは両DocumentPane region、Explorer separatorは`explorer-pane preview-workspace`を参照し、single modeもprimary prefixへ統一する。
 
 **ドキュメント記載**: §6 表「TabStrip ID | `tab-<id>` / `document-preview` | pane prefix付きで一意」。§9.3「tab: `tab-${paneId}-${tab.id}`、preview: `document-preview-${paneId}`」。§12.1 DOM 図。§13「separatorは`role="separator"`、`aria-orientation="vertical"`、両pane IDの`aria-controls`、min/max/nowを持つ」。
 
@@ -115,7 +123,9 @@ Low 指摘は DOM ID 改名の波及先、security 根拠記述の精度、Merma
 
 **severity**: Low
 **工程**: Phase 2（設計の根拠記述訂正）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: 設計§11を親Viewer document全体の`navigator.userActivation`契約へ訂正し、pane区別は`event.source + tab + revision`で行うことを明記した。duplicate guardはpane/iframe instance単位とし、1 clickは同paneで1回、両paneで別々にclickした場合は各paneで1回と定義した。
 
 **ドキュメント記載**: §11「非active paneからのuser clickも、**そのiframe自身にtransient activationがあり**source検証を通るため許可する。active paneはpointer/focus captureで同時に更新されるが、security境界には使わない。」「各HtmlPreviewは固有iframe ref、ready flag、timeout、duplicate external-open guardを持つ。」
 
@@ -131,7 +141,9 @@ security 境界そのものは弱まらない（`event.source` の一致・`orig
 
 **severity**: Low
 **工程**: Phase 2（設計追記）／ Phase 4（手動確認の具体化）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: 設計§10.1へ同一Mermaid tabの2 pane表示でもgenerated IDがdocument内一意である要件と`deterministicIds`非採用を追記した。§17 / §19ではcommon pitfalls反映と、両SVGのmarker / clipPath / 配色 / themeを確認する手動scenarioを具体化した。
 
 **ドキュメント記載**: §5.4、§10.1、§17「`docs/architecture/common_pitfalls.md`: 複数pane Mermaid並行実行、HTML handshake、**duplicate DOM ID**、iframe上separator drag」。§19-5「`sample_docs/plantuml.md` 等を使い、Mermaid + PlantUMLを両paneで表示し …」。
 
@@ -145,7 +157,9 @@ security 境界そのものは弱まらない（`event.source` の一致・`orig
 
 **severity**: Low
 **工程**: Phase 2（設計追記）／ Phase 3（恒久ドキュメント反映）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: 設計§12.2へMarkdown本文幅はpane content box相対、gutter breakpointとtab `32vw`はwindow viewport基準の既存契約を維持すると明記した。§17 / §19へTODO-2026-021とのdocs整合と、viewport 760px超でpaneだけを狭める確認を追加した。
 
 **ドキュメント記載**: §12.2 幅 policy、§16「`App.css` | preview grid、pane、active state、separator、狭幅、cursor」、§19-9 狭幅確認。
 
@@ -162,7 +176,9 @@ security 境界そのものは弱まらない（`event.source` の一致・`orig
 
 **severity**: Low
 **工程**: Phase 2（設計追記）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: 設計§8.1でprimary未選択時はsecondaryも`null`としthrowしない規則を定義した。§10.3でsplit off / pane unmount / pane未選択 / visual切断時にimage viewerを閉じ、focus originが切断済みならprimary regionへfallbackする規則を追加し、unit / manual観点へ反映した。
 
 **ドキュメント記載**: §8.1「primaryのtabに隣接するopen tabから異なるIDをsecondary初期値として選ぶ。右隣、なければ左隣、なければ`null`。」§8.2 split off 手順。§10.3「別paneのactivateだけでviewerを閉じる必要はないが、発生元paneのtab/revisionが変わった場合は閉じる。」§20「focus復帰先unmount | connected確認後fallback pane region」。
 
@@ -177,7 +193,9 @@ security 境界そのものは弱まらない（`event.source` の一致・`orig
 
 **severity**: Low
 **工程**: Phase 2（設計追記）
-**status**: open
+**status**: 対応済み（再確認待ち）
+
+**対応**: 設計§9.4へ`workspaceWidth: number | null`を受け、未計測・非finite・separator幅以下では`null`を返して50/50 CSS fallbackを使う関数契約を追加した。自動clampはratioへ書き戻さず、明示操作は可動域がある場合だけ更新、min=max時はno-opとし、§18.1へ境界testを追加した。
 
 **ドキュメント記載**: §12.2「effective minimumは `min(240, floor((workspaceWidth - 6) / 2))`」「primary実幅boundsは `[effectiveMinimum, workspaceWidth - 6 - effectiveMinimum]`」「requested ratioは実幅clampとは別に保持し、狭幅で一時clampされても再拡大時に利用者のratioへ戻す」。§7.1「requested ratioはsession中の利用者指定を保持し、実幅clamp値をstateへ書き戻さない。」§7.3 `set-requested-ratio`「finiteかつ0より大きく1より小さいratioだけを保存する」。§14「split width計測前 | 50/50 CSS fallback」。
 

@@ -111,9 +111,11 @@ Mermaid は global configuration を使うため、2 pane の `mermaid.run()` �
 
 module-global queue は test / remount /複数window間で所有者が曖昧になるため作らない。
 
-### 5.5 採用: 専用 `splitView.ts` の純粋 policy
+### 5.5 採用: 専用 `splitView.ts` / `paneRuntime.ts` の純粋 policy
 
 layout transition と幅計算を `App.tsx` の event handler に散らさず、typed action と純粋関数を `src/splitView.ts` に集約する。React component state、DOM、Tauri API は同moduleへ持ち込まない。
+
+pane / tab / revision のstale判定と、shared tab state + 自pane runtimeからTabStrip表示stateを合成するpolicyは `src/paneRuntime.ts` に集約する。layout transitionとpreview runtimeを別moduleに分け、`App.tsx`のeffect closureへ重要なguard式を埋め込まない。`paneRuntime.ts`もReact、DOM、Tauri、Mermaidへ依存しない。
 
 Explorer幅 policyとの数式共通化は行わない。Explorerはpreview予約幅を確保する外側pane、split separatorは残りpreview workspaceを2分する内側layoutで、最小値と狭幅時の縮退規則が異なる。pointer capture / keyboard eventのReact配線だけは既存Explorer実装のpatternを踏襲する。
 
@@ -210,6 +212,14 @@ loading priority:
 6. active pane Mermaid rendering
 7. ready
 
+各paneのTabStripに表示するstate label / classも同じ合成規則を使う。
+
+1. shared tabが`loading` / `rendering` / `error`なら、そのshared stateを優先する。
+2. shared tabが`ready`で、当該tabがそのpaneで選択中かつ`PanePreviewStatus`のtab / revisionが一致する場合だけ、`loading-html`を`loading`、`rendering-mermaid`を`rendering`、pane runtime `error`を`error`として表示する。
+3. 当該paneで非選択のtab、またはruntime identityが不一致ならshared stateだけを表示する。
+
+したがって同じHTML tabを両paneへ表示して片方だけtimeoutした場合、timeoutしたpaneのTabStripだけが`Error`となり、他方paneのTabStripは自身のruntimeを表示する。
+
 ### 7.3 split state action
 
 `splitView.ts` は少なくとも次のactionを扱う。
@@ -217,13 +227,15 @@ loading priority:
 - `select-tab`: paneをactiveにし、tab IDと任意anchorを設定する。
 - `activate-pane`: selectionを変えずactive paneだけを変更する。
 - `enable-split`: primaryを維持し、別tab候補をsecondaryへ設定する。
-- `disable-split`: active paneのselectionをprimaryへ移し、active paneをprimaryにする。
+- `disable-split`: active paneが非`null`のtabを選択している場合だけそのselection / pending navigationをprimaryへ移す。active paneが未選択なら既存primary selectionを維持し、primaryも未選択でopen tabが残る場合だけ先頭tabへfallbackする。active paneをprimaryにする。
 - `remove-tab`: closed IDを参照するpaneだけ、既存close規則のfallback IDへ置換する。
 - `reset-root`: modeとrequested ratioは維持し、両pane selection/navigationをclear、active paneをprimaryへ戻す。
 - `consume-navigation`: pane / tab / anchor一致時だけpendingをclearする。
 - `set-requested-ratio`: finiteかつ0より大きく1より小さいratioだけを保存する。
 
 存在しないpane IDや有限でないratioなどprogramming errorはthrowし、不正入力をfallbackで補正しない。close済みasync completionやnavigation consumeのような正当なstale eventはguardでignoreする。
+
+`disable-split`はfallback判定にopen順が必要なため、actionへcurrent ordered tab IDsを明示的に渡す。空paneや空tab collectionは正当なUI stateであり、programming errorとしてthrowしない。
 
 ## 8. 状態遷移とデフォルト動作
 
@@ -234,12 +246,15 @@ loading priority:
 3. mode=`split`、activePaneId=`primary`。
 4. secondary pending navigation / runtimeはclearする。
 
+primaryが未選択の場合は、open tabが残っていてもsecondary初期値を`null`とする。未選択は正当なempty stateとして扱い、隣接tab探索をthrowさせない。
+
 ### 8.2 split off
 
-1. active paneのselectionとpending navigationをprimaryへ引き継ぐ。
-2. secondaryをclearする。
-3. mode=`single`、activePaneId=`primary`。
-4. secondaryのDocumentPane、iframe、Mermaid adapterをcleanupする。
+1. active paneが非`null`のtabを選択している場合だけ、そのselectionとpending navigationをprimaryへ引き継ぐ。
+2. active paneが未選択なら既存primary selection / pending navigationを維持する。primaryも未選択でopen tabが残る場合は先頭tabをprimaryへ選び、pending navigationは`null`とする。
+3. secondaryをclearする。
+4. mode=`single`、activePaneId=`primary`。
+5. secondaryのDocumentPane、iframe、Mermaid adapterをcleanupする。
 
 split offでsecondary HTMLをprimaryへ引き継ぐ場合、pane ownershipが変わるためiframe remountと新しいready handshakeを許容する。theme、Explorer resize、pane resize、active pane変更だけではiframe keyを変えずreloadしない。
 
@@ -307,11 +322,14 @@ trusted HTML iframe内のeventは親React treeへbubbleしないため、iframe�
 
 ### 9.3 `TabStrip`
 
-`paneId`、pane selection、preview IDをpropsで受ける。同じglobal tabsを表示するがDOM IDを次のようにpane scopeへ変更する。
+`paneId`、pane selection、preview ID、自paneの`PanePreviewStatus`をpropsで受ける。同じglobal tabsを表示するがDOM IDを次のようにpane scopeへ変更する。
 
 - tab: `tab-${paneId}-${tab.id}`
-- preview: `document-preview-${paneId}`
+- DocumentPane region: `document-pane-${paneId}`
+- tabpanel preview: `document-preview-${paneId}`
 - tablist label: `Primary pane open documents` / `Secondary pane open documents`
+
+single modeでもprimary prefixを使い、旧`document-preview` IDは残さない。split separatorの`aria-controls`は`document-pane-primary document-pane-secondary`、Explorer separatorの`aria-controls`は`explorer-pane preview-workspace`とし、PreviewWorkspaceへ固定ID `preview-workspace`を付ける。各tabの`aria-controls`は同paneのtabpanel previewを指す。
 
 pane selectionが`null`でもtabsが存在する場合、先頭tabをroving focus target (`tabIndex=0`, `aria-selected=false`) としてkeyboardから到達可能にする。選択中tabとそのclose buttonだけを通常のTab順へ含める既存契約は維持する。
 
@@ -324,7 +342,21 @@ pane selectionが`null`でもtabsが存在する場合、先頭tabをroving focu
 
 React、DOM、Tauri、Mermaidへ依存しない。`splitView.test.ts`で直接検証する。
 
-### 9.5 既存module
+width policyの公開契約は次とする。
+
+- `getSplitPaneWidthBounds(workspaceWidth: number | null): SplitPaneWidthBounds | null`。未計測、非finite、separator幅以下は`null`を返し、Appは50/50 CSS fallbackを使う。外部layout計測の未確定値をprogramming errorとしてthrowしない。
+- `getPrimaryPaneWidth(requestedRatio, workspaceWidth)`はboundsがある場合だけclamp済みpxを返す。
+- 自動clampはrequested ratioへ書き戻さない。pointer / keyboardによる利用者の明示操作は通常boundsに幅がある場合だけratioを更新し、狭幅でmin=maxの場合はno-opとして以前のrequested ratioを保つ。
+
+### 9.5 `paneRuntime.ts`
+
+- `isPaneResultCurrent({ paneId, tabId, revision }, splitViewState, tabIdentities)`で、paneが現在表示対象か、pane selectionとtab revisionが一致するかを純粋判定する。
+- `resolvePaneTabPresentationState(tab, paneId, splitViewState, panePreviewStatus)`で§7.2のshared / pane-local合成規則を適用する。
+- stale pane preview statusをclear / ignoreするidentity判定を提供する。
+
+App / DocumentPaneは上記戻り値に従い、DOM nodeの`isConnected`確認だけをeffect側に残す。`paneRuntime.test.ts`でpane切替、tab切替、revision更新、tab close、split off、同一tabの両pane表示と片pane errorを検証する。
+
+### 9.6 既存module
 
 - `documentPolicy.ts`: source / opaque origin / tab / revision / ready / activation / duplicate / scheme検証を維持する。`HtmlPreview`は自身のpaneで現在選択されているtab ID / revisionをcontextへ渡し、active paneか否かをsecurity条件にしない。
 - `imageViewer.ts`: transform / DOM adapter policyを維持する。App側requestに`paneId`を交差型で付与し、moduleへsplit依存を持ち込まない。
@@ -342,6 +374,8 @@ React、DOM、Tauri、Mermaidへ依存しない。`splitView.test.ts`で直接�
 6. 失敗時は同pane runtimeだけerrorへする。
 7. cleanup時はtaskをcancel扱いにし、adapterとlistenerを解除する。実行中Promise自体を中断するfallbackは追加せず、結果guardでstale適用を防ぐ。
 
+同一Mermaid tabを両paneで描画した場合も、生成されるSVGのmarker / clipPath / style用IDは同一HTML document内で一意でなければならない。`deterministicIds`は有効化せず、直列queueでMermaidの既存ID採番を共有する。Phase 4では両paneの生成SVG内IDと`url(#...)`参照が衝突せず、marker / 配色 / themeが独立して正しく描画されることを確認する。
+
 ### 10.2 PlantUML
 
 - source抽出、Rust command、結果cacheはtab単位のまま変更しない。
@@ -356,6 +390,7 @@ React、DOM、Tauri、Mermaidへ依存しない。`splitView.test.ts`で直接�
 - image viewer requestには発生元`paneId + tabId + revision`を保持する。
 - modal表示中は既存どおりbackgroundをinertにする。
 - keyboard起点は発生元button、pointer起点は発生元paneのpreviewへfocusを戻す。別paneのactivateだけでviewerを閉じる必要はないが、発生元paneのtab/revisionが変わった場合は閉じる。
+- split off、pane unmount、発生元paneの未選択化、発生元visualのDOM切断時もviewerを閉じる。focusOriginが接続済みならそこへ戻し、接続されていなければ生存するprimary pane regionへfallbackする。
 
 ## 11. trusted HTML とセキュリティ境界
 
@@ -363,7 +398,8 @@ React、DOM、Tauri、Mermaidへ依存しない。`splitView.test.ts`で直接�
 - `open_document`がvalidated `previewUrl`を返した時点でshared tabのdocument loadを`ready`にし、iframe mount後の`loading-html` / ready / timeoutはpane runtimeだけで管理する。旧`markHtmlReady` / `markHtmlError`によるglobal tab更新は削除する。
 - `event.source` はそのpaneのiframe `contentWindow` と完全一致させる。
 - `origin="null"`、selected tab ID、revision、message shape、ready、transient activation、duplicate、HTTP(S) schemeの既存policyをすべて通す。
-- 非active paneからのuser clickも、そのiframe自身にtransient activationがありsource検証を通るため許可する。active paneはpointer/focus captureで同時に更新されるが、security境界には使わない。
+- transient activationは親Viewer document全体の`navigator.userActivation`状態であり、pane / iframeごとには区別できない。pane間の区別は`event.source`とselected tab / revision一致で行い、active pane条件をsecurity判定へ追加しない。非active pane由来のuser clickも既存policyをすべて通る場合だけ許可する。
+- duplicate external-open guardはHtmlPreview instance、すなわちpane単位とする。1 clickのmessage重複は同paneで1回に抑止し、同じ文書の同じhrefを利用者が両paneで別々にclickした場合は各paneで1回ずつopenできる。
 - ready / timeout / external-open failureはpane runtimeへ反映し、他paneの同じtabをerrorにしない。
 - iframe keyは`paneId + tabId + revision`とする。theme、active pane、split ratio、Explorer widthでは変更しない。
 - `sandbox="allow-scripts"`、CSP、custom protocol、root boundary、capabilityは変更しない。
@@ -399,7 +435,11 @@ DocumentPaneは `role="region"` と `aria-label="Primary document pane"` / `aria
 - Home / Endはdynamic min / max、ArrowLeft / ArrowRightは16px移動とする。
 - `aria-valuemin` / `aria-valuemax` / `aria-valuenow` はclamp後px値を公開する。
 
-極端に狭くboundsが同値になる場合はseparator操作で値を変えないが、modeを自動変更しない。overflowは各pane内のtable / code / diagram / iframeへ閉じ込め、app shell全体へ移さない。
+未計測、非finite、separator幅以下のworkspace widthではtyped boundsを作らず50/50 CSS fallbackを使う。自動clampはrequested ratioへ書き戻さない。pointer / keyboardによる明示操作はboundsに可動域がある場合だけrequested ratioを更新し、極端に狭くboundsが同値ならno-opとして以前のratioを保つ。modeは自動変更しない。
+
+各paneのMarkdown本文幅はpane content box相対の`calc(100% - 48px)`へ追従する。一方、24pxから14pxへのgutter切替は既存どおりwindow viewportの`@media (max-width: 760px)`基準とし、viewportが760px超のままsplitで個別paneだけが狭くなっても24px gutterを維持する。tab itemの`min(220px, 32vw)`もwindow viewport基準の既存契約を維持するため、狭いpaneではTabStripのhorizontal overflowがsingleより早く発生する。
+
+overflowは各pane内のTabStrip / table / code / diagram / iframeへ閉じ込め、app shell全体へ移さない。
 
 ### 12.3 pointer
 
@@ -425,7 +465,7 @@ Explorer separatorと同じpointer capture lifecycleを使うが、resize state�
 | document open失敗 | global tab error。選択している各paneでerror表示 |
 | PlantUML失敗 | tab errorとdiagram単位errorを共有し、他tabへ混線させない |
 | Mermaid失敗 | 発生pane runtimeだけerror。他paneの同tabは維持 |
-| HTML handshake timeout | 発生iframe/paneだけerror。sandboxを緩和するfallbackなし |
+| HTML handshake timeout | 発生iframe/paneだけerror。自paneのTabStripを`Error`表示し、他paneへ混線させない。sandboxを緩和するfallbackなし |
 | external URL open失敗 | 発生paneだけerror。unsupported schemeは既存policyでopenしない |
 | closed / reloaded tabのasync完了 | pane + tab + revision guardでignore |
 | invalid layout programming input | pure policyがthrow。暗黙fallbackで隠さない |
@@ -450,6 +490,8 @@ pane errorが発生しても他paneの閲覧とtab選択を妨げない。global
 | `markdown-viewer-tauri/src/App.css` | preview grid、pane、active state、separator、狭幅、cursor |
 | `markdown-viewer-tauri/src/splitView.ts` | typed transition / width policy（新規） |
 | `markdown-viewer-tauri/src/splitView.test.ts` | state / width / close / root / navigation test（新規） |
+| `markdown-viewer-tauri/src/paneRuntime.ts` | pane / tab / revision guard、TabStrip state合成（新規） |
+| `markdown-viewer-tauri/src/paneRuntime.test.ts` | stale result、pane-local status、同一tab両pane test（新規） |
 | `documentPolicy.ts` | 原則変更なし。props命名調整が必要な場合も判定契約は不変 |
 | `imageViewer.ts` | 原則変更なし。split依存はApp側交差型へ閉じ込める |
 | Rust / Tauri config | 変更なし |
@@ -462,12 +504,12 @@ pane errorが発生しても他paneの閲覧とtab選択を妨げない。global
 - `docs/rules/project_overview.md`: Tauri 2 pane表示の概要。
 - `docs/architecture/overview.md`: split stateとpreview flow。
 - `docs/architecture/code_patterns.md`: shared tab data / pane runtime / Mermaid queue pattern。
-- `docs/architecture/common_pitfalls.md`: 複数pane Mermaid並行実行、HTML handshake、duplicate DOM ID、iframe上separator drag。
+- `docs/architecture/common_pitfalls.md`: 複数pane Mermaid並行実行と生成ID、HTML handshake、pane-scoped DOM ID、iframe上separator drag。
 - `docs/components/tauri_viewer/README.md`
 - `docs/components/tauri_viewer/basic_design.md`
 - `docs/components/tauri_viewer/detail_design.md`
 - `docs/components/tauri_viewer/interface_spec.md`
-- `docs/rules/development_workflow.md`: split手動確認matrix。
+- `docs/rules/development_workflow.md`: split手動確認matrix。TODO-2026-021で確定したpane相対本文幅 / viewport基準gutterの既存項目と整合させる。
 
 ADRは追加しない。今回の判断はTauri component固有であり、複数案件に再利用される横断的採用判断にはまだ達していない。Avalonia反映仕様の確定後に横断判断が成立した場合、`TODO-2026-007` で起票要否を再評価する。
 
@@ -478,14 +520,21 @@ ADRは追加しない。今回の判断はTauri component固有であり、複�
 `splitView.test.ts`:
 
 - single初期state。
-- split on時のsecondary隣接tab、1 tab時`null`、active primary。
+- split on時のsecondary隣接tab、1 tab時`null`、primary未選択時はsecondaryも`null`、active primary。
 - paneごとのselect / pending navigation / consume guard。
-- split off時にactive secondary selectionをprimaryへ引継ぐ。
+- split off時にactive secondary selectionをprimaryへ引継ぐ。active pane未選択時はprimary維持、両方未選択かつtabありでは先頭fallback。
 - close active / non-active / 両pane同一tab / 最後のtabのfallback。
 - root resetでmode / ratio維持、selection clear。
 - invalid / stale actionのthrowまたはignore契約。
 - ratio 0.5、pointer ratio、16px key、Home / End。
-- 通常幅と狭幅のdynamic bounds、requested ratio復元。
+- 未計測 / 非finite / separator幅以下、通常幅、min=maxの狭幅、requested ratio復元。狭幅でpointer / keyboard操作してもratioを上書きしない。
+
+`paneRuntime.test.ts`:
+
+- pane切替後、tab切替後、revision更新後、tab close後、split off後のcaptured result拒否。
+- current pane + tab + revision一致時だけresult受理。
+- 同一tabを両paneへ表示した時、片paneのruntime errorを他paneへ合成しない。
+- shared loading / rendering / error優先と、selected tabだけのloading-html / rendering-mermaid / error合成。
 
 既存test:
 
@@ -515,15 +564,15 @@ git diff --check
 
 ## 19. ユーザ動作確認観点
 
-1. View menuからsplit on / offし、primary維持、secondary初期選択、active secondaryからsingleへ戻る挙動を確認する。
+1. View menuからsplit on / offし、primary維持、secondary初期選択、active secondaryからsingleへ戻る挙動を確認する。空secondaryをactiveにしてsplit offしてもprimary文書を失わないことも確認する。
 2. primary / secondaryで別Markdownを選び、各paneを独立scrollする。
 3. pointer / focusでactive paneを変え、Explorer、Reload、relative Markdown link、anchor、StatusBar、ErrorBannerが対象paneだけへ反映されることを確認する。
 4. active / non-active tab close、両paneで同一tab、最後のtab、root変更成功 / 失敗でselectionが復旧することを確認する。
-5. `sample_docs/plantuml.md` 等を使い、Mermaid + PlantUMLを両paneで表示し、theme / window / Explorer / split resize後もMermaid sourceへ戻らずPlantUML commandを不要に再実行しないことを確認する。
+5. 同一のMermaid文書を両paneへ表示し、両SVGのgenerated ID / marker / clipPath / 配色 / themeが独立して正しく描画されることを確認する。Mermaid + PlantUMLの組合せでもtheme / window / Explorer / split resize後にMermaid sourceへ戻らずPlantUML commandを不要に再実行しないことを確認する。
 6. Markdown + trusted HTML、HTML + HTMLを表示し、各iframe handshake、fragment、HTTP(S) external open、Theme非reload、resize非reloadを確認する。
 7. `sample_docs/html_fixture/malicious.html` でroot外resource、external network、popup、form、download、Tauri IPCが引き続き拒否されることを確認する。
-8. 両paneの通常画像 / Mermaid / PlantUMLからimage viewerをpointer / keyboardで開き、close時に発生元paneへfocusが戻ることを確認する。
-9. split separatorをpointer、ArrowLeft / ArrowRight、Home / Endで操作し、iframe上でもdrag継続、ARIA値、focus維持、狭幅 / 再拡大を確認する。
+8. 両paneの通常画像 / Mermaid / PlantUMLからimage viewerをpointer / keyboardで開き、close時に発生元paneへfocusが戻ることを確認する。secondary viewer表示中のsplit off / tab closeではviewerが閉じ、primary regionへ安全にfocus fallbackすることも確認する。
+9. split separatorをpointer、ArrowLeft / ArrowRight、Home / Endで操作し、iframe上でもdrag継続、ARIA値、focus維持、狭幅 / 再拡大を確認する。viewport 760px超のままsplitでpaneだけを狭めてもMarkdown gutterは24pxのまま、TabStripはpane内horizontal overflowになることを確認する。
 10. Tabだけで両paneのTabStripとseparatorへ到達し、tab role / active pane indicator / focus indicator / unique controls関係を確認する。
 11. single modeで既存Multi-tab、Markdown / HTML、MenuBar / StatusBar、Settings、Recent Folders、Explorer resize、image viewerが退行しないことを確認する。
 
