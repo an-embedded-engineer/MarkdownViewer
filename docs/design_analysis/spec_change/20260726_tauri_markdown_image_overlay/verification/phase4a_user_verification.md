@@ -26,3 +26,16 @@ Phase 4-aを一度NGとしてPhase 3相当へ戻し、activationをpointer / key
 
 - pointerで開き、Close / Escapeで閉じてもpillと本文全体outlineが表示されない。
 - Tabで`Open image viewer` buttonへ移動し、Enter / Spaceで開いてClose / Escapeで閉じると同buttonへfocusが戻る。
+
+## 再確認結果
+
+修正後のユーザー実機再確認で次を確認した。
+
+| 観点 | 結果 |
+| --- | --- |
+| pointer clickでviewerを開いた場合、close後に`Open image viewer` pillが表示されない | PASS |
+| Tab移動で`Open image viewer` pillが表示される | PASS |
+| pillをEnter / Spaceでactivateするとviewerが開く | PASS |
+| keyboard起点でviewerを閉じた後、同じpillがfocusされた状態で残る | PASS |
+
+初回確認でPASSだった通常画像、Mermaid、PlantUMLのopen、zoom / pan、Close / Escape操作とあわせ、Phase 4-aのユーザー動作確認は完了とする。未解決事項はない。
