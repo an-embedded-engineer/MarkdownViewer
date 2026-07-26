@@ -11,6 +11,7 @@ OS 連携とファイルシステム境界は Rust command / `DocumentStore` へ
 - TypeScript renderer (`renderMarkdown` / `MarkdownPreview`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。MermaidがReact外で置換したSVGを保持するため、生成HTMLと`dangerouslySetInnerHTML`値はMarkdown内容が変わるまで安定化する。
 - TypeScript policy (`documentPolicy.ts`): command responseの排他shape、HTML preview URL、opaque-origin messageをpure functionで検証する。
 - TypeScript policy (`explorerPane.ts`): Explorer幅の最小値、workspace実寸に応じたdynamic最大値、clamp、keyboard操作をpure functionで管理する。幅はsession-onlyで永続化しない。
+- TypeScript policy / DOM adapter (`imageViewer.ts`): image viewerのfit / zoom / pan / wheel / intrinsic size / activation判定をpure functionへ集約し、Markdown preview内で描画が完了した通常画像、Mermaid SVG、PlantUML SVGだけをtyped requestへ解決する。
 - Rust: canonical current root、Markdown / HTML open、`mvhtml` resource配信、PlantUML レンダリング、Recent Folders / Viewer settings の app config JSON 永続化。
 - Tauri config: dialog / opener / asset protocol の権限管理とshell CSP。HTML protocol originをcapability remote URLへ追加しない。
 
@@ -67,6 +68,7 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 React UI -> Tauri invoke -> Rust commands -> filesystem / Java
 React UI -> markdown-it / mermaid -> WebView DOM
 React UI -> explorerPane.ts -> Explorer width bounds / keyboard policy
+React UI -> imageViewer.ts -> transform policy / Markdown DOM source resolver
 React UI -> @tauri-apps/plugin-dialog / plugin-opener -> OS
 HtmlPreview -> mvhtml protocol -> DocumentStore -> root内allowlist resource
 ```
@@ -199,6 +201,7 @@ state TabLoading : active tab loadState = loading
 state AppConfigUpdating : foregroundConfigOperationCount > 0
 state PlantUmlPending : active tab loadState = rendering
 state Error : error strip に errorMessage 表示
+state ImageViewerOpen : imageViewerRequest set\napp shell inert
 
 NoRoot --> HasRoot : Open Folder / loadRoot scan成功
 HasRoot --> TabLoading : Explorer 選択 / Reload
@@ -210,6 +213,8 @@ AppConfigUpdating --> Error : config command 失敗
 HasRoot --> PlantUmlPending : PlantUML fence 検出
 PlantUmlPending --> HasRoot : render_plantuml_diagrams 完了
 PlantUmlPending --> Error : render 失敗 / firstError
+HasRoot --> ImageViewerOpen : decorated visual click / button activate
+ImageViewerOpen --> HasRoot : Close / Escape / backdrop
 Error --> HasRoot : 次の操作で復帰
 @enduml
 ```

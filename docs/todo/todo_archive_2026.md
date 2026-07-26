@@ -1,5 +1,34 @@
 # TODO Archive 2026
 
+## TODO-2026-022 Tauri Markdown画像オーバーレイ表示
+
+- Status: `done`
+- Category: `spec-change`
+- Created: `2026-07-26`
+- Completed: `2026-07-26`
+- Branch: `spec-change/tauri-markdown-image-overlay`
+- Design analysis:
+  - `docs/design_analysis/spec_change/20260726_tauri_markdown_image_overlay/`
+- Change report:
+  - `docs/design_analysis/spec_change/20260726_tauri_markdown_image_overlay/change_report.md`
+- Review records:
+  - `docs/design_analysis/spec_change/20260726_tauri_markdown_image_overlay/review/tauri_markdown_image_overlay_design_review.md`
+  - `docs/design_analysis/spec_change/20260726_tauri_markdown_image_overlay/review/tauri_markdown_image_overlay_impl_review.md`
+- Summary:
+  - Added a modal image viewer for loaded Markdown images and rendered Mermaid / PlantUML SVGs without changing the normal document layout.
+  - Added fit-to-viewport, zoom up to 800%, pointer / keyboard pan, 100% reset, modal close, focus trap, and Light / Dark styling.
+  - Kept linked-image navigation, SVG anchors, trusted HTML iframe security, Rust backend, asset protocol, and normal preview layout boundaries intact.
+  - Split close focus restoration by pointer / keyboard activation after Phase 4-a feedback so keyboard affordances remain available without appearing after mouse use.
+- Verification:
+  - User confirmed pointer cursor / open, image / Mermaid / PlantUML overlay display, button / mouse / keyboard zoom and pan, and Close / Escape behavior.
+  - User reconfirmed that pointer close leaves no `Open image viewer` pill, while Tab exposes the pill and Enter / Space opens the viewer with focus restored after close.
+  - `npm run build` and 42 frontend tests passed.
+  - `cargo fmt -- --check`, `cargo check`, and 22 Rust tests passed.
+  - Design and all implementation review rounds were approved with no unresolved findings.
+  - `diff.zip` generated from `d2e9fd5..64cde48` and verified with `unzip -t`.
+- Follow-up:
+  - No new follow-up item is required. Avalonia support, trusted HTML images, download, separate windows, and transform persistence remain outside this TODO.
+
 ## TODO-2026-021 Tauri document preview 横幅の可変化
 
 - Status: `done`

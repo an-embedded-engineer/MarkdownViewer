@@ -1,0 +1,1 @@
+`docs/design_analysis/spec_change/20260726_tauri_markdown_image_overlay/prompts/phase3_impl_review_initial_claude.md`を読んで、レビューを開始してください。

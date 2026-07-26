@@ -21,6 +21,24 @@ import {
   getExplorerWidthForKey,
   initialExplorerWidth,
 } from "./explorerPane";
+import {
+  createImageViewerDomAdapter,
+  createImageViewerFitTransform,
+  createImageViewerResetTransform,
+  getImageViewerActivation,
+  getImageViewerFitScale,
+  getImageViewerWheelFactor,
+  imageViewerButtonZoomInFactor,
+  imageViewerButtonZoomOutFactor,
+  imageViewerMaximumScale,
+  panImageViewerTransform,
+  resizeImageViewerTransform,
+  resolveImageViewerSource,
+  zoomImageViewerTransform,
+  type ImageViewerGeometry,
+  type ImageViewerRequest,
+  type ImageViewerTransform,
+} from "./imageViewer";
 
 type FileTreeNode = {
   name: string;
@@ -124,13 +142,15 @@ function App() {
   const [requestedExplorerWidth, setRequestedExplorerWidth] = useState(initialExplorerWidth);
   const [workspaceWidth, setWorkspaceWidth] = useState<number | null>(null);
   const [isExplorerResizing, setIsExplorerResizing] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const [imageViewerRequest, setImageViewerRequest] = useState<ImageViewerRequest | null>(null);
+  const previewRef = useRef<HTMLElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const explorerResizeRef = useRef<ExplorerResizeState | null>(null);
   const menuBarRef = useRef<HTMLElement>(null);
   const fileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const tabsRef = useRef<OpenDocumentTab[]>([]);
   const nextTabIdRef = useRef(1);
+  const imageViewerFocusReturnRef = useRef<HTMLElement | null>(null);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const explorerWidth = clampExplorerWidth(requestedExplorerWidth, workspaceWidth);
@@ -594,10 +614,47 @@ function App() {
     return activeTabId;
   }
 
+  function closeImageViewer() {
+    if (imageViewerRequest) {
+      imageViewerFocusReturnRef.current =
+        imageViewerRequest.activation === "keyboard"
+          ? imageViewerRequest.focusOrigin
+          : previewRef.current;
+    }
+    setImageViewerRequest(null);
+  }
+
   async function handlePreviewClick(event: React.MouseEvent<HTMLDivElement>) {
-    const target = event.target as HTMLElement;
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
     const anchor = target.closest("a");
     const href = anchor?.getAttribute("href");
+
+    if (
+      activeTab?.documentType === "markdown" &&
+      previewRef.current &&
+      !(anchor && target.closest("svg"))
+    ) {
+      const request = resolveImageViewerSource(
+        target,
+        previewRef.current,
+        activeTab.id,
+        activeTab.revision,
+        getImageViewerActivation(event.detail),
+      );
+      if (request) {
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        setImageViewerRequest(request);
+        return;
+      }
+    }
 
     if (!href) {
       return;
@@ -861,28 +918,70 @@ function App() {
       return;
     }
 
+    const adapter = createImageViewerDomAdapter(container, {
+      tabId: activeTab.id,
+      revision: activeTab.revision,
+      documentPath: activeTab.path,
+    });
+    adapter.decorate();
     const nodes = container.querySelectorAll<HTMLElement>(".mermaid");
-    if (nodes.length === 0) {
-      return;
-    }
-
     let cancelled = false;
     const tabId = activeTab.id;
     const revision = activeTab.revision;
-    mermaid.run({ nodes }).catch((error) => {
-      if (!cancelled) {
-        updateTabIfCurrent(tabId, revision, (tab) => ({
-          ...tab,
-          loadState: "error",
-          errorMessage: `Mermaid render failed: ${toErrorMessage(error)}`,
-        }));
-      }
-    });
+    if (nodes.length > 0) {
+      mermaid
+        .run({ nodes })
+        .then(() => {
+          if (!cancelled) {
+            adapter.decorate();
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            updateTabIfCurrent(tabId, revision, (tab) => ({
+              ...tab,
+              loadState: "error",
+              errorMessage: `Mermaid render failed: ${toErrorMessage(error)}`,
+            }));
+          }
+        });
+    }
 
     return () => {
       cancelled = true;
+      adapter.cleanup();
     };
   }, [activeTab?.id, activeTab?.revision, activeTab?.plantUmlDiagrams, theme]);
+
+  useEffect(() => {
+    if (!imageViewerRequest) {
+      return;
+    }
+    if (
+      !activeTab ||
+      activeTab.documentType !== "markdown" ||
+      activeTab.id !== imageViewerRequest.tabId ||
+      activeTab.revision !== imageViewerRequest.revision
+    ) {
+      closeImageViewer();
+    }
+  }, [activeTab?.id, activeTab?.revision, activeTab?.documentType, imageViewerRequest]);
+
+  useEffect(() => {
+    if (imageViewerRequest || !imageViewerFocusReturnRef.current) {
+      return;
+    }
+    const focusReturn = imageViewerFocusReturnRef.current;
+    imageViewerFocusReturnRef.current = null;
+    const timer = window.setTimeout(() => {
+      if (focusReturn.isConnected) {
+        focusReturn.focus();
+      } else {
+        previewRef.current?.focus();
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [imageViewerRequest]);
 
   useEffect(() => {
     if (
@@ -924,8 +1023,8 @@ function App() {
     <>
       <main
         className={`app-shell ${isExplorerResizing ? "explorer-resizing" : ""}`}
-        aria-hidden={settingsDraft ? true : undefined}
-        inert={settingsDraft ? true : undefined}
+        aria-hidden={settingsDraft || imageViewerRequest ? true : undefined}
+        inert={settingsDraft || imageViewerRequest ? true : undefined}
       >
         <MenuBar
           menuBarRef={menuBarRef}
@@ -1053,7 +1152,352 @@ function App() {
           onSave={() => void saveSettings()}
         />
       ) : null}
+
+      {imageViewerRequest ? (
+        <ImageViewerDialog request={imageViewerRequest} onClose={closeImageViewer} />
+      ) : null}
     </>
+  );
+}
+
+type ImageViewerDialogProps = {
+  request: ImageViewerRequest;
+  onClose: () => void;
+};
+
+type ImageViewerDragState = {
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+};
+
+function ImageViewerDialog({ request, onClose }: ImageViewerDialogProps) {
+  const sourceLabel =
+    request.kind === "image"
+      ? "Image"
+      : request.kind === "mermaid"
+        ? "Mermaid diagram"
+        : "PlantUML diagram";
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const backdropPointerRef = useRef(false);
+  const dragRef = useRef<ImageViewerDragState | null>(null);
+  const [geometry, setGeometry] = useState<ImageViewerGeometry | null>(null);
+  const [transform, setTransform] = useState<ImageViewerTransform | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [announcedScale, setAnnouncedScale] = useState<number | null>(null);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content || !request.visual.isConnected) {
+      onClose();
+      return;
+    }
+    const clone = request.visual.cloneNode(true) as HTMLImageElement | SVGSVGElement;
+    clone.setAttribute("aria-hidden", "true");
+    clone.removeAttribute("width");
+    clone.removeAttribute("height");
+    clone.style.removeProperty("max-width");
+    clone.style.removeProperty("width");
+    clone.style.removeProperty("height");
+    clone.style.width = `${request.intrinsicWidth}px`;
+    clone.style.height = `${request.intrinsicHeight}px`;
+    content.replaceChildren(clone);
+    return () => content.replaceChildren();
+  }, [request]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+    const updateGeometry = (width: number, height: number) => {
+      if (width <= 0 || height <= 0) {
+        return;
+      }
+      const nextGeometry: ImageViewerGeometry = {
+        intrinsicWidth: request.intrinsicWidth,
+        intrinsicHeight: request.intrinsicHeight,
+        viewportWidth: width,
+        viewportHeight: height,
+        padding: window.innerWidth <= 760 ? 12 : 24,
+      };
+      setGeometry(nextGeometry);
+      setTransform((current) =>
+        current
+          ? resizeImageViewerTransform(current, nextGeometry)
+          : createImageViewerFitTransform(nextGeometry),
+      );
+    };
+    const initial = viewport.getBoundingClientRect();
+    updateGeometry(initial.width, initial.height);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        updateGeometry(entry.contentRect.width, entry.contentRect.height);
+      }
+    });
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [request]);
+
+  useEffect(() => {
+    viewportRef.current?.focus();
+  }, [request]);
+
+  useEffect(() => {
+    if (!transform) {
+      return;
+    }
+    const timer = window.setTimeout(() => setAnnouncedScale(transform.scale), 250);
+    return () => window.clearTimeout(timer);
+  }, [transform?.scale]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !geometry) {
+      return;
+    }
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      const factor = getImageViewerWheelFactor(event.deltaY, event.deltaMode, rect.height);
+      const anchor = {
+        x: event.clientX - (rect.left + rect.width / 2),
+        y: event.clientY - (rect.top + rect.height / 2),
+      };
+      setTransform((current) =>
+        current ? zoomImageViewerTransform(current, geometry, factor, anchor) : current,
+      );
+    };
+    viewport.addEventListener("wheel", handleWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", handleWheel);
+  }, [geometry]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key === "Tab" && dialogRef.current) {
+        const controls = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), [tabindex]:not([tabindex="-1"])',
+          ),
+        );
+        if (controls.length === 0) {
+          event.preventDefault();
+          dialogRef.current.focus();
+          return;
+        }
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const updateZoom = (factor: number) => {
+    if (!geometry) {
+      return;
+    }
+    setTransform((current) =>
+      current ? zoomImageViewerTransform(current, geometry, factor) : current,
+    );
+  };
+
+  const updatePan = (x: number, y: number) => {
+    if (!geometry) {
+      return;
+    }
+    setTransform((current) =>
+      current ? panImageViewerTransform(current, geometry, { x, y }) : current,
+    );
+  };
+
+  const handleViewportKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!geometry || !transform) {
+      return;
+    }
+    const panStep = event.shiftKey ? 160 : 48;
+    if (event.key === "+" || event.key === "=") {
+      event.preventDefault();
+      updateZoom(imageViewerButtonZoomInFactor);
+    } else if (event.key === "-") {
+      event.preventDefault();
+      updateZoom(imageViewerButtonZoomOutFactor);
+    } else if (event.key === "0") {
+      event.preventDefault();
+      setTransform(createImageViewerResetTransform(geometry));
+    } else if (event.key === "f" || event.key === "F") {
+      event.preventDefault();
+      setTransform(createImageViewerFitTransform(geometry));
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      updatePan(-panStep, 0);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      updatePan(panStep, 0);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      updatePan(0, -panStep);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      updatePan(0, panStep);
+    }
+  };
+
+  const percentage = Math.round((transform?.scale ?? 0) * 100);
+  const fitScale = geometry ? getImageViewerFitScale(geometry) : 0;
+
+  return (
+    <div
+      className="image-viewer-backdrop"
+      onPointerDown={(event) => {
+        backdropPointerRef.current = event.target === event.currentTarget;
+      }}
+      onPointerUp={(event) => {
+        if (backdropPointerRef.current && event.target === event.currentTarget) {
+          onClose();
+        }
+        backdropPointerRef.current = false;
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="image-viewer-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="image-viewer-title"
+        aria-describedby="image-viewer-instructions"
+        tabIndex={-1}
+      >
+        <header className="image-viewer-header">
+          <h2 id="image-viewer-title">
+            {sourceLabel}
+            {request.accessibleName === sourceLabel ? "" : `: ${request.accessibleName}`}
+          </h2>
+          <button type="button" aria-label="Close image viewer" onClick={onClose}>
+            Close
+          </button>
+        </header>
+        <div className="image-viewer-toolbar" role="toolbar" aria-label="Image viewer controls">
+          <button
+            type="button"
+            aria-label="Zoom out"
+            disabled={!transform || transform.scale <= fitScale + 0.000001}
+            onClick={() => updateZoom(imageViewerButtonZoomOutFactor)}
+          >
+            Zoom out
+          </button>
+          <output aria-label="Current zoom" aria-live="off">
+            {percentage}%
+          </output>
+          <button
+            type="button"
+            aria-label="Zoom in"
+            disabled={!transform || transform.scale >= imageViewerMaximumScale - 0.000001}
+            onClick={() => updateZoom(imageViewerButtonZoomInFactor)}
+          >
+            Zoom in
+          </button>
+          <button
+            type="button"
+            aria-label="Fit image"
+            disabled={!geometry}
+            onClick={() => geometry && setTransform(createImageViewerFitTransform(geometry))}
+          >
+            Fit
+          </button>
+          <button
+            type="button"
+            aria-label="Reset image to 100%"
+            disabled={!geometry}
+            onClick={() => geometry && setTransform(createImageViewerResetTransform(geometry))}
+          >
+            100%
+          </button>
+        </div>
+        <div
+          ref={viewportRef}
+          className={`image-viewer-viewport ${isDragging ? "dragging" : ""}`}
+          tabIndex={0}
+          aria-label="Zoomable and pannable image"
+          onKeyDown={handleViewportKeyDown}
+          onPointerDown={(event) => {
+            if (event.button !== 0 || !event.isPrimary || !transform) {
+              return;
+            }
+            dragRef.current = {
+              pointerId: event.pointerId,
+              clientX: event.clientX,
+              clientY: event.clientY,
+            };
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setIsDragging(true);
+            event.preventDefault();
+          }}
+          onPointerMove={(event) => {
+            const drag = dragRef.current;
+            if (!drag || drag.pointerId !== event.pointerId) {
+              return;
+            }
+            updatePan(event.clientX - drag.clientX, event.clientY - drag.clientY);
+            drag.clientX = event.clientX;
+            drag.clientY = event.clientY;
+          }}
+          onPointerUp={(event) => {
+            if (dragRef.current?.pointerId !== event.pointerId) {
+              return;
+            }
+            dragRef.current = null;
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+            setIsDragging(false);
+          }}
+          onPointerCancel={() => {
+            dragRef.current = null;
+            setIsDragging(false);
+          }}
+          onLostPointerCapture={() => {
+            dragRef.current = null;
+            setIsDragging(false);
+          }}
+        >
+          <div
+            ref={contentRef}
+            className="image-viewer-content"
+            aria-hidden="true"
+            inert
+            style={
+              transform
+                ? {
+                    transform: `translate(-50%, -50%) translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
+                  }
+                : undefined
+            }
+          />
+        </div>
+        <p id="image-viewer-instructions" className="image-viewer-instructions">
+          Wheel or trackpad to zoom. Drag or use Arrow keys to pan. Press F to fit, 0 for 100%, and Escape to close.
+        </p>
+        <span className="image-viewer-live" aria-live="polite">
+          {announcedScale === null ? "" : `Zoom ${Math.round(announcedScale * 100)} percent`}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -1669,7 +2113,7 @@ type MarkdownPreviewProps = {
   markdown: string;
   plantUmlDiagrams: PlantUmlDiagramResult[];
   selectedFilePath: string;
-  previewRef: React.RefObject<HTMLDivElement | null>;
+  previewRef: React.RefObject<HTMLElement | null>;
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
 };
 
@@ -1693,6 +2137,7 @@ function MarkdownPreview({
     <article
       ref={previewRef}
       className="markdown-body"
+      tabIndex={-1}
       onClick={onClick}
       dangerouslySetInnerHTML={innerHtml}
     />

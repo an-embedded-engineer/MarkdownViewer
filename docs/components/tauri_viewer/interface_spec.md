@@ -12,6 +12,7 @@
 - Reload: MenuBar の File dropdown から root treeとactive tabだけを再読み込みする。
 - Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
 - Settings: MenuBar の File dropdown からSettings dialogを開き、Theme / current window size / PlantUML jar pathを確認する。Themeとjar pathを変更してSave、またはCancelできる。
+- Markdown image viewer: 描画済みの通常画像、Mermaid、PlantUMLをclickするか、直後のkeyboard buttonをEnter / Spaceでactivateしてmodal表示する。wheel / trackpad、toolbar、keyboardでzoomし、drag / Arrowでpanする。
 
 ## MenuBar 表示
 
@@ -62,6 +63,16 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - 描画済みMermaidはwindow / Explorer resize後もSVG表示を維持し、元のdiagram source文字列へ戻らない。
 - trusted HTML iframeはpreview pane全幅へ追従し、HTML文書自身の`width` / `max-width`とsecurity境界をViewerから変更しない。
 - documentの縦scrollは`.preview-pane`が所有し、app shell全体へscrollを移さない。
+
+### Markdown image viewer
+
+- 対象はMarkdown React DOM内のload済み通常画像、描画成功済みMermaid SVG、描画成功済みPlantUML SVG。trusted HTML iframe内の画像、pending / error diagram、dimension不明visualは対象外。
+- pointer clickと隣接native buttonのEnter / Spaceで開く。SVG内anchorはlinkを優先する。linked imageの画像領域clickはviewerを優先し、link自体のkeyboard activationはnavigationを維持する。
+- 初期表示と`Fit`はvisual全体をpadding 24px（window viewport 760px以下は12px）内へ収め、100%を超えて拡大しない。zoom範囲は現在のfit倍率から800%。`100%`はnatural size、offset 0へ戻す。
+- `Zoom out` / `Zoom in`、wheel / trackpad、`+` / `-`を提供する。wheelはpointer位置、それ以外はviewport中央をzoom中心とする。現在倍率を整数percentで表示する。
+- primary pointer drag、Arrow 48px、Shift+Arrow 160pxでpanする。visualがviewportより小さい軸は中央へ固定し、大きい軸は各端へ到達可能な範囲へclampする。
+- `Escape`、Close、backdrop clickで閉じる。keyboard起点では起点buttonへfocusを戻し、pointer起点ではactive previewへfocusを戻してkeyboard専用pillを表示しない。Tab / Shift+Tabはdialog内でloopし、表示中の背景UIは`inert`となる。
+- 通常時の画像縮小、diagram containerのborder / padding / horizontal scroll、Markdown title、本文の行組みを変更しない。transform stateはclose / tab / Reloadを跨いで保持しない。
 
 ## Error Strip 表示
 
