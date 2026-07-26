@@ -6,7 +6,12 @@
 **対象設計**: `docs/design_analysis/spec_change/20260726_tauri_markdown_image_overlay/design/tauri_markdown_image_overlay_design.md`
 **対象実装記録**: `docs/design_analysis/spec_change/20260726_tauri_markdown_image_overlay/impl/tauri_markdown_image_overlay_impl.md`
 **Phase 2 レビュー**: `review/tauri_markdown_image_overlay_design_review.md`（承認、未解決 0 件、`7bcc92b`）
-**判定**: **条件付き差し戻し (Changes Requested)**。設計との対応、security 境界、数式、lifecycle、恒久 docs はいずれも整合しており、方針転換や再設計は不要。ただし keyboard 起点の操作性に関わる **Medium 2 件**を修正してから Phase 4 へ進むこと。High 0 件。**未解決指摘 5 件（Medium 2 / Low 3）**。
+**Round 1 fix コミット**: `80741cf` (fix: address Tauri image viewer implementation review)
+**再レビュー日**: 2026-07-26
+**初回判定**: 条件付き差し戻し (Changes Requested)。Medium 2 件 / Low 3 件、High 0 件。
+**再レビュー判定 / 最終**: **承認 (Approved)**。Phase 4 進行可。初回指摘 **5 件（Medium 2 / Low 3）はすべてクローズ**し、再レビューでの新規指摘は 0 件。High は通じて 0 件。**未解決指摘 0 件**。判定根拠は 8 章を正とする。
+
+> **本文書の読み方**: 1〜6 章は初回レビュー（対象 `ad68ae4`）の記録であり、指摘内容と根拠を保存する目的でそのまま残す（status のみ現状へ更新）。7 章は実装 Agent の対応記録、**8 章が再レビュー（対象 `80741cf`）の検証結果と最終判定**である。
 
 ---
 
@@ -59,7 +64,7 @@
 
 **severity**: Medium
 **対象工程**: Phase 3 実装修正
-**status**: 未対応
+**status**: クローズ（Round 1 再レビューで確認。8 章参照）
 
 ---
 
@@ -76,7 +81,7 @@
 
 **severity**: Medium
 **対象工程**: Phase 3 実装修正（+ 設計 §18 / development workflow の手動確認項目追記）
-**status**: 未対応
+**status**: クローズ（Round 1 再レビューで確認。8 章参照）
 
 ---
 
@@ -90,7 +95,7 @@
 
 **severity**: Low
 **対象工程**: Phase 3 docs 修正
-**status**: 未対応
+**status**: クローズ（Round 1 再レビューで確認。8 章参照）
 
 ---
 
@@ -112,7 +117,7 @@
 
 **severity**: Low
 **対象工程**: Phase 3 実装修正
-**status**: 未対応
+**status**: クローズ（Round 1 再レビューで確認。8 章参照）
 
 ### 3.2 設計 §17 が列挙した自動テスト 11 項目のうち 2 項目が未実装
 
@@ -127,7 +132,7 @@
 
 **severity**: Low
 **対象工程**: Phase 3 テスト追加
-**status**: 未対応
+**status**: クローズ（Round 1 再レビューで確認。8 章参照）
 
 ---
 
@@ -163,13 +168,13 @@ Phase 2 レビュー §9.2 の実装条件 2 件（`:focus` 可視化、`user-se
 
 | ID | severity | 概要 | 対象工程 | status |
 | --- | --- | --- | --- | --- |
-| 1.1 | Medium | `<output>` の暗黙 live region で zoom 通知が二重化し debounce が無効 | Phase 3 実装 | 未対応 |
-| 1.2 | Medium | focus pill が 1 frame 誤配置され、`position: fixed` 化で対象 visual への scroll 追従も失われる | Phase 3 実装 / 手動確認項目 | 未対応 |
-| 2.1 | Low | `docs/tests/README.md` の Manual UI check に image viewer 未追加 | Phase 3 docs | 未対応 |
-| 3.1 | Low | dialog title が操作 label を流用し語が重複。可視 label と accessible name も不一致 | Phase 3 実装 | 未対応 |
-| 3.2 | Low | 設計 §17 の縦長 fit と center zoom offset のテストが未実装 | Phase 3 テスト | 未対応 |
+| 1.1 | Medium | `<output>` の暗黙 live region で zoom 通知が二重化し debounce が無効 | Phase 3 実装 | クローズ (`80741cf`) |
+| 1.2 | Medium | focus pill が 1 frame 誤配置され、`position: fixed` 化で対象 visual への scroll 追従も失われる | Phase 3 実装 / 手動確認項目 | クローズ (`80741cf`) |
+| 2.1 | Low | `docs/tests/README.md` の Manual UI check に image viewer 未追加 | Phase 3 docs | クローズ (`80741cf`) |
+| 3.1 | Low | dialog title が操作 label を流用し語が重複。可視 label と accessible name も不一致 | Phase 3 実装 | クローズ (`80741cf`) |
+| 3.2 | Low | 設計 §17 の縦長 fit と center zoom offset のテストが未実装 | Phase 3 テスト | クローズ (`80741cf`) |
 
-**未解決 5 件（Medium 2 / Low 3）。Phase 3 は未承認。** Medium 2 件を修正し、Low 3 件へ対応または採否理由を記録したうえで再レビューすること。Medium 2 件はいずれも局所修正（`aria-live="off"` の付与、`startTracking` での同期配置と `scrollIntoView`）で、設計変更を伴わない。修正後は `npm test -- --run` / `npm run build` を再実行し、impl 記録 §5 の結果と 1.2 に対応する手動確認項目を更新すること。
+初回レビュー時点の未解決は 5 件（Medium 2 / Low 3）だった。Round 1 fix `80741cf` で全件がクローズし、**再レビュー時点の未解決は 0 件**。最新の判定と根拠は 8 章を正とする。
 
 ---
 
@@ -186,3 +191,46 @@ Phase 2 レビュー §9.2 の実装条件 2 件（`:focus` 可視化、`user-se
 | 3.2 | 縦長geometryのheight制約fitと、非zero offsetからのcenter zoomを追加した。既存fit期待値も厳密値`0.595`へ修正した | 対応済み・再レビュー待ち |
 
 修正後の検証結果は`npm test -- --run`が3 files / 41 tests Pass、`npm run build`がPass（既存chunk size warningのみ）、`cargo check`がPass。
+
+---
+
+## 8. 再レビュー（`80741cf`）と最終判定
+
+`80741cf` の差分（frontend 3 ファイル、設計、impl 記録、`development_workflow.md`、`docs/tests/README.md`）を取得し、初回指摘 5 件それぞれについて修正内容が根本原因に対応しているかを実ソースと突き合わせて検証した。あわせて 3 つの検証コマンドを再実行した。
+
+### 8.1 検証コマンド（再レビュー時に再実行）
+
+| command | 実行結果 | 実装 Agent 報告との一致 |
+| --- | --- | --- |
+| `cd markdown-viewer-tauri && npm test -- --run` | Pass。3 files / **41 tests** | 一致 |
+| `cd markdown-viewer-tauri && npm run build` | Pass。既存 chunk size warning のみ | 一致 |
+| `cd markdown-viewer-tauri/src-tauri && cargo check` | Pass | 一致 |
+
+### 8.2 指摘別のクローズ判定
+
+| ID | 修正 | 再確認結果 | status |
+| --- | --- | --- | --- |
+| 1.1 | `<output aria-label="Current zoom" aria-live="off">`（`App.tsx:1399-1401`） | **クローズ**。author 指定の `aria-live` は role から導かれる暗黙値より優先されるため、`role="status"` 由来の `aria-live="polite"` が無効化され、live 通知が 250ms debounce の `.image-viewer-live` 一本になる。可視表示と `aria-label` は残るので、focus / 参照時の読み上げは維持される。設計 §9 の意図と一致する |
+| 1.2 | `startTracking` で `visual.isConnected` を確認し、`scrollIntoView({ block: "nearest", inline: "nearest" })` → `setTriggerPosition` を**同期実行**してから `update()`（rAF）と scroll / resize listener を開始（`imageViewer.ts:305-313`） | **クローズ**。(a) `focus` handler は focus 操作の一部として paint 前に同期実行されるため、`--image-viewer-trigger-top/left` が `:focus` style の初回適用と同じ frame で確定し、1 frame の `top/left: auto` 誤配置が消える。(b) `scrollIntoView` を明示したことで、`position: fixed` 化により browser の focus scroll が働かない可能性に依存しなくなった。`scroll-behavior: smooth` は CSS に無い（`App.css` に `overscroll-behavior` のみ）ため既定の instant scroll となり、直後の `getBoundingClientRect()` は scroll 後の値を返す。`block/inline: "nearest"` は CSSOM-View の nearest 規則により、対象が scrollport より大きい場合は「何もしない」か既存の整列を維持するため、横 scroll 済み Mermaid / PlantUML container の内部 scroll 位置を巻き戻さない。disconnect 時は listener を張らず button 除去と fallback focus のみ行う分岐も維持されている |
+| 2.1 | `docs/tests/README.md` の Manual UI check へ「Markdown image viewer（zoom / pan / focus / layout 非退行）」を追加 | **クローズ**。impl 記録 §6 にも反映済み |
+| 3.1 | 操作名と内容名を分離。`contentName` は画像 `alt \|\| "Markdown image"` / `"Mermaid diagram"` / `"PlantUML diagram"`、button は `aria-label="Open image viewer: <contentName>"` + `data-image-viewer-name`、resolver は `dataset.imageViewerName` を `accessibleName` に採る（`imageViewer.ts:288, 378-385, 435-457, 533`）。dialog h2 は `sourceLabel === accessibleName` なら種別のみ表示（`App.tsx:1170-1176, 1383-1384`） | **クローズ**。header は `Mermaid diagram` / `PlantUML diagram` / `Image: <alt>` となり語の重複が消えた。可視文言 `Open image viewer` が accessible name の先頭に含まれるため WCAG 2.5.3 Label in Name も満たす。空 alt は `Image: Markdown image` で意味の通る表示になる。`contentName` は `dataset` 経由で設定され `innerHTML` を通らないため、alt 由来文字列の注入経路も増えていない |
+| 3.2 | `intrinsicWidth: 600, intrinsicHeight: 2000` の height 制約 fit（`toBe(0.326)`）と、非 zero offset からの center zoom（`toBe(125)` / `toBe(-75)`）を追加。既存期待値を厳密値 `0.595` へ修正（`imageViewer.test.ts:26-35, 70-80`） | **クローズ**。手計算で一致を確認した。height ケースは avail 952x652 に対し `min(1, 952/600, 652/2000) = 0.326` で **`availableHeight / intrinsicHeight` 分岐が初めて選択**される。center zoom は ratio 1.25、bounds が x 1399 / y 924 で clamp 非発動、`offset' = offset × 1.25` が成立する。既存ケースも `952/1600 = 0.595` の厳密一致となり、`toBeCloseTo` の緩さに依存しなくなった。設計 §17 の 11 項目がこれで全て実装された |
+
+### 8.3 修正に伴う波及の確認
+
+- **設計文の同期**: §6.1 / §6.2 / §6.3 の button label 記述、§6.1.1 の同期配置と `scrollIntoView`、§18-1 の画面外 visual scenario が `80741cf` で更新済み。実装と設計文に乖離はない。
+- **手動確認手順**: `development_workflow.md:184` に「画面外の画像に対応する viewer button へ Tab 移動した時、対象画像が表示領域へ入り、pill がその右上へずれずに表示されること」が追加され、1.2 の修正を Phase 4-a で判定できる。
+- **impl 記録**: §2 に対応概要、§4 にテスト 2 項目、§5 に 41 tests、§6 に `docs/tests/README.md` が反映済みで、実装・設計・レビューと一致する。
+- **回帰**: 修正は viewer 固有の 3 ファイルに閉じており、`src-tauri/`、Markdown image rule、link 処理、CSS の通常時 trigger 規則には差分がない。security 境界と通常時 layout の非退行は初回レビューの結論のまま維持される。
+
+### 8.4 最終判定
+
+- 初回指摘 5 件（Medium 2 / Low 3）: **すべてクローズ**
+- 再レビュー追加指摘: **0 件**
+- **未解決 0 件。Phase 3 承認 (Approved)。Phase 4 進行可。**
+
+承認に伴い `meta.md` の `impl_status` を `done`、Phase Status の Phase 3 行を `Done` へ更新すること。Phase 4-a のユーザ動作確認では、設計 §18 の 12 scenario に加えて、本レビューで実機確認へ委ねた次の 3 点を重点的に判定すること。
+
+1. 画面外画像に対応する button への Tab 移動で、対象画像が表示領域へ入り pill がその右上へ出ること（1.2 の実機確認）。
+2. 横 scroll 済み Mermaid / PlantUML の viewer button へ focus した時、container 内部の横 scroll 位置が巻き戻らないこと（1.2 の副作用確認）。
+3. screen reader で zoom した際、倍率通知が入力停止後に 1 回だけ行われること（1.1 の実機確認）。
