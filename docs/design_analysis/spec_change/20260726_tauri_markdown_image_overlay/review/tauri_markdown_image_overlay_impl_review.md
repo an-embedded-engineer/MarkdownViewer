@@ -9,9 +9,12 @@
 **Round 1 fix コミット**: `80741cf` (fix: address Tauri image viewer implementation review)
 **再レビュー日**: 2026-07-26
 **初回判定**: 条件付き差し戻し (Changes Requested)。Medium 2 件 / Low 3 件、High 0 件。
-**再レビュー判定 / 最終**: **承認 (Approved)**。Phase 4 進行可。初回指摘 **5 件（Medium 2 / Low 3）はすべてクローズ**し、再レビューでの新規指摘は 0 件。High は通じて 0 件。**未解決指摘 0 件**。判定根拠は 8 章を正とする。
+**再レビュー判定**: 承認 (Approved)。初回指摘 5 件（Medium 2 / Low 3）はすべてクローズ、新規指摘 0 件。
+**Phase 4-a 追加レビュー コミット**: `27ca57c` (fix: restore image viewer focus by activation type)
+**Phase 4-a 追加レビュー日**: 2026-07-26
+**Phase 4-a 追加レビュー判定 / 最新**: **承認 (Approved)。Phase 4-a ユーザー再確認へ進行可**。activation 分岐の修正は指摘された UX 問題の根本原因に対応しており、keyboard / screen reader 経路の focus 復帰も維持されている。**ブロッキング指摘 0 件（High / Medium なし）**、**未解決指摘 2 件（いずれも Low、再確認セッション内で観察・適用できる範囲）**。判定根拠は 9 章を正とする。
 
-> **本文書の読み方**: 1〜6 章は初回レビュー（対象 `ad68ae4`）の記録であり、指摘内容と根拠を保存する目的でそのまま残す（status のみ現状へ更新）。7 章は実装 Agent の対応記録、**8 章が再レビュー（対象 `80741cf`）の検証結果と最終判定**である。
+> **本文書の読み方**: 1〜6 章は初回レビュー（対象 `ad68ae4`）、7 章は実装 Agent の対応記録、8 章は再レビュー（対象 `80741cf`）の記録であり、いずれも当時の内容を保存する目的で残す。**最新の判定と未解決状況は 9 章（Phase 4-a 追加レビュー、対象 `27ca57c`）を正とする。**
 
 ---
 
@@ -194,7 +197,7 @@ Phase 2 レビュー §9.2 の実装条件 2 件（`:focus` 可視化、`user-se
 
 ---
 
-## 8. 再レビュー（`80741cf`）と最終判定
+## 8. 再レビュー（`80741cf`）と Phase 3 承認
 
 `80741cf` の差分（frontend 3 ファイル、設計、impl 記録、`development_workflow.md`、`docs/tests/README.md`）を取得し、初回指摘 5 件それぞれについて修正内容が根本原因に対応しているかを実ソースと突き合わせて検証した。あわせて 3 つの検証コマンドを再実行した。
 
@@ -223,7 +226,7 @@ Phase 2 レビュー §9.2 の実装条件 2 件（`:focus` 可視化、`user-se
 - **impl 記録**: §2 に対応概要、§4 にテスト 2 項目、§5 に 41 tests、§6 に `docs/tests/README.md` が反映済みで、実装・設計・レビューと一致する。
 - **回帰**: 修正は viewer 固有の 3 ファイルに閉じており、`src-tauri/`、Markdown image rule、link 処理、CSS の通常時 trigger 規則には差分がない。security 境界と通常時 layout の非退行は初回レビューの結論のまま維持される。
 
-### 8.4 最終判定
+### 8.4 Phase 3 承認判定（この時点の判定。最新は 9 章）
 
 - 初回指摘 5 件（Medium 2 / Low 3）: **すべてクローズ**
 - 再レビュー追加指摘: **0 件**
@@ -234,3 +237,72 @@ Phase 2 レビュー §9.2 の実装条件 2 件（`:focus` 可視化、`user-se
 1. 画面外画像に対応する button への Tab 移動で、対象画像が表示領域へ入り pill がその右上へ出ること（1.2 の実機確認）。
 2. 横 scroll 済み Mermaid / PlantUML の viewer button へ focus した時、container 内部の横 scroll 位置が巻き戻らないこと（1.2 の副作用確認）。
 3. screen reader で zoom した際、倍率通知が入力停止後に 1 回だけ行われること（1.1 の実機確認）。
+
+---
+
+## 9. Phase 4-a 追加レビュー（`27ca57c`）
+
+Phase 4-a のユーザー実機確認（`verification/phase4a_user_verification.md`）で「pointer 起点で開いて閉じた後にも keyboard 用 pill が表示される」が NG となり、Phase 3 相当へ差し戻して修正された。その修正コミット `27ca57c` の差分（frontend 3 ファイル、設計、component docs 2 件、`development_workflow.md`、impl 記録、meta、検証記録）を検証した。
+
+### 9.1 検証コマンド（追加レビュー時に再実行）
+
+| command | 実行結果 | 実装 Agent 報告との一致 |
+| --- | --- | --- |
+| `cd markdown-viewer-tauri && npm test -- --run` | Pass。3 files / **42 tests** | 一致 |
+| `cd markdown-viewer-tauri && npm run build` | Pass。既存 chunk size warning のみ | 一致 |
+| `cd markdown-viewer-tauri/src-tauri && cargo check` | Pass | 一致 |
+
+### 9.2 指定観点の検証結果
+
+| 観点 | 検証結果 |
+| --- | --- |
+| UIEvent `detail` による activation 判定 | **妥当**。`getImageViewerActivation(clickDetail)` は `detail === 0` を keyboard、正値を pointer とする（`imageViewer.ts:41-43`）。`UIEvent.detail` は click 回数であり、native `<button>` の Enter / Space による合成 click は全主要 engine で `detail = 0`、実 pointer click は 1 以上になる。判定を DOM 非依存の pure function として切り出し、`resolveImageViewerSource` は値を受け取るだけ（`imageViewer.ts:502`）という責務分離も、`imageViewer.ts` の既存 pure policy 慣行と一致する。React の `SyntheticMouseEvent` は `UIEvent` 由来の `detail` を素通しするため、`event.detail` の参照（`App.tsx:645`）も正しい |
+| modal close 後の focus 管理 | **妥当**。`closeImageViewer` は activation で復帰先を分け（`App.tsx:617-624`）、`imageViewerFocusReturnRef` を `HTMLElement \| null` へ一般化している。復帰は従来どおり 0ms defer 後に `isConnected` を確認し、不成立なら `previewRef.current?.focus()` へ落ちる（`App.tsx:970-985`）。Phase 2 指摘 1.3 で確定した「`inert` 解除後に defer して復帰する」契約は維持されている |
+| screen reader / keyboard 経路の維持 | **維持**。Tab → Enter / Space は `detail = 0` で keyboard 判定となり、従来どおり `focusOrigin` へ復帰して pill が可視化される。支援技術が生成する activation も一般に `detail = 0` の合成 click となるため、AT 利用時の復帰 focus も従来どおり残る。仮に `detail` を 1 以上で合成する AT があっても、復帰先が active preview になるだけで focus が失われる経路は無く、劣化は緩やかである |
+| pointer 経路で pill を出さないこと | **成立**。pointer click は `detail >= 1` で pointer 判定となり、復帰先が `.markdown-body` になるため button は focus されず `:focus` が成立しない。pill の可視化条件は `.markdown-body .image-viewer-trigger:focus`（`App.css:1019`）だけであり、他に表示経路は無い。開く側でも、通常状態の button は `pointer-events: none` かつ `<img>` は focusable でないため、click 時に button へ focus が移ることもない |
+| tab / revision 変更時の fallback | **妥当**。不一致 effect からの `closeImageViewer` も同じ経路を通る。keyboard 起点では `focusOrigin.isConnected` が false になり `previewRef.current` へ、pointer 起点では close 時点の `previewRef.current`（再 render 後なので新 tab の article）へ復帰する。新 tab が HTML / 未 load で `MarkdownPreview` が unmount している場合は ref が null となり復帰処理自体が skip されるが、focus 可能な Markdown preview が存在しない状況であり、動作として妥当 |
+| 文書整合 | **概ね一致**。設計 §3.2 / §5.3 / §6.4（`activation` field）/ §18-6、`detail_design.md:286`、`interface_spec.md:74`、`development_workflow.md:186`、impl §8、`meta.md`（`verification_status: in_progress`、Phase 4 行）、`verification/phase4a_user_verification.md` がいずれも修正後の挙動と一致する。残る不足は 9.3.2 のみ |
+
+**pointer 復帰先の妥当性**（追加確認）: `.markdown-body` は `tabIndex={-1}` を持つため `focus()` が実際に成立する（`App.tsx:2126` 相当）。`min-height: 100%`（`App.css:885-892`）で常に scrollport 以上の高さがあり、CSSOM-View の focus scroll は「要素が scrollport より大きく両端が外側」のとき何もしないため、復帰時に preview の scroll 位置が飛ぶこともない。
+
+### 9.3 追加レビューで検出した指摘
+
+#### 9.3.1 pointer 起点 + keyboard close で `.markdown-body` 全体に focus ring が出る可能性
+
+**根拠**: pointer 起点の復帰先は `.markdown-body` だが、この要素には focus 表示を抑止する CSS が無い（`App.css` の `:focus` 系規則は `.image-viewer-dialog button` / `.image-viewer-viewport` / `.explorer-separator` / `.tab-activate` / `.tab-close` / `.image-viewer-trigger` のみで、`.markdown-body` は対象外）。`:focus-visible` は scripted focus であっても「直前のユーザー操作が keyboard だった」場合に一致するため、次の経路で UA 既定の focus ring が **本文 article 全体（幅いっぱい・文書高さ）** に描かれ得る。
+
+- 画像を **click で開く**（activation = pointer）→ **Escape で閉じる**（直前操作は keyboard）→ `.markdown-body` へ programmatic focus → `:focus-visible` 一致 → 全体 outline
+
+Close button の click や backdrop click で閉じた場合は直前操作が pointer なので一致せず、この経路だけが露出する。従来はこの focus 先が「復帰先が detach 済み」の稀な fallback だったが、今回の修正で **pointer 経路の常用パス**になったため露出が上がった。engine 差（WKWebView / WebView2 / WebKitGTK）があるため必ず出るとは断定できないが、出た場合は「マウス操作後に用途不明の大きな UI が出る」という今回の NG と同種の見え方になる。
+
+**推奨対応**: `.markdown-body:focus { outline: none }` を追加する。`.markdown-body` は `tabindex="-1"` で Tab 順に入らず、programmatic focus 専用の受け皿であるため、outline 抑止による keyboard 操作性の損失は無い。あわせて `development_workflow.md` の手動確認へ「pointer で開いて Escape で閉じた場合も、本文全体に outline が出ないこと」を追加し、Phase 4-a 再確認で判定できるようにする。
+
+**severity**: Low（機能影響なし。engine 依存の表示のみ。ただし再確認で NG になれば往復が 1 回増えるため、再確認前の適用を推奨する）
+**対象工程**: Phase 3 相当の追加修正（CSS 1 規則）+ Phase 4-a 観察項目
+**status**: 未対応
+
+#### 9.3.2 `imageViewer.ts` の責務記述に activation policy が未反映
+
+**根拠**: `getImageViewerActivation` は `imageViewer.ts` の 6 つ目の pure policy export だが、責務を列挙している恒久 docs 2 箇所が「fit / zoom / pan / wheel / intrinsic size」のままである。
+
+- `docs/components/tauri_viewer/README.md:71`: 「image viewer の fit / zoom / pan / wheel / intrinsic size policy と、Markdown DOM 内の 3 種 visual だけを扱う decoration / resolver を提供する」
+- `docs/components/tauri_viewer/basic_design.md:14`: 「image viewer の fit / zoom / pan / wheel / intrinsic size 計算を pure function へ集約し…」
+
+`detail_design.md` / `interface_spec.md` は activation 分岐を反映済みで、挙動仕様としての欠落はない。module の責務一覧だけが実体より狭い。
+
+**推奨対応**: 上記 2 行の列挙へ activation を加える（例: 「fit / zoom / pan / wheel / intrinsic size / activation policy」）。`basic_design.md:71` の依存図行は「transform policy / Markdown DOM source resolver」のままでも齟齬は無いが、揃えるなら同時に更新する。
+
+**severity**: Low
+**対象工程**: Phase 3 相当の docs 修正
+**status**: 未対応
+
+### 9.4 判定
+
+- Phase 4-a フィードバック対応の修正内容: **承認**。指定された 6 観点すべてで期待どおりの実装を確認した。activation を pure policy として切り出した設計も既存の module 慣行と整合し、keyboard / AT 経路の復帰 focus を保ったまま pointer 経路の余計な UI を消せている。
+- **ブロッキング指摘 0 件（High 0 / Medium 0）。未解決指摘 2 件（Low 2）。**
+- **Phase 4-a ユーザー再確認へ進行可。** ただし 9.3.1 は再確認で同種の NG を再発させ得るため、**再確認の前に CSS 1 規則を適用してから実施することを推奨する**（適用しない場合は観察項目として扱い、結果を検証記録へ残すこと）。9.3.2 は挙動に影響しないため、再確認と並行して修正してよい。
+
+再確認では `development_workflow.md:186` に追加された 2 経路（pointer 起点で pill が出ないこと / Tab 起点の button へ focus が戻ること）に加えて、次を観察対象に含めること。
+
+1. pointer で開き **Escape** で閉じた場合に、本文全体へ outline が出ないこと（9.3.1）。
+2. Tab で button へ移動して Enter / Space で開き、Escape と Close button の双方で閉じた場合に、いずれも同じ button へ focus が戻り pill が可視になること（keyboard 経路の close 手段差の確認）。
