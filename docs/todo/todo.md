@@ -52,7 +52,7 @@
 
 ## TODO-2026-007 Tauri 先行 UX 評価と Avalonia 反映仕様化
 
-- status: open
+- status: in_progress
 - workflow: documentation
 - wbs: `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
 - work_package_id: WP-005
