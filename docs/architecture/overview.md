@@ -17,11 +17,12 @@ Avalonia UI と C# による Markdown Viewer 実装。
 
 Tauri v2、React、TypeScript、Rust による Markdown Viewer 実装。
 
-- Frontend: `src/App.tsx`, `src/App.css`, `src/documentPolicy.ts`
+- Frontend: `src/App.tsx`, `src/App.css`, `src/splitView.ts`, `src/paneRuntime.ts`, `src/documentPolicy.ts`
 - Rust command: `src-tauri/src/lib.rs`
 - Tauri config: `src-tauri/tauri.conf.json`, `src-tauri/capabilities/default.json`
 - Markdown 表示: `markdown-it` でHTML化し、React側で表示する。
-- Mermaid 表示: `mermaid` をReactのプレビュー更新タイミングで実行する。
+- Split View: `OpenDocumentTab[]`を共有データの正本とし、`SplitViewState`がprimary / secondaryの選択、active pane、session-only ratioを管理する。
+- Mermaid 表示: App instance所有queueでpaneごとの描画を直列化し、pane / tab / revision guardとpane固有render IDで結果の混線を防ぐ。
 - PlantUML 表示: Rust command がローカル Java / `plantuml.jar` を使ってSVG化し、React側でHTMLへ差し替える。
 - HTML 表示: Rust `DocumentStore` が current root と `open_document` / `mvhtml` protocol を管理し、React は `sandbox="allow-scripts"` の iframe へ preview URL を渡す。HTML source は frontend state へ返さない。
 - HTML 境界: canonical root 検証、resource allowlist、response CSP/CORS、shell CSP、opaque-origin iframe、typed message policy を重ねる。HTML protocol originへ Tauri capability を付与しない。
@@ -32,7 +33,7 @@ Tauri v2、React、TypeScript、Rust による Markdown Viewer 実装。
 2. フォルダ選択ダイアログでdocumentルートを選ぶ。
 3. ファイルツリーを構築し、Explorerに表示する。
 4. `.md` / `.markdown` は本文を読み込み、`.html` はroot-relative preview URLを生成する。
-5. MarkdownはReact DOM、trusted HTMLはsandboxed iframeで右ペインに表示する。
+5. MarkdownはReact DOM、trusted HTMLはsandboxed iframeでactiveなdocument paneに表示する。Split Viewでは左右paneが同じtab collectionから独立に選択する。
 6. Mermaidコードブロックを図として描画する。
 7. PlantUMLコードブロックをローカルPlantUML CLIでSVGとして描画する。
 8. 相対Markdownリンクはアプリ内遷移し、外部URLは既定ブラウザで開く。

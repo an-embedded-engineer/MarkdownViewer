@@ -8,11 +8,13 @@ work_branch: "new-feature/tauri-split-view"
 components:
   - "markdown-viewer-tauri/src/App.tsx"
   - "markdown-viewer-tauri/src/App.css"
+  - "markdown-viewer-tauri/src/splitView.ts"
+  - "markdown-viewer-tauri/src/paneRuntime.ts"
   - "markdown-viewer-tauri/src/documentPolicy.ts"
   - "docs/components/tauri_viewer"
 status: "in_progress"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "draft"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -57,5 +59,5 @@ follow_up:
 | Phase 0 Requirements | Done (`c023374`) |
 | Phase 1 Branch and meta | Done (`09d57dc`) |
 | Phase 2 Design review | Done (approved by re-review, 9 findings resolved, 0 unresolved; `68f1fa5`) |
-| Phase 3 Implementation and docs review | Not started |
+| Phase 3 Implementation and docs review | Draft implementation complete; review pending |
 | Phase 4 Verification and completion | Not started |

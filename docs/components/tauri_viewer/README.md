@@ -8,8 +8,8 @@ Tauri v2 + React + TypeScript + Rust による Markdown / trusted HTML document 
 
 - Tauri dialog plugin でフォルダを選択する。
 - Rust `DocumentStore` で current root、ファイルツリー構築、Markdown / HTML open、root-scoped protocolを管理する。
-- React で MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、TabStrip、Markdown / HTML preview、error strip、StatusBar を表示する。
-- 同一 root 内の Markdown / HTML を複数タブで保持し、active tabだけを単一preview paneへ描画する。
+- React で MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、pane-local TabStrip、Markdown / HTML preview、error strip、StatusBar を表示する。
+- 同一 root 内の Markdown / HTML をglobal tab collectionで保持し、single viewまたは左右2 pane Split Viewへpaneごとの選択で描画する。
 - Markdown本文はpreview pane幅からresponsiveな左右gutterを引いた幅へ追従し、trusted HTML iframeはpreview pane全幅へ追従する。
 - `markdown-it`、`mermaid`、Rust 側 PlantUML command で Markdown / Mermaid / PlantUML を描画する。
 - Markdown内の通常画像、描画済みMermaid、描画済みPlantUMLをmodal image viewerへ開き、fit、最大800%のzoom、pan、100% resetを提供する。
@@ -45,6 +45,10 @@ markdown-viewer-tauri/
 │   ├── documentPolicy.test.ts    — frontend policy unit test
 │   ├── explorerPane.ts           — Explorer幅の境界 / keyboard policy
 │   ├── explorerPane.test.ts      — Explorer幅policy unit test
+│   ├── splitView.ts              — Split View状態遷移 / 幅 / keyboard policy
+│   ├── splitView.test.ts         — split / close / root / resize policy unit test
+│   ├── paneRuntime.ts            — pane async guard / TabStrip表示state合成
+│   ├── paneRuntime.test.ts       — stale result / pane-local runtime unit test
 │   ├── imageViewer.ts            — image viewer transform policy / DOM decoration / source resolver
 │   ├── imageViewer.test.ts       — zoom / pan / wheel / intrinsic size policy unit test
 │   ├── App.css                   — Light / Dark テーマ + MenuBar / resizable Explorer / TabStrip / StatusBar レイアウト
@@ -65,11 +69,13 @@ markdown-viewer-tauri/
 | 要素 | 役割 | ソース |
 | --- | --- | --- |
 | `main.tsx` | React DOM ルートに `App` をマウント | [markdown-viewer-tauri/src/main.tsx](../../../markdown-viewer-tauri/src/main.tsx) |
-| `App` / `MenuBar` / `SettingsDialog` / `RootPathBar` / `FileTree` / `TabStrip` / `MarkdownPreview` / `HtmlPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`tabs` / `activeTabId` を typed document stateの正本とし、HTMLはsandboxed iframeだけで表示する | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
+| `App` / `DocumentPane` / `MenuBar` / `SettingsDialog` / `RootPathBar` / `FileTree` / `TabStrip` / `MarkdownPreview` / `HtmlPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`tabs`をdocument data、`SplitViewState`を表示選択の正本とし、paneごとのMarkdown DOM / sandboxed HTML iframeを表示する | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
+| `splitView.ts` | single / split遷移、pane選択、tab close / root reset、requested ratioとdynamic幅・keyboard操作をpure functionで管理する | [markdown-viewer-tauri/src/splitView.ts](../../../markdown-viewer-tauri/src/splitView.ts) |
+| `paneRuntime.ts` | pane / tab / revisionのasync guardと、shared tab state + pane runtimeによるTabStrip表示stateをpure functionで合成する | [markdown-viewer-tauri/src/paneRuntime.ts](../../../markdown-viewer-tauri/src/paneRuntime.ts) |
 | `documentPolicy.ts` | Markdown / HTML response shape、preview revision URL、opaque-origin bridge messageをpure functionで検証する | [markdown-viewer-tauri/src/documentPolicy.ts](../../../markdown-viewer-tauri/src/documentPolicy.ts) |
 | `explorerPane.ts` | Explorerの初期/最小/dynamic最大幅、clamp、ArrowLeft / ArrowRight / Home / End操作をDOM非依存のpure functionで管理する | [markdown-viewer-tauri/src/explorerPane.ts](../../../markdown-viewer-tauri/src/explorerPane.ts) |
 | `imageViewer.ts` | image viewerのfit / zoom / pan / wheel / intrinsic size / activation policyと、Markdown DOM内の3種visualだけを扱うdecoration / resolverを提供する | [markdown-viewer-tauri/src/imageViewer.ts](../../../markdown-viewer-tauri/src/imageViewer.ts) |
-| `App.css` | Light / Dark テーマ、MenuBar、Settings dialog、幅変更可能なExplorer、treeの縦横overflowとtyped SVG icon、TabStrip、error strip、StatusBar、pane相対のMarkdown本文幅と図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
+| `App.css` | Light / Dark テーマ、MenuBar、Settings dialog、幅変更可能なExplorer / Split View、active pane、pane-local TabStrip、error strip、StatusBar、pane相対のMarkdown本文幅と図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
 | `scan_directory` | Rust command。root 配下を再帰走査して `FileTreeNode` を返す。除外ディレクトリあり | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `open_document` | Rust command。`DocumentStore` current root内のMarkdownはUTF-8本文、HTMLはroot-relative `previewUrl`を排他的responseで返す | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `mvhtml` protocol | segment decode、canonical root、MIME allowlist、CSP/CORSを検証し、HTMLへready / external-link bridgeを注入する | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
