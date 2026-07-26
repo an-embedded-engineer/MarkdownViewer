@@ -1,5 +1,42 @@
 # TODO Archive 2026
 
+## TODO-2026-006 Tauri Split view 導入
+
+- Status: `done`
+- Category: `new-feature`
+- Created: `2026-07-26`
+- Completed: `2026-07-26`
+- Branch: `new-feature/tauri-split-view`
+- WBS:
+  - `docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧`
+- Work package: `WP-004`
+- Depends on: `TODO-2026-005`, `TODO-2026-017`
+- Design analysis:
+  - `docs/design_analysis/new_feature/20260726_tauri_split_view/`
+- Change report:
+  - `docs/design_analysis/new_feature/20260726_tauri_split_view/change_report.md`
+- Review records:
+  - `docs/design_analysis/new_feature/20260726_tauri_split_view/review/tauri_split_view_design_review.md`
+  - `docs/design_analysis/new_feature/20260726_tauri_split_view/review/tauri_split_view_impl_review.md`
+- Summary:
+  - Added single / left-right 2-pane Split View to the Tauri viewer while keeping shared document data and pane-local selection / runtime.
+  - Routed Explorer, TabStrip, Reload, relative links, status, errors, Mermaid, trusted HTML, and image viewer behavior by active or originating pane.
+  - Added pointer / keyboard separator resizing, active pane indication, pane-scoped DOM IDs, and accessibility state.
+  - Preserved Rust commands, custom protocol, Tauri capability, CSP, settings schema, and existing single-view behavior.
+- Verification:
+  - User confirmed `View > Split View` toggles the layout.
+  - User confirmed primary and secondary can select different tabs and preview different files simultaneously.
+  - `npm run build` and 71 frontend tests passed.
+  - `cargo fmt -- --check`, `cargo check`, and 22 Rust tests passed.
+  - Design and implementation follow-up reviews were approved with no unresolved findings.
+  - `diff.zip` generated from `c023374..f8f6136` and verified with `unzip -t`.
+  - Completion artifacts were committed at `a3acab4` and are ready for Phase 4-c merge approval.
+- Follow-up:
+  - `TODO-2026-023` tracks pane-local tab groups.
+  - `TODO-2026-024` tracks moving tabs between panes.
+  - `TODO-2026-025` tracks vertical and horizontal 2-pane split orientation.
+  - Avalonia rollout remains in `TODO-2026-011`; UX evaluation and common specification remain in `TODO-2026-007`.
+
 ## TODO-2026-022 Tauri Markdown画像オーバーレイ表示
 
 - Status: `done`

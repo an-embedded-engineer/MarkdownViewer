@@ -171,6 +171,10 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - Explorer separatorをpointer / ArrowLeft / ArrowRight / Home / Endで操作し、180pxからworkspaceに応じたdynamic最大幅まで変更できること
 - Explorer separatorのpointer drag後もseparatorにfocusが残り、続けてkeyboardで幅を変更できること
 - windowを506px未満へ縮めてもExplorer幅とseparatorのARIA値が180pxを下回らず、再拡大時に直前の要求幅へ戻ること
+- `View > Split View`でsingle / 左右2 paneを切り替え、primary維持、secondary隣接tab選択、active secondaryからsingleへの引き継ぎ、空secondaryからのprimary維持が仕様どおりであること
+- primary / secondaryのTabStripから別文書または同じ文書を独立に選択し、pointer / focusでactive paneを変えるとExplorer強調、Reload、相対Markdown link、StatusBar、ErrorBannerの対象が切り替わること
+- Split separatorをpointer / ArrowLeft / ArrowRight / Home / Endで操作し、preferred minimum 240px、狭幅時の等幅縮退、ARIA値、focus維持、再拡大時のrequested ratio復元を確認すること
+- active / non-active tab close、両paneで同じtab、最後のtab、root変更でpane selectionが一貫して復旧し、無効tab IDが残らないこと
 - 深い階層・長いMarkdown / HTML / image名で必要時だけExplorer内の水平scrollbarが現れ、縦横の末尾へ到達できること
 - 短いtreeでは不要な水平scrollbarが出ず、directory / Markdown / HTML / imageのicon、開閉、選択、disabled状態をLight / Darkで判別できること
 - Markdown プレビュー表示
@@ -187,6 +191,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - image viewerを閉じた通常表示でinline画像段落の行組み、diagramのborder / padding / horizontal scroll、linked image / SVG anchor操作が退行しないこと
 - Mermaid 描画
 - Mermaid と PlantUML が同居する `sample_docs/plantuml.md` で両方の図が描画されること
+- 同じMermaid文書を両paneへ表示し、SVG / marker / clipPathのIDと参照がpane間で衝突せず、Theme / split resize後も両方が正しく表示されること
 - PlantUML 描画
 - PlantUML 描画中に読み込み中表示が出ること
 - Light / Dark 切替
@@ -199,6 +204,8 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - HTMLからroot外resource、external network、popup、form、download、Tauri IPCへ到達できないこと
 - HTML表示中にThemeを切り替えてもiframeがreloadされず、Markdown / HTML tab切替で状態が混線しないこと
 - HTML表示中のExplorer resizeがiframe上でも継続し、cursor表示に操作上の違和感がないこと
+- Markdown + HTMLおよびHTML + HTMLをsplit表示し、片paneのready / timeout / external-open状態が他paneへ混線せず、Split separatorのdragがiframe上でも継続すること
+- secondaryの画像viewerを開いた状態でtab closeまたはsplit offし、viewerが閉じて接続済み起点またはprimary paneへfocusが戻ること
 - `sample_docs/html_fixture/` と `sample_docs/html_fixture/malicious.html` をHTML手動fixtureとして使用すること
 
 ## 静的解析・整形

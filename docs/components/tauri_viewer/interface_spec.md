@@ -5,12 +5,14 @@
 - Open Folder: MenuBar の File dropdown からフォルダ選択ダイアログを開く。
 - Recent Folders: MenuBar の File dropdown から最近開いた root folder を開く。
 - Remove Recent Folder: Recent Folders entry の delete button から該当 entry を削除する。
-- Explorer item click: 未openのMarkdown / HTMLは新規tabを開き、同一pathがopen済みならactivateする。
+- Explorer item click: 未openのMarkdown / HTMLは新規tabを開き、同一pathがopen済みならactive paneでactivateする。
 - Explorer resize: ExplorerとPreview間のseparatorをpointerでdragする。separatorへfocus後、ArrowLeft / ArrowRightは16px単位、Home / Endは現在の最小 / dynamic最大幅へ移動する。
 - Tab activate: TabStripから表示するdocumentを切り替える。ArrowLeft / ArrowRight / Home / Endでもfocusとselectionを移動できる。
-- Tab close: 非active tabではselectionを維持する。active tabでは右隣、なければ左隣へ移り、最後のtab close後は未選択表示になる。
-- Reload: MenuBar の File dropdown から root treeとactive tabだけを再読み込みする。
+- Tab close: global tabを両paneのTabStripから削除する。閉じたtabを選択していたpaneだけ右隣、なければ左隣へ移り、最後のtab close後は両paneが未選択表示になる。
+- Reload: MenuBar の File dropdown から root treeとactive paneのselected tabだけを再読み込みする。同じtabを両paneで表示している場合は共有revision更新により両方を再描画する。
 - Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
+- Split View: MenuBarの`View > Split View`でsingle / 左右2 paneを切り替える。pane内をpointer操作またはfocusするとそのpaneがactiveになる。
+- Split resize: pane間separatorをpointerでdragする。ArrowLeft / ArrowRightは16px単位、Home / Endはdynamic最小 / 最大幅へ移動する。
 - Settings: MenuBar の File dropdown からSettings dialogを開き、Theme / current window size / PlantUML jar pathを確認する。Themeとjar pathを変更してSave、またはCancelできる。
 - Markdown image viewer: 描画済みの通常画像、Mermaid、PlantUMLをclickするか、直後のkeyboard buttonをEnter / Spaceでactivateしてmodal表示する。wheel / trackpad、toolbar、keyboardでzoomし、drag / Arrowでpanする。
 
@@ -20,7 +22,7 @@ MenuBar は window top に `File` / `View` を表示する React UI で、menu n
 
 - `File`: `Open Folder...`、`Recent Folders`、`Reload`、`Settings...`
 - `Recent Folders`: 最大 10 件。主表示は保存時点の folder name、補助表示は absolute path。
-- `View`: `Theme: Light` または `Theme: Dark`
+- `View`: `Theme: Light` または `Theme: Dark`、`Split View` (`role="menuitemcheckbox"`)
 
 Recent Folders entry click で保存済み path が存在しない場合は error strip に表示し、entry は自動削除しない。削除は delete button による明示操作だけで行う。
 
@@ -43,7 +45,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 
 - 初期幅280px、最小幅180px、hard最大幅640pxとする。dynamic最大幅は`max(180, min(640, workspaceWidth - 320 - 6))`で、Preview予約幅320pxとseparator幅6pxを考慮する。
 - 幅はsession中だけ保持し、root変更やReloadでは維持する。アプリ再起動またはfrontend reloadでは初期幅へ戻す。
-- separatorは`role="separator"`、vertical orientation、Explorer / Previewへの`aria-controls`、現在の有効範囲と値を公開する。
+- separatorは`role="separator"`、vertical orientation、`explorer-pane preview-workspace`への`aria-controls`、現在の有効範囲と値を公開する。
 - pane titleは固定し、tree viewportだけが縦横scrollを所有する。深い階層・長い名前は省略せず、表示幅を超える場合だけ水平scrollで末尾へ到達可能にする。
 - directoryは開閉chevronとfolder icon、Markdown / HTML / imageは種別ごとのinline SVG iconを表示する。iconは装飾扱いとし、node名をaccessible nameの正本にする。
 
@@ -53,7 +55,17 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - active / Loading / Rendering / Errorを表示し、長いfile nameはellipsis、absolute pathは`title`で確認できる。
 - 多数tabは横scrollで到達可能にする。`role="tablist"` / `role="tab"` とroving tabindexを使う。
 - activate buttonとactive tabのclose buttonだけをTabキーのfocus順に含める。非active tabをcloseする場合は、先に矢印キーでactivateしてからclose buttonへ移動する。
-- tab永続化、reorder、pin、split viewは対象外。
+- single / splitの各paneに同じglobal tab collectionを表示する。選択とLoading / Rendering / Error表示はpaneごとで、同じtabを両paneへ選択してもtabを複製しない。
+- DOM IDは`tab-${paneId}-${tabId}`、`document-preview-${paneId}`、`document-pane-${paneId}`とし、single時もprimary prefixを使う。
+- tab永続化、reorder、pinは対象外。
+
+## Split View 表示
+
+- 初期modeはsingle、requested ratioは0.5。split on時はprimaryを維持し、右隣、なければ左隣の別tabをsecondaryへ選ぶ。別tabがなければsecondaryは未選択とする。
+- split off時はselected tabを持つactive paneをprimaryへ引き継ぐ。active secondaryが未選択なら既存primaryを維持し、両pane未選択でtabが残る場合だけ先頭tabへ復旧する。
+- separator幅は6px、preferred pane minimumは240px。狭幅では`min(240, floor((workspaceWidth - 6) / 2))`まで等幅方向へ縮める。自動clampはrequested ratioへ書き戻さず、再拡大時に直前の指定比率へ戻す。
+- `role="separator"`は計測完了後に描画し、`aria-controls="document-pane-primary document-pane-secondary"`とclamp済みpxのmin / max / nowを持つ。
+- split mode、選択、比率はsession-onlyで、再起動後はsingle / 0.5へ戻る。上下分割、3 pane以上、layout persistenceは対象外。
 
 ## Document Preview 表示
 
@@ -61,6 +73,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - 通常のMarkdown左右gutterは24pxとする。window viewportが760px以下の場合は既存responsive layoutにより14pxへ切り替える。Explorer resizeなどでpreview paneだけが狭くなってもgutterは切り替えない。
 - Markdown内のtable、code block、Mermaid、PlantUMLは必要時に要素内で横scrollし、imageとPlantUML SVGは本文幅以下へ縮小する。
 - 描画済みMermaidはwindow / Explorer resize後もSVG表示を維持し、元のdiagram source文字列へ戻らない。
+- MermaidはApp所有queueでpane間を直列描画し、pane / tab / revision / diagram indexを含むrender IDで同一document内のSVG IDを分離する。
 - trusted HTML iframeはpreview pane全幅へ追従し、HTML文書自身の`width` / `max-width`とsecurity境界をViewerから変更しない。
 - documentの縦scrollは`.preview-pane`が所有し、app shell全体へscrollを移さない。
 
@@ -71,7 +84,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - 初期表示と`Fit`はvisual全体をpadding 24px（window viewport 760px以下は12px）内へ収め、100%を超えて拡大しない。zoom範囲は現在のfit倍率から800%。`100%`はnatural size、offset 0へ戻す。
 - `Zoom out` / `Zoom in`、wheel / trackpad、`+` / `-`を提供する。wheelはpointer位置、それ以外はviewport中央をzoom中心とする。現在倍率を整数percentで表示する。
 - primary pointer drag、Arrow 48px、Shift+Arrow 160pxでpanする。visualがviewportより小さい軸は中央へ固定し、大きい軸は各端へ到達可能な範囲へclampする。
-- `Escape`、Close、backdrop clickで閉じる。keyboard起点では起点buttonへfocusを戻し、pointer起点ではactive previewへfocusを戻してkeyboard専用pillを表示しない。Tab / Shift+Tabはdialog内でloopし、表示中の背景UIは`inert`となる。
+- `Escape`、Close、backdrop clickで閉じる。keyboard起点では発生元paneの起点button、pointer起点では発生元previewへfocusを戻す。発生元tab / revisionの変更、tab close、split offで発生元paneがunmountした場合も閉じ、接続済み起点がなければprimary paneへfocusを戻す。Tab / Shift+Tabはdialog内でloopし、表示中の背景UIは`inert`となる。
 - 通常時の画像縮小、diagram containerのborder / padding / horizontal scroll、Markdown title、本文の行組みを変更しない。transform stateはclose / tab / Reloadを跨いで保持しない。
 
 ## Error Strip 表示
@@ -83,7 +96,7 @@ StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術�
 ## StatusBar 表示
 
 - `File`: 表示中 document file name。未選択時は `No file selected`。
-- `State`: `Loading folder...`、`Updating app settings...`、`Loading Markdown...`、`Loading HTML...`、`Rendering PlantUML diagrams...`、`Ready` のいずれか。左から順に優先する。
+- `State`: `Loading folder...`、`Updating app settings...`、`Loading Markdown...`、`Loading HTML preview...`、`Rendering PlantUML diagrams...`、`Rendering Mermaid diagrams...`、`Ready` のいずれか。active paneを対象に優先度順で表示する。
 
 `State` の値だけを `aria-live="polite"` とし、`File` は live region に含めない。
 
@@ -212,6 +225,6 @@ Markdown / HTML / PlantUML responseは`tabId + revision`が現在値と一致す
 
 - iframeは`sandbox="allow-scripts"`だけを持ち、`allow-same-origin`、forms、popup、top navigation、downloadを許可しない。
 - HTML sourceはfrontendへ返さず、Theme変更だけではiframe URL / keyを変更しない。
-- `ready`は`event.source === iframe.contentWindow`、`event.origin === "null"`、active tab revision、exact message shapeを満たす最初の1回だけ受理する。5秒以内に届かなければtab errorにする。
+- `ready`は`event.source === iframe.contentWindow`、`event.origin === "null"`、発生paneのselected tab / revision、exact message shapeを満たす最初の1回だけ受理する。5秒以内に届かなければ当該pane runtimeだけをerrorにする。
 - `openExternal`は上記に加え、absolute `http:` / `https:`、transient user activation、duplicate guardを満たす場合だけ`openUrl`へ渡す。`file:`、`javascript:`、`data:`、`mailto:`、custom schemeは拒否する。
-- reject理由はdevelopment consoleへ残し、messageを信頼境界とはみなさない。HTMLは利用者が信頼するactive documentに限定する。
+- reject理由はdevelopment consoleへ残し、messageを信頼境界とはみなさない。active pane条件はsecurity判定へ追加せず、pane間はiframe sourceとtab / revisionで区別する。HTMLは利用者が信頼するdocumentに限定する。

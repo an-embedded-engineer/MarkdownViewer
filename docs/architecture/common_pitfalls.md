@@ -4,6 +4,7 @@
 
 - ReactでMarkdown本文が同じままReloadすると、state変更が発火せずMermaidが再実行されないことがある。
 - Tauri版ではプレビュー更新番号を持ち、Reload時もDOMを再生成してMermaidを再実行する。
+- 複数paneから`mermaid.initialize` / renderを並行実行するとglobal設定と生成IDが競合する。App instance所有queueで直列化し、`paneId + tabId + revision + index`を含むrender IDを使う。
 
 ## 2. ローカル画像表示
 
@@ -49,3 +50,10 @@
 - cross-origin / opaque-origin iframe は HTTP error responseでも `load` eventを発火し得るため、`load` / `error` eventをprotocol成功判定に使わない。
 - 成功HTMLにだけ注入される`ready` handshakeを正本とし、source / origin / revisionを検証する。timeoutとlistenerはrevision変更・unmount時に必ず解除する。
 - HTMLを表示するためにcapability remote origin、`allow-same-origin`、external network sourceを追加して境界を緩和しない。
+
+## 10. Split View のDOMとruntime
+
+- 同じtabを2 paneで表示しても、Mermaid DOM、HTML iframe handshake、scroll、pending anchor、image viewerの発生元を共有しない。async結果は`paneId + tabId + revision`と現在stateを照合する。
+- tab / tabpanel / paneのIDはpane prefixを含める。単一表示でもprimary prefixを使い、single専用IDとの互換経路を残さない。
+- HTMLの`ready`はpaneごとのiframe sourceと照合する。片paneのready / timeoutをglobal tab stateへ書くと、同じHTML tabを表示する他paneへ状態が混線する。
+- iframe上を通過するseparator dragはpointer captureで継続する。cursor表示はiframe documentへ継承されないため、実機で操作上の違和感も確認する。

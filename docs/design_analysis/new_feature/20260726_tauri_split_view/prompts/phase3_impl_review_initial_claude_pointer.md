@@ -1,0 +1,1 @@
+`docs/design_analysis/new_feature/20260726_tauri_split_view/prompts/phase3_impl_review_initial_claude.md` を読んで、Phase 3実装レビューを開始してください。

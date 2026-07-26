@@ -1,6 +1,6 @@
 # MarkdownViewer
 
-MarkdownViewer は、Markdown ドキュメントを編集環境から独立して閲覧するためのデスクトップアプリ比較プロジェクトです。同じ用途を異なる技術スタックで実装し、Markdown/Mermaid/PlantUML 表示、ファイルアクセス、UI、配布方法を比較しています。Tauri 版は、選択 root 内の trusted UTF-8 HTML 仕様書も sandboxed preview で表示できます。
+MarkdownViewer は、Markdown ドキュメントを編集環境から独立して閲覧するためのデスクトップアプリ比較プロジェクトです。同じ用途を異なる技術スタックで実装し、Markdown/Mermaid/PlantUML 表示、ファイルアクセス、UI、配布方法を比較しています。Tauri 版は、選択 root 内の trusted UTF-8 HTML 仕様書を sandboxed preview で表示でき、2文書を左右に並べる Split View に対応します。
 
 ## 実装
 

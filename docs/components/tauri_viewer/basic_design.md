@@ -6,11 +6,13 @@ OS 連携とファイルシステム境界は Rust command / `DocumentStore` へ
 
 ## 責務
 
-- React: MenuBar dropdown、Settings dialog、Recent Folders、root path strip、幅変更可能なExplorer、TabStrip、Preview、error strip、StatusBar、永続 Theme / window resize queue、tab単位のエラー / loading、Markdown → HTML 変換、document type別preview。
+- React: MenuBar dropdown、Settings dialog、Recent Folders、root path strip、幅変更可能なExplorer / Split View、pane-local TabStrip / Preview、error strip、StatusBar、永続 Theme / window resize queue、tab単位とpane単位のエラー / loading、Markdown → HTML 変換、document type別preview。
 - CSS layout: Markdown本文はpreview pane content boxから左右gutterを引いた幅とし、固定px最大幅を持たない。trusted HTML iframeはpreview pane全幅を使い、iframe内文書自身のlayoutを上書きしない。
 - TypeScript renderer (`renderMarkdown` / `MarkdownPreview`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。MermaidがReact外で置換したSVGを保持するため、生成HTMLと`dangerouslySetInnerHTML`値はMarkdown内容が変わるまで安定化する。
 - TypeScript policy (`documentPolicy.ts`): command responseの排他shape、HTML preview URL、opaque-origin messageをpure functionで検証する。
 - TypeScript policy (`explorerPane.ts`): Explorer幅の最小値、workspace実寸に応じたdynamic最大値、clamp、keyboard操作をpure functionで管理する。幅はsession-onlyで永続化しない。
+- TypeScript policy (`splitView.ts`): single / split、active pane、paneごとのtab / pending navigation、close / root reset、requested ratioとdynamic幅をpure functionで管理する。
+- TypeScript policy (`paneRuntime.ts`): pane / tab / revisionのasync結果guardと、共有tab stateとpane-local preview stateからTabStrip表示stateを合成する。
 - TypeScript policy / DOM adapter (`imageViewer.ts`): image viewerのfit / zoom / pan / wheel / intrinsic size / activation判定をpure functionへ集約し、Markdown preview内で描画が完了した通常画像、Mermaid SVG、PlantUML SVGだけをtyped requestへ解決する。
 - Rust: canonical current root、Markdown / HTML open、`mvhtml` resource配信、PlantUML レンダリング、Recent Folders / Viewer settings の app config JSON 永続化。
 - Tauri config: dialog / opener / asset protocol の権限管理とshell CSP。HTML protocol originをcapability remote URLへ追加しない。
@@ -52,6 +54,17 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 | `errorMessage` | `string \| null` | tab単位代表error |
 | `plantUmlDiagrams` | `PlantUmlDiagramResult[]` | tab単位のpending / SVG / error cache |
 
+`SplitViewState`は表示layoutの正本であり、`OpenDocumentTab`へpane情報を埋め込まない。
+
+| field | 型 | 補足 |
+|---|---|---|
+| `mode` | `single \| split` | 左右2 paneだけを提供する |
+| `activePaneId` | `primary \| secondary` | Explorer、Reload、StatusBar、代表errorの対象 |
+| `primary` / `secondary` | `PaneState` | paneごとの`activeTabId`とpending anchor。secondaryはsingle時に未選択 |
+| `requestedSplitRatio` | number | 0より大きく1より小さいsession-only指定値。狭幅時のclamp値を書き戻さない |
+
+`PanePreviewStatus`はMermaid / HTML iframeのDOM固有状態を`paneId + tabId + revision`へ帰属させる。document openとPlantUML結果は共有tab stateのまま維持し、同じtabを両paneへ表示してもread / PlantUML commandを重複させない。
+
 `ViewerSettings` は Rust / TypeScript / app config JSON で camelCase 対応する。
 
 | field | 型 | 補足 |
@@ -68,6 +81,7 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 React UI -> Tauri invoke -> Rust commands -> filesystem / Java
 React UI -> markdown-it / mermaid -> WebView DOM
 React UI -> explorerPane.ts -> Explorer width bounds / keyboard policy
+React UI -> splitView.ts / paneRuntime.ts -> pane selection / width / async guard policy
 React UI -> imageViewer.ts -> transform policy / Markdown DOM source resolver
 React UI -> @tauri-apps/plugin-dialog / plugin-opener -> OS
 HtmlPreview -> mvhtml protocol -> DocumentStore -> root内allowlist resource
@@ -197,15 +211,15 @@ skinparam shadowing false
 
 state NoRoot : rootPath = null
 state HasRoot : rootPath set\ntabs は0件以上
-state TabLoading : active tab loadState = loading
+state TabLoading : active pane tab loadState = loading
 state AppConfigUpdating : foregroundConfigOperationCount > 0
-state PlantUmlPending : active tab loadState = rendering
+state PlantUmlPending : active pane tab loadState = rendering
 state Error : error strip に errorMessage 表示
 state ImageViewerOpen : imageViewerRequest set\napp shell inert
 
 NoRoot --> HasRoot : Open Folder / loadRoot scan成功
 HasRoot --> TabLoading : Explorer 選択 / Reload
-TabLoading --> HasRoot : open_document / HTML ready 成功
+TabLoading --> HasRoot : open_document / pane HTML ready 成功
 TabLoading --> Error : Tauri command 失敗
 HasRoot --> AppConfigUpdating : recent / theme / settings 保存
 AppConfigUpdating --> HasRoot : app config JSON 更新完了

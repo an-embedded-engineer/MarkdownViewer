@@ -14,6 +14,7 @@ MarkdownViewer は、VSCode やコーディングエージェントが生成し�
 - `Avalonia/MarkdownViewer.Avalonia/`: C# / Avalonia 版のデスクトップアプリ。
 - `markdown-viewer-tauri/`: Tauri v2 + React + TypeScript 版のデスクトップアプリ。
   - Markdown は React DOM で描画し、trusted HTML は root-scoped custom protocol と sandboxed iframe で分離表示する。
+  - globalなopen tabデータを共有しながら、single viewまたはpaneごとの選択・runtimeを持つ左右2 pane Split Viewで表示する。
 - `docs/`: 設計、開発ルール、workflow 用の project-level 文書。
 - `instructions/`: Agent 向け共通指示の同期元。
 - `scripts/`: Agent 指示同期などの補助スクリプト。

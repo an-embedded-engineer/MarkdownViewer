@@ -1,0 +1,71 @@
+---
+title: "TODO-2026-006 Tauri Split view introduction"
+created_date: "2026-07-26"
+category: "new_feature"
+todo_id: "TODO-2026-006"
+work_package_id: "WP-004"
+work_branch: "new-feature/tauri-split-view"
+components:
+  - "markdown-viewer-tauri/src/App.tsx"
+  - "markdown-viewer-tauri/src/App.css"
+  - "markdown-viewer-tauri/src/splitView.ts"
+  - "markdown-viewer-tauri/src/paneRuntime.ts"
+  - "markdown-viewer-tauri/src/documentPolicy.ts"
+  - "docs/components/tauri_viewer"
+status: "done"
+design_status: "done"
+impl_status: "done"
+completion_status: "done"
+verification_status: "done"
+related_commits:
+  - "c023374 : Phase 0 define TODO-2026-006 split view scope"
+  - "09d57dc : Phase 1 initialize Tauri split view workflow"
+  - "f98dfed : Phase 2 complete Tauri split view design review"
+  - "810f0c3 : Phase 3 implement Tauri split view"
+  - "c8f5272 : Phase 3 address implementation review findings"
+  - "7eb32ea : Phase 3 implementation review approved after re-review"
+  - "0dfc91b : Phase 3 complete Tauri split view implementation review"
+  - "f8f6136 : Phase 4-a verify Tauri split view and record follow-ups"
+  - "a3acab4 : Phase 4-b complete report, diff archive, TODO archive, and history"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-006-tauri-split-view-導入"
+source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
+source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
+depends_on:
+  - "TODO-2026-005 Tauri Multi-tab core introduction"
+  - "TODO-2026-017 Tauri HTML document viewing support"
+follow_up:
+  - "TODO-2026-007 Tauri UX evaluation and Avalonia specification"
+  - "TODO-2026-011 Avalonia Split view introduction"
+  - "TODO-2026-023 Tauri pane-local tab group introduction"
+  - "TODO-2026-024 Tauri tab movement between panes"
+  - "TODO-2026-025 Tauri vertical and horizontal split orientation"
+---
+
+# TODO-2026-006 Tauri Split view introduction meta
+
+## Scope
+
+- Add single / split layout state with primary and secondary pane selections while keeping `OpenDocumentTab[]` as the document-data source of truth.
+- Render one preview pane in single mode and two side-by-side panes in split mode, with an explicit active pane and independent tab selection.
+- Route Explorer selection, tab activation and close, Reload, relative Markdown navigation, status, and errors through pane-aware state.
+- Isolate Markdown, Mermaid, PlantUML, trusted HTML, anchor navigation, scrolling, loading, errors, and image-viewer interaction by pane, tab, and revision.
+- Preserve responsive layout, Explorer resizing, Light / Dark theme, Settings, MenuBar, StatusBar, Recent Folders, and existing HTML security boundaries.
+
+## Non-Scope
+
+- Three or more panes, horizontal splitting, arbitrary split trees, or pane-layout persistence.
+- Drag and drop between panes, tab reorder, pinning, duplicate tabs, editing, or unsaved state.
+- Documents outside the current root, per-pane themes, or Avalonia implementation.
+- Rust command, custom protocol, capability, or CSP changes unless Phase 2 proves a change unavoidable.
+
+## Phase Status
+
+| Phase | Status |
+| --- | --- |
+| Phase 0 Requirements | Done (`c023374`) |
+| Phase 1 Branch and meta | Done (`09d57dc`) |
+| Phase 2 Design review | Done (approved by re-review, 9 findings resolved, 0 unresolved; `68f1fa5`) |
+| Phase 3 Implementation and docs review | Done (approved by re-review, 4 findings resolved, 0 unresolved; `7eb32ea`) |
+| Phase 4-a User verification | Done (user accepted split toggle and independent file preview in both panes; automated verification passed) |
+| Phase 4-b Completion | Done (change report, diff archive, TODO archive, history, and follow-ups prepared) |
+| Phase 4-c Merge | Awaiting user approval |
