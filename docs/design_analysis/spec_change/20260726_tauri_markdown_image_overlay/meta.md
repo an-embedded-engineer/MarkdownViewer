@@ -21,6 +21,8 @@ related_commits:
   - "d2e9fd5 : Phase 0 define TODO-2026-022 image overlay scope"
   - "e0b7fe3 : Phase 2 design Tauri Markdown image overlay"
   - "0c92ca6 : Phase 2 review Tauri Markdown image overlay design"
+  - "19bf862 : Phase 2 address initial design review findings"
+  - "1092187 : Phase 2 re-review round 1 fixes"
 ---
 
 # TODO-2026-022 Tauri Markdown画像オーバーレイ表示 meta
@@ -52,6 +54,6 @@ related_commits:
 | --- | --- |
 | Phase 0 Requirements | Done (`d2e9fd5`) |
 | Phase 1 Branch and meta | Done |
-| Phase 2 Design review | In review (Round 1 findings: Medium 7 / Low 7) |
+| Phase 2 Design review | In review (Round 2 finding: Medium 1) |
 | Phase 3 Implementation and docs review | Pending |
 | Phase 4 Verification and completion | Pending |

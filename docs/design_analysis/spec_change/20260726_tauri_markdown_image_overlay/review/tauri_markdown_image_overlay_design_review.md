@@ -61,6 +61,18 @@ inline style は selector の specificity では上書きできない。`.image-
 **対象工程**: Phase 2 設計修正 → Phase 3 実装
 **status**: 未対応
 
+### 7.2.1 Round 2 指摘対応
+
+設計 §6.1-6.4、§16、§18へ次を反映した。
+
+- buttonは通常時visually-hiddenかつabsolute配置として文書flow / pointer hit testから外し、keyboard focus時だけvisual右上へfixed pillとして可視化する。focus中のscroll / resize追従とdisconnect時のfocus fallbackも定義した。
+- 通常画像は`img`直後、linked imageは`a`直後、Mermaidは`.mermaid`直後、PlantUMLは既存`.plantuml-diagram`直後へ挿入する。diagram専用wrapperは追加せず、既存border / padding / horizontal scroll領域を維持する。
+- visual / buttonへ同じopaque `data-image-viewer-id`を付け、kind markerとactive preview root allowlistを併用して`focusOrigin`を双方向解決する。ID不一致・重複は拒否する。
+- `.markdown-body` typographyを打ち消すbutton CSS reset、focus時のclip解除・可視outline・pointer event契約を定義した。
+- 手動scenarioへfocus pillの可視性と、inline段落の行組みおよびdiagram layoutがdecoration前後で不変であることを追加した。
+
+**status**: 対応済み・再確認待ち
+
 ---
 
 ### 1.2 wheel zoom が React の `onWheel` では実装できない（passive listener 固定）
@@ -374,6 +386,6 @@ Round 1 の 14 件はすべてクローズと判定する。
 
 | ID | severity | 概要 | status |
 | --- | --- | --- | --- |
-| 7.2 | Medium | 隣接 viewer button の表示契約・挿入位置・visual との対応付けが未定義 | 未対応 |
+| 7.2 | Medium | 隣接 viewer button の表示契約・挿入位置・visual との対応付けが未定義 | 対応済み・再確認待ち |
 
-Round 1 指摘 14 件はクローズ。7.2 を設計へ反映すれば未解決 0 件となり Phase 2 承認・Phase 3 進行可とする。承認時は `meta.md` の `design_status` を `reviewed`、Phase 2 行を Done へ更新すること。
+Round 1 指摘14件はクローズ。7.2は設計へ反映済みであり、Claude再確認で未解決0件または追加指摘を確定する。承認時は`meta.md`の`design_status`を`reviewed`、Phase 2行をDoneへ更新すること。
