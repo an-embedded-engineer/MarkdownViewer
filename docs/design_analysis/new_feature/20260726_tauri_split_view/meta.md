@@ -12,23 +12,21 @@ components:
   - "markdown-viewer-tauri/src/paneRuntime.ts"
   - "markdown-viewer-tauri/src/documentPolicy.ts"
   - "docs/components/tauri_viewer"
-status: "in_progress"
+status: "done"
 design_status: "done"
 impl_status: "done"
-completion_status: "not_started"
+completion_status: "done"
 verification_status: "done"
 related_commits:
   - "c023374 : Phase 0 define TODO-2026-006 split view scope"
   - "09d57dc : Phase 1 initialize Tauri split view workflow"
-  - "10948dc : Phase 2 draft Tauri split view design"
-  - "5aebaa9 : Phase 2 design review (changes requested)"
-  - "dd0dead : Phase 2 address Tauri split view design review"
-  - "68f1fa5 : Phase 2 design review approved after re-review"
+  - "f98dfed : Phase 2 complete Tauri split view design review"
   - "810f0c3 : Phase 3 implement Tauri split view"
-  - "60ba906 : Phase 3 implementation review (changes requested)"
   - "c8f5272 : Phase 3 address implementation review findings"
   - "7eb32ea : Phase 3 implementation review approved after re-review"
-source_todo_path: "docs/todo/todo.md#todo-2026-006-tauri-split-view-導入"
+  - "0dfc91b : Phase 3 complete Tauri split view implementation review"
+  - "f8f6136 : Phase 4-a verify Tauri split view and record follow-ups"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-006-tauri-split-view-導入"
 source_wbs_path: "docs/design_analysis/wbs/20260705_ui_ux_multi_tab_menu_status_recent_dirs/wbs.md#work-package-一覧"
 source_report_path: "docs/design_analysis/research_analysis/20260705_ui_ux_multi_tab_menu_status_recent_dirs/report.md"
 depends_on:
@@ -68,4 +66,5 @@ follow_up:
 | Phase 2 Design review | Done (approved by re-review, 9 findings resolved, 0 unresolved; `68f1fa5`) |
 | Phase 3 Implementation and docs review | Done (approved by re-review, 4 findings resolved, 0 unresolved; `7eb32ea`) |
 | Phase 4-a User verification | Done (user accepted split toggle and independent file preview in both panes; automated verification passed) |
-| Phase 4-b Completion | Not started |
+| Phase 4-b Completion | Done (change report, diff archive, TODO archive, history, and follow-ups prepared) |
+| Phase 4-c Merge | Awaiting user approval |
