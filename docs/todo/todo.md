@@ -53,6 +53,56 @@
   - 手動確認で Markdown + Markdown、Markdown + HTML、Mermaid + PlantUML の同時表示、各 pane の独立 scroll、loading / error と非同期描画の分離を確認できる。
   - 手動確認で window / Explorer / pane resize、Light / Dark、keyboard / focus、HTML security boundary、single view 回帰を確認できる。
 
+## TODO-2026-023 Tauri pane-local tab group 導入
+
+- status: open
+- workflow: new-feature
+- depends_on: TODO-2026-006
+- summary: Tauri版のprimary / secondaryでTabStripの所属・表示順を分離し、各paneで開いたtabだけを表示する。
+- feasibility: 実現可能。現行の共有`OpenDocumentTab[]`はdocument cacheとして維持できるが、paneごとのordered tab ID collectionとactive tabを正本化し、open / close / Reload / root reset / split offのpolicyを移行する必要がある。
+- scope:
+  - primary / secondaryごとにtabの所属と表示順を管理する。
+  - Explorerまたはlinkから開いたdocumentはactive paneのTabStripへ追加する。
+  - 同じpathを両paneで開く場合のdocument data共有とpane-local runtime分離を両立する。
+- completion:
+  - 各paneのTabStripにはそのpaneで開いたtabだけが表示され、他paneのtab追加・closeで意図せず増減しない。
+  - tab activate / close、Reload、relative link、root変更、split on / offでpane-local tab collectionとactive tabが一貫して復旧する。
+  - Markdown / HTML / Mermaid / PlantUMLの非同期結果とloading / error表示がpane間で混線しない。
+  - `npm test`、`npm run build`、`cargo check`が成功する。
+
+## TODO-2026-024 Tauri pane間tab移動
+
+- status: open
+- workflow: new-feature
+- depends_on: TODO-2026-023
+- summary: Tauri版で開いているtabをprimary / secondaryのTabStrip間で移動できるようにする。
+- feasibility: 実現可能。TODO-2026-023のpane-local tab ownershipを前提に、移動元・移動先のordered tab IDs、active tab fallback、pane runtime / focusを1つのtyped transitionで更新する必要がある。
+- completion:
+  - tabをprimaryからsecondary、secondaryからprimaryへ明示操作で移動できる。
+  - 移動後もdocument data、scroll / preview、loading / error、relative link、image viewerのpane identityが破綻しない。
+  - active tabを移動した場合、移動元は隣接tabまたは未選択へ復旧し、移動先では対象tabを選択できる。
+  - keyboardだけでも移動操作へ到達でき、focusとaccessible name / stateが維持される。
+  - `npm test`、`npm run build`、`cargo check`が成功する。
+
+## TODO-2026-025 Tauri上下・左右split方向対応
+
+- status: open
+- workflow: new-feature
+- depends_on: TODO-2026-023
+- summary: Tauri版の2pane splitを左右方向だけでなく上下方向でも表示できるようにする。
+- feasibility: 実現可能。現行`ViewMode`と左右幅専用policy / CSS gridをsplit orientation + axis共通size policyへ拡張し、separatorのpointer座標・keyboard・ARIA orientationを方向別に切り替える必要がある。
+- scope:
+  - single、左右2pane、上下2paneを切り替える。
+  - pane-local TabStripとpreviewをどちらの方向でも同じ`DocumentPane`経路で描画する。
+  - separator操作、狭幅・狭高さ縮退、requested ratioを方向に応じて扱う。
+- non_scope:
+  - 3pane以上、入れ子split tree、任意数のeditor groupは別途WBSで分解する。
+- completion:
+  - View操作で左右splitと上下splitを選択でき、切替後もpaneごとのtabとactive paneが維持される。
+  - pointer / keyboard separator操作、focus、`aria-orientation` / valueがsplit方向と一致する。
+  - Markdown / HTML / Mermaid / PlantUMLが上下・左右の利用可能領域へ追従し、不必要に再読み込みされない。
+  - `npm test`、`npm run build`、`cargo check`が成功する。
+
 ## TODO-2026-007 Tauri 先行 UX 評価と Avalonia 反映仕様化
 
 - status: open

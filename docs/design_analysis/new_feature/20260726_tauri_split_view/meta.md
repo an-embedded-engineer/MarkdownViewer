@@ -16,7 +16,7 @@ status: "in_progress"
 design_status: "done"
 impl_status: "done"
 completion_status: "not_started"
-verification_status: "not_started"
+verification_status: "done"
 related_commits:
   - "c023374 : Phase 0 define TODO-2026-006 split view scope"
   - "09d57dc : Phase 1 initialize Tauri split view workflow"
@@ -37,6 +37,9 @@ depends_on:
 follow_up:
   - "TODO-2026-007 Tauri UX evaluation and Avalonia specification"
   - "TODO-2026-011 Avalonia Split view introduction"
+  - "TODO-2026-023 Tauri pane-local tab group introduction"
+  - "TODO-2026-024 Tauri tab movement between panes"
+  - "TODO-2026-025 Tauri vertical and horizontal split orientation"
 ---
 
 # TODO-2026-006 Tauri Split view introduction meta
@@ -64,4 +67,5 @@ follow_up:
 | Phase 1 Branch and meta | Done (`09d57dc`) |
 | Phase 2 Design review | Done (approved by re-review, 9 findings resolved, 0 unresolved; `68f1fa5`) |
 | Phase 3 Implementation and docs review | Done (approved by re-review, 4 findings resolved, 0 unresolved; `7eb32ea`) |
-| Phase 4 Verification and completion | Not started |
+| Phase 4-a User verification | Done (user accepted split toggle and independent file preview in both panes; automated verification passed) |
+| Phase 4-b Completion | Not started |

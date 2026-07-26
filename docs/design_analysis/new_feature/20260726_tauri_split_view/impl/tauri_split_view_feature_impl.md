@@ -89,3 +89,21 @@ Rust command、custom protocol、Tauri capability、CSP、settings schemaは変�
 | 3.3 HTML bridgeのtab / revision判定が同一述語 | impl + test / Low | `isPaneSelectionCurrent`と`isTabRevisionCurrent`を独立pure policyとして公開し、`isPaneResultCurrent`を両者の合成へ変更。HTML bridge contextへ各述語を個別配線した |
 
 対応後に`npm test -- --run`（5 files / 71 tests）と`npm run build`を再実行し、いずれも成功した。設計契約と恒久ドキュメントの変更は不要で、実装の適合修正として閉じている。
+
+## 8. Phase 4-a 動作確認結果
+
+2026-07-26、ユーザが起動したTauri版で次を確認し、本workflowの提供範囲をOKと判断した。
+
+- `View > Split View`でsingle / 左右splitを切り替えられる。
+- primary / secondaryそれぞれでtabを開き、異なるfileを同時にpreviewできる。
+
+同日に最終自動検証を再実行した。
+
+| コマンド | 結果 |
+| --- | --- |
+| `cd markdown-viewer-tauri && npm test -- --run` | 成功。5 files / 71 tests passed |
+| `cd markdown-viewer-tauri && npm run build` | 成功。既存large chunk warningのみ |
+| `cd markdown-viewer-tauri/src-tauri && cargo check` | 成功 |
+| `cd markdown-viewer-tauri/src-tauri && cargo test` | 成功。22 tests passed |
+
+ユーザ提案の拡張3件は現行構造から軽く実現性を確認し、いずれも実現可能と判断した。本TODOの完了範囲は拡大せず、pane-local tab groupを`TODO-2026-023`、pane間tab移動を`TODO-2026-024`、上下・左右split方向を`TODO-2026-025`としてfollow-up登録した。任意数の入れ子split treeは変更規模がさらに大きいため、`TODO-2026-025`では2paneの方向切替までを対象とする。
