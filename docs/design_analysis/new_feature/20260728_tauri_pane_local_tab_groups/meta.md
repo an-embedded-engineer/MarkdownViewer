@@ -18,7 +18,7 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "in_progress"
+completion_status: "done"
 verification_status: "done"
 related_commits:
   - "a97c530 : Phase 0 define TODO-2026-023 pane-local tab groups"
@@ -35,7 +35,8 @@ related_commits:
   - "d0f8dac : Phase 3 approve implementation with all 3 findings resolved"
   - "cea681a : Phase 3 stabilize TabStrip height after Phase 4-a feedback"
   - "025a81b : Phase 3 approve TabStrip height stabilization with 0 unresolved findings"
-source_todo_path: "docs/todo/todo.md#todo-2026-023-tauri-pane-local-tab-group--pane-間移動"
+  - "c807c1a : Phase 4-a verify pane-local tab groups and add UX follow-up"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-023-tauri-pane-local-tab-group--pane-間移動"
 source_design_path: "docs/design_analysis/new_feature/20260726_tauri_split_view/"
 depends_on:
   - "TODO-2026-006 Tauri Split view introduction"
@@ -72,5 +73,5 @@ follow_up:
 | Phase 2 Design review | Done and approved (`8ecbe5a`; 13 findings resolved, 0 unresolved) |
 | Phase 3 Implementation and docs review | Done after Phase 4-a feedback (`025a81b`; TabStrip height fix approved, 0 unresolved findings) |
 | Phase 4-a User verification | Done; initial height issue fixed and user confirmed constant height with no recurrence on 2026-07-29 |
-| Phase 4-b Completion | In progress; follow-up TODO-2026-026 registered |
-| Phase 4-c Merge | Not started |
+| Phase 4-b Completion | Done; change report, diff artifact, archive, history, and follow-up TODO-2026-026 prepared |
+| Phase 4-c Merge | Awaiting user approval |
