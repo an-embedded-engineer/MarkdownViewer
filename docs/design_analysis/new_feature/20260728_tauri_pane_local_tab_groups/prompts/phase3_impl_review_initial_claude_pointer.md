@@ -1,0 +1,1 @@
+`docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/prompts/phase3_impl_review_initial_claude.md` を読んで、Phase 3実装レビューを開始してください。
