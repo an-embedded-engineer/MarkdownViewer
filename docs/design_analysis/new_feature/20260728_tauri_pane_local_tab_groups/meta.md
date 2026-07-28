@@ -12,11 +12,12 @@ components:
   - "markdown-viewer-tauri/src/splitView.test.ts"
   - "markdown-viewer-tauri/src/paneRuntime.test.ts"
   - "docs/components/tauri_viewer"
+  - "docs/components/avalonia_viewer/tauri_ux_rollout_spec.md"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
 design_status: "done"
-impl_status: "draft"
+impl_status: "in_review"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -28,6 +29,8 @@ related_commits:
   - "7de22bb : Phase 2 approve design with one follow-up Low finding"
   - "3542fbb : Phase 2 resolve final runtime status clear finding"
   - "8ecbe5a : Phase 2 approve design with all 13 findings resolved"
+  - "13c87a3 : Phase 3 implement Tauri pane-local tab groups"
+  - "cb10f6d : Phase 3 initial implementation review approved with 3 non-blocking findings"
 source_todo_path: "docs/todo/todo.md#todo-2026-023-tauri-pane-local-tab-group--pane-間移動"
 source_design_path: "docs/design_analysis/new_feature/20260726_tauri_split_view/"
 depends_on:
@@ -62,7 +65,7 @@ follow_up:
 | Phase 0 Requirements | Done and approved (`a97c530`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`8ecbe5a`; 13 findings resolved, 0 unresolved) |
-| Phase 3 Implementation and docs review | Draft implementation and permanent docs prepared; automated verification passed; review pending |
+| Phase 3 Implementation and docs review | In review; initial review approved with 3 non-blocking findings (`cb10f6d`), all addressed pending follow-up confirmation |
 | Phase 4-a User verification | Not started |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |

@@ -85,6 +85,7 @@
 - `docs/components/tauri_viewer/detail_design.md`: App / reducer / DocumentPane / TabStripの実装契約
 - `docs/components/tauri_viewer/interface_spec.md`: pane-local open / close / move / split off-on / accessibility
 - `docs/rules/development_workflow.md`: 旧global TabStripの手動合否基準を新仕様へ置換
+- `docs/components/avalonia_viewer/tauri_ux_rollout_spec.md`: TODO-2026-006 baselineとTauri現行pane-local semanticsの差、およびAvalonia導入時の再評価条件を注記
 
 ## 6. 自動検証結果
 
@@ -101,7 +102,19 @@
 
 UIの実機確認はPhase 4-aでユーザが実施する。確認項目は`docs/rules/development_workflow.md`のTauri手動確認と設計書§17を正とする。
 
-## 7. 既知制約
+## 7. 実装レビュー対応
+
+Claude実装レビュー `cb10f6d` はblocking 0件で承認し、非ブロッキングのMedium 1件 / Low 2件を検出した。Phase 3内で全件へ対応した。
+
+| 指摘 | 対応 |
+| --- | --- |
+| `interface_spec.md`に旧global表示順の記述が残る | 表示単位をpane-local group、data一意性をglobal pathとして粒度を分けて記述 |
+| Avalonia rollout specに旧split継承規則だけが残る | TODO-2026-006 baselineであること、TauriはTODO-2026-023で置換済みであること、Avalonia導入時の再評価条件を注記 |
+| `loadRoot`の更新順がReact batchingへ依存する | `reset-root`でgroupを先にclearし、その後global tabsをclearする順へ変更。全中間状態で`group ⊆ global tabs`を維持 |
+
+対応後も仕様差分はなく、root scan成功後のcommit pointと既存の表示挙動を維持する。
+
+## 8. 既知制約
 
 - drag and drop、group内reorder、pin、複数選択、一括move / closeは対象外。
 - 上下split、3 pane以上、split treeは対象外。

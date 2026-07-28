@@ -468,8 +468,8 @@ function App() {
       setRootPath(path);
       setFileTree(tree);
       setIsRootLoading(false);
-      updateTabs(() => []);
       applySplitView({ type: "reset-root" });
+      updateTabs(() => []);
 
       const initialFile = findReadme(tree) ?? findFirstMarkdown(tree) ?? findFirstHtml(tree);
       if (initialFile) {

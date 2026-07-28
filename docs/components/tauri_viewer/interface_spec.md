@@ -52,7 +52,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 
 ## TabStrip 表示
 
-- 同一root内でopenしたMarkdown / HTMLをopen順に表示する。同一pathのtabは重複作成しない。
+- 各TabStripは自paneのgroupに属するMarkdown / HTMLだけを表示する。global document dataはroot内でpath一意とし、同一pathのdocumentを重複作成しない。
 - active / Loading / Rendering / Errorを表示し、長いfile nameはellipsis、absolute pathは`title`で確認できる。
 - 多数tabは横scrollで到達可能にする。`role="tablist"` / `role="tab"` とroving tabindexを使う。
 - 各TabStripは自paneの`orderedTabIds`に属するtabだけをlocal挿入順で表示する。ArrowLeft / ArrowRight / Home / Endもlocal順へ適用する。
