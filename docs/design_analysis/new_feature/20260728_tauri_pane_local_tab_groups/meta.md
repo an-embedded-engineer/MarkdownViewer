@@ -15,9 +15,9 @@ components:
   - "docs/components/avalonia_viewer/tauri_ux_rollout_spec.md"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "in_progress"
+status: "implemented"
 design_status: "done"
-impl_status: "in_review"
+impl_status: "done"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -31,6 +31,8 @@ related_commits:
   - "8ecbe5a : Phase 2 approve design with all 13 findings resolved"
   - "13c87a3 : Phase 3 implement Tauri pane-local tab groups"
   - "cb10f6d : Phase 3 initial implementation review approved with 3 non-blocking findings"
+  - "83e0ce8 : Phase 3 address all 3 implementation review findings"
+  - "d0f8dac : Phase 3 approve implementation with all 3 findings resolved"
 source_todo_path: "docs/todo/todo.md#todo-2026-023-tauri-pane-local-tab-group--pane-間移動"
 source_design_path: "docs/design_analysis/new_feature/20260726_tauri_split_view/"
 depends_on:
@@ -65,7 +67,7 @@ follow_up:
 | Phase 0 Requirements | Done and approved (`a97c530`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`8ecbe5a`; 13 findings resolved, 0 unresolved) |
-| Phase 3 Implementation and docs review | In review; initial review approved with 3 non-blocking findings (`cb10f6d`), all addressed pending follow-up confirmation |
+| Phase 3 Implementation and docs review | Done and approved (`d0f8dac`; 3 findings resolved, 0 unresolved) |
 | Phase 4-a User verification | Not started |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |
