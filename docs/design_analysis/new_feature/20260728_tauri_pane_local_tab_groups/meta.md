@@ -18,8 +18,8 @@ components:
 status: "implemented"
 design_status: "done"
 impl_status: "done"
-completion_status: "not_started"
-verification_status: "in_progress"
+completion_status: "in_progress"
+verification_status: "done"
 related_commits:
   - "a97c530 : Phase 0 define TODO-2026-023 pane-local tab groups"
   - "e7fc3f7 : Phase 1 initialize Tauri pane-local tab groups workflow"
@@ -43,6 +43,7 @@ integrated_todo:
   - "TODO-2026-024 Tauri tab movement between panes"
 follow_up:
   - "TODO-2026-025 Tauri vertical and horizontal split orientation"
+  - "TODO-2026-026 Tauri TabStrip visual state, scrolling, and drag move UX"
 ---
 
 # TODO-2026-023 Tauri pane-local tab groups and tab movement between panes meta
@@ -70,6 +71,6 @@ follow_up:
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`8ecbe5a`; 13 findings resolved, 0 unresolved) |
 | Phase 3 Implementation and docs review | Done after Phase 4-a feedback (`025a81b`; TabStrip height fix approved, 0 unresolved findings) |
-| Phase 4-a User verification | Initial verification NG recorded; TabStrip height fix approved and user re-verification pending |
-| Phase 4-b Completion | Not started |
+| Phase 4-a User verification | Done; initial height issue fixed and user confirmed constant height with no recurrence on 2026-07-29 |
+| Phase 4-b Completion | In progress; follow-up TODO-2026-026 registered |
 | Phase 4-c Merge | Not started |

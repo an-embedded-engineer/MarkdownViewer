@@ -54,6 +54,46 @@
   - 手動確認で同じMarkdown / HTML documentを両paneに開き、Mermaid / PlantUML / HTML ready・timeoutを含む表示状態が混線しない。
   - `npm test -- --run`、`npm run build`、`cargo check`が成功し、既存single / split viewとHTML security boundaryの回帰がない。
 
+## TODO-2026-026 Tauri TabStrip 状態表現・scroll・drag move UX改善
+
+- status: open
+- workflow: new-feature
+- depends_on: TODO-2026-023
+- source_feedback: TODO-2026-023 Phase 4-a
+- summary: Tauri版TabStripをcompactな1行表示へ整理し、上端indicatorによる状態表現、必要時だけのhorizontal scrollbar、選択tab全体の自動scroll、pane間drag and drop移動を追加する。
+- feasibility: 実現可能。既存のtyped `move-tab` transitionは再利用できる。visual stateは`resolvePaneTabPresentationState`を入力にCSS class / pseudo-elementで表現し、dragはHTML Drag and DropまたはPointer EventsをWebView別に評価する。tab activate buttonだけでなくtab item全体をscroll targetにする必要がある。
+- target_users:
+  - 多数のtabを左右paneで扱い、状態を判別しつつpreview領域を広く保ちたい利用者。
+  - pointerでtabを直接反対paneへ移動したい一方、keyboardや支援技術でも同じ操作へ到達したい利用者。
+- scope:
+  - active / error / rendering状態をtab上端のindicatorへ統一し、Error / Renderingのvisible textを廃止する。
+  - Errorは赤い上端線、Renderingは別色または左から伸びるindeterminate animationで表現する。実progress値が無いため進捗率とは扱わない。
+  - visible text廃止後も状態をaccessible name / description、`aria-busy`等の適切なARIAで通知する。
+  - 1行tabに合わせてTabStrip固定高をcompact化し、通常 / error / rendering / empty / overflowで高さを変えない。
+  - horizontal scrollbarはpointer hoverまたはkeyboard focus時だけ視認可能にし、表示切替でTabStripやpreviewがlayout shiftしないようにする。
+  - overflow中のtabをactivateまたはfocusした時、titleだけでなくmove / close buttonを含むtab item全体が表示範囲へ入るようscroll位置を調整する。
+  - split表示中、tabを反対paneへdrag and dropして既存`move-tab` transitionを実行する。drop target / drag feedback / cancelを明示する。
+  - 既存の矢印move buttonをkeyboard / assistive technology向けの代替導線として維持する。
+- non_scope:
+  - 同一pane内reorder、pin、複数選択、一括move / close。
+  - 実数のrender progress表示。現行runtimeに進捗率が無いためindeterminate表現までとする。
+  - dragだけを唯一の移動導線にすること、または矢印move buttonの廃止。
+- integration_points:
+  - `markdown-viewer-tauri/src/App.tsx`の`TabStrip`、tab item refs、focus / scroll調停、drag event wiring。
+  - `markdown-viewer-tauri/src/App.css`のactive / error / rendering indicator、compact height、scrollbar visibility、drag / drop feedback、reduced motion。
+  - `markdown-viewer-tauri/src/splitView.ts`の既存atomic `move-tab` action。drag専用の重複state transitionは追加しない。
+  - `markdown-viewer-tauri/src/paneRuntime.ts`のpresentation state合成とARIA state導出。
+- completion:
+  - Error / Renderingのvisible textが無くても、通常・active・error・renderingを上端indicatorとaccessible stateで識別できる。
+  - Error indicatorはtab上端に赤で表示され、Rendering indicatorはError / activeと混同しない。animationを使う場合は`prefers-reduced-motion`へ対応する。
+  - TabStripがcompactな固定高を維持し、左右pane、empty、overflow、状態遷移でpreview上端に段差や高さ変動が生じない。
+  - horizontal scrollbarはhover / focus時だけ視認可能で、表示切替によるlayout shiftがない。
+  - overflow中に右端を含む任意tabをactivate / focusすると、title、move、close controlを含むtab item全体が自動的に表示範囲へ入る。
+  - pointer dragでprimary / secondary間を移動でき、source fallback、destination selection、focus、runtime guardが矢印moveと一致する。cancel時はstateを変更しない。
+  - keyboardだけでも既存move buttonから同じ移動を実行でき、drag state / drop targetが支援技術を妨げない。
+  - Light / Dark、single / split、narrow window、horizontal overflow、HTML / Mermaid / PlantUML表示で回帰がない。
+  - `npm test`、`npm run build`、`cargo check`が成功する。
+
 ## TODO-2026-025 Tauri上下・左右split方向対応
 
 - status: open

@@ -125,6 +125,8 @@ Claude実装レビュー `cb10f6d` はblocking 0件で承認し、非ブロッ�
 
 再確認では、通常 / 状態付き / empty / scrollbar有無を左右で組み合わせ、tab追加・close・moveを反復しても両TabStripが同じ高さを維持することを確認する。
 
+2026-07-29の再確認で、ユーザはTabStripの高さが一定になり、低くなりすぎる現象も再発しないことを確認した。Phase 4-aを合格とし、TabStripの状態indicator、compact height、scrollbar UX、tab item全体の自動scroll、pane間drag and dropは現行scopeを拡大せず`TODO-2026-026`へ登録した。
+
 ## 9. 既知制約
 
 - drag and drop、group内reorder、pin、複数選択、一括move / closeは対象外。
