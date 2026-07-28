@@ -89,4 +89,4 @@ Rust command、custom protocol、Tauri capability、CSP、settings schema、trus
 
 ## Phase 4-c
 
-Phase 4-b成果物を作成済み。`new-feature/tauri-pane-local-tab-groups`の`main`へのmergeはユーザー承認待ち。
+ユーザーの最終承認後、`new-feature/tauri-pane-local-tab-groups`を`main`へ`--no-ff`でマージした。merge commitは`74526ac`。

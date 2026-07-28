@@ -44,3 +44,5 @@ Tauri版Split Viewはprimary / secondaryで異なるdocumentを同時表示で�
   - `cea681a` TabStrip height stabilization
   - `025a81b` height stabilization approval
   - `c807c1a` Phase 4-a user verification and follow-up registration
+  - `dc1a1f9` Phase 4-b completion artifacts
+  - `74526ac` Phase 4-c merge into `main`

@@ -30,7 +30,7 @@
   - `TODO-2026-026`: TabStrip上端indicator、compact固定高、scroll UX、pane間drag and drop移動。
   - Avalonia版のpane / multi-tab水平展開は`TODO-2026-011` / `TODO-2026-012`で扱う。
 - Completion:
-  - Phase 4-b成果物を作成済み。Phase 4-cの`main` mergeはユーザー承認待ち。
+  - ユーザーのPhase 4-c承認後、`main`へ`--no-ff`でマージした。merge commitは`74526ac`。
 
 ## TODO-2026-007 Tauri 先行 UX 評価と Avalonia 反映仕様化
 
