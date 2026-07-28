@@ -252,7 +252,7 @@ export type PaneState = {
 - global `OpenDocumentTab[]` / refsと`SplitViewState`を組み合わせる唯一のintegration owner。
 - `openOrActivateTab`を`open-tab` actionへ接続する。
 - `closeTab`をpane-local closeへ変更し、次stateのreference setからglobal evictionを判断する。
-- `moveTab`でtyped actionとdestination focusを調停する。close / move handlerはpane runtime statusを直接clearせず、既存generic effectへ委ねる。
+- `moveTab`でtyped actionとdestination focusを調停する。close / move / open / reload / root reset / split toggle handlerはpane runtime statusを直接clearせず、既存generic effectへ委ねる。`setPanePreviewStatus(..., null)`によるclearはこのgeneric effectだけに限定し、`setPanePreviewStatus`の他の呼び出しは`updatePanePreviewPhase`経由のstatus設定だけにする。
 - `resolveGroupTabs<T extends { id: string }>(orderedTabIds: string[], tabs: T[]): T[]`を`useMemo`からprimary / secondaryそれぞれ1回だけ呼び、解決済みviewを`DocumentPane`へ渡す。missing IDのthrowはこのApp integration boundaryに限定する。
 - Reload、root、StatusBar / ErrorBanner、Explorer selected pathはactive paneのactive IDから導出する。
 - global tabs orderをTabStrip UI orderとして使用しない。
@@ -353,7 +353,7 @@ pane result guardとpresentation合成の責務は変更しない。`activeTabId
 | --- | --- |
 | `markdown-viewer-tauri/src/splitView.ts` | `createInitialSplitViewState`引数廃止、ordered IDs、group actions、pending規則、generic resolver、reference helper、split payload削除、private adjacent fallback |
 | `markdown-viewer-tauri/src/splitView.test.ts` | 既存initial / split toggle / selection testをgroup schemaへ置換し、add / close / move / root / pending / invalid invariant testを追加 |
-| `markdown-viewer-tauri/src/App.tsx` | open、local close、cache eviction、move、App境界のgroup view解決、hidden secondary案内、focus integration。close / toggleの直接runtime clearを削除 |
+| `markdown-viewer-tauri/src/App.tsx` | open、local close、cache eviction、move、App境界のgroup view解決、hidden secondary案内、focus integration。close / move / open / reload / root reset / split toggleの直接runtime clearをすべて削除し、`setPanePreviewStatus`の呼び出しを`updatePanePreviewPhase`経由のstatus設定とgeneric effectによるclearの2経路だけに限定 |
 | `markdown-viewer-tauri/src/App.css` | split時move buttonを含むtab item grid / hover / focus |
 | `markdown-viewer-tauri/src/paneRuntime.test.ts` | 引数付きinitial stateと非member select前提をgroup membership helperへ書換え、move / retained secondary / same ID両groupのguard回帰を追加 |
 | `paneRuntime.ts` | 原則変更なし。型変更に伴う参照調整のみ |
