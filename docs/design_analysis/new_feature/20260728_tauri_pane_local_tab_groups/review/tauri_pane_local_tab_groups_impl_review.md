@@ -1,13 +1,15 @@
 # TODO-2026-023 Tauri pane-local tab group / pane 間移動 実装・恒久ドキュメントレビュー
 
 **レビュー日**: 2026-07-28
+**再確認日**: 2026-07-28
 **対象ドキュメント**: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/impl/tauri_pane_local_tab_groups_feature_impl.md`
 **対象設計書**: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/design/tauri_pane_local_tab_groups_feature_design.md`（承認済み `8ecbe5a`）
 **対象設計レビュー**: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/review/tauri_pane_local_tab_groups_design_review.md`（承認、検出 13 件すべて解決済み・未解決 0 件）
 **対象 meta**: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-023（統合済み TODO-2026-024 を含む）
-**レビュー対象コミット**: `13c87a3` (Phase 3 implement Tauri pane-local tab groups)
-**判定**: **承認 (Approved)**。Phase 4（ユーザ検証・完了処理）へ進行可。**blocking 指摘 0 件**。未解決は **Medium 1 件 / Low 2 件**で、いずれも非ブロッキング（恒久 docs の残存記述 2 件と、現時点で正しく動作している更新順の堅牢化 1 件）。Phase 4-a のユーザ検証を妨げないため、Phase 4-b 完了処理までの対応で足りる。
+**初回レビュー対象コミット**: `13c87a3` (Phase 3 implement Tauri pane-local tab groups)
+**Round 1 fix コミット**: `83e0ce8` (Phase 3 address pane-local tab groups implementation review)
+**判定**: **承認 (Approved)**。Phase 4（ユーザ検証・完了処理）へ進行可。**blocking 指摘 0 件**。初回検出の **Medium 1 件 / Low 2 件 = 全 3 件は Round 1 fix (`83e0ce8`) ですべて解決済み**と再確認した。**未解決指摘 0 件。** 再確認で新規指摘は検出しなかった。
 
 ---
 
@@ -26,7 +28,11 @@ TODO-2026-023 Phase 3 の実装・恒久ドキュメントレビュー。`13c87a
 
 テストは旧仕様を緩めたものではない。`splitView.test.ts` は共通 fixture `stateWithPaneTabs` を導入した上で、旧仕様 test（secondary 隣接自動選択、active secondary → primary 引き継ぎ、global `remove-tab`、group 未登録 ID の `select-tab`）を**削除**し、新 contract の境界値と失敗系を直接検証する 14 test へ置換している。`paneRuntime.test.ts` も引数付き初期 state 前提を group membership 前提へ書き換えた上で、move 前後の source / destination 判定、single 中の retained secondary 拒否、再 split 後の revision guard、同一 document 両 group の error 分離を追加している。width / ratio / keyboard の既存 policy test は意味を変えずそのまま残っている（設計 §16.1 の移行方針どおり）。
 
-検出した 3 件はいずれも非ブロッキングである。恒久 docs に承認済み設計 §15 の置換対象が 1 行残っていること（指摘 2.1）、設計 §15 の対象外だった Avalonia rollout spec に Tauri で廃止した split 継承規則が `common` baseline として残っていること（指摘 2.2）、`loadRoot` の global tabs / group 更新順が `closeTab` と逆で invariant 4 の維持を React の batching に依存していること（指摘 3.1）である。3.1 は現時点で正しく動作しており、退行ではない。
+初回レビューで検出した 3 件はいずれも非ブロッキングであった。恒久 docs に承認済み設計 §15 の置換対象が 1 行残っていること（指摘 2.1）、設計 §15 の対象外だった Avalonia rollout spec に Tauri で廃止した split 継承規則が `common` baseline として残っていること（指摘 2.2）、`loadRoot` の global tabs / group 更新順が `closeTab` と逆で invariant 4 の維持を React の batching に依存していること（指摘 3.1）である。
+
+Round 1 fix (`83e0ce8`) では、(1) `interface_spec.md` の当該行を「表示単位 = pane group の tab」「一意性 = global path」へ粒度を分けて書き換え、(2) Avalonia rollout spec へ baseline / 現行 Tauri semantics / 再評価条件の 3 点を注記し、(3) `loadRoot` の 2 行を入れ替えて全中間状態で `group ⊆ global tabs` を成立させ、併せて `common_pitfalls.md` へ順序規則を、実装記録へ対応内容を同期した、という形で 3 件とも推奨対応どおり解決されている。
+
+再確認の結果、対応による新たな齟齬・退行・契約逸脱は検出しなかった。自動検証 6 コマンドを再実行し、すべて Round 1 fix 前と同じ結果（5 files / 77 tests、build 成功、`cargo` 3 種成功、`git diff --check` 成功）であることを確認している。
 
 ---
 
@@ -47,8 +53,10 @@ TODO-2026-023 Phase 3 の実装・恒久ドキュメントレビュー。`13c87a
 
 **severity**: Medium
 **blocking**: **non-blocking**
-**工程**: Phase 3（恒久ドキュメント修正）。Phase 4-b 完了処理までに対応
-**status**: 未解決
+**工程**: Phase 3（恒久ドキュメント修正）
+**status**: **解決済み**（2026-07-28 再確認、commit `83e0ce8`）
+
+**対応**: `interface_spec.md:55` を、表示単位（pane group に属する tab）と data 一意性（global の path 一意）へ粒度を分けた記述へ置換した。
 
 **根拠**: 承認済み設計 §15 は `docs/components/tauri_viewer/interface_spec.md` について「`## TabStrip 表示`の同一global collection / global open順をpane-local所属・挿入順へ**節単位で書換え**」と定めている。また承認済み設計レビュー指摘 1.3 は、置換が必要な確定記述として同節の 2 文を名指ししていた。
 
@@ -76,12 +84,20 @@ docs/components/tauri_viewer/interface_spec.md:55
 
 置換後、同節が「表示単位は pane group の tab」「data の一意性は path」という 2 つの粒度を混同しないことを確認する。
 
+**確認 (`83e0ce8`)**: 推奨とほぼ同文へ置換され、粒度の混同が解消された。
+
+- 55 行目が「各TabStripは自paneのgroupに属するMarkdown / HTMLだけを表示する。global document dataはroot内でpath一意とし、同一pathのdocumentを重複作成しない。」へ書き換わった。表示単位（pane group）と一意性の対象（global document data の path）が別の主語として書き分けられており、「root 内で open した文書がすべて global な open 順で並ぶ」と読める余地は無くなった。
+- 同節 58 行目「各TabStripは自paneの`orderedTabIds`に属するtabだけをlocal挿入順で表示する。ArrowLeft / ArrowRight / Home / Endもlocal順へ適用する。」との関係も確認した。55 行目が「何を表示するか + data 一意性」、58 行目が「どの順で並べ、keyboard がどの順に従うか」を扱っており、記述の重なりはあるが矛盾は無い。
+- 恒久 docs 全体を再 grep し、`open順に表示` / `同じglobal tab collection` / `global tabを両pane` のいずれも `design_analysis/` 配下の履歴文書を除いて残存しないことを確認した。**設計 §15 の置換対象は全件反映済みである。**
+
 ### 2.2 Avalonia rollout spec が Tauri で廃止した split off / on 継承規則を `common` baseline として残している
 
 **severity**: Low
 **blocking**: **non-blocking**
-**工程**: Phase 3（恒久ドキュメント追記）または TODO-2026-011 / TODO-2026-012 着手時
-**status**: 未解決
+**工程**: Phase 3（恒久ドキュメント追記）
+**status**: **解決済み**（2026-07-28 再確認、commit `83e0ce8`）
+
+**対応**: rollout spec の `Split View baseline` 節へ、当該規則が TODO-2026-006 baseline であること、Tauri では TODO-2026-023 で置換済みであること、Avalonia へ採用する semantics は TODO-2026-011 / TODO-2026-012 で確定することを 1 行で注記した。実装記録 §5 の docs 反映一覧へも同ファイルを追加した。
 
 **根拠**: `docs/components/avalonia_viewer/tauri_ux_rollout_spec.md` は「現在のAvalonia実装を説明する文書ではなく、`TODO-2026-008`から`TODO-2026-012`で段階導入する **target contract**」と定義されている。その `Split View baseline` 節に次が残っている。
 
@@ -106,6 +122,12 @@ docs/components/avalonia_viewer/tauri_ux_rollout_spec.md:71
 
 32 行目の `follow-up` 行へ「Tauri は TODO-2026-023 で採用済み」を追記して、再評価の起点を明確にしてもよい。
 
+**確認 (`83e0ce8`)**: 推奨した 3 要素がすべて 1 行に収まる形で追記された。
+
+- 72 行目へ「上記split on / off規則はTODO-2026-006のbaselineである。TauriではTODO-2026-023で両groupの所属・順序・選択を保持するpane-local tab group仕様へ置換済みであり、TODO-2026-011 / TODO-2026-012でAvaloniaへ採用するsemanticsを確定する。」が入った。(a) baseline の出自、(b) Tauri 側が置換済みである事実、(c) 再評価の担当 TODO、の 3 点が揃っており、TODO-2026-011 の実装者が参照元の変更に気付かないまま旧規則を実装する経路は塞がれた。
+- 注記を 70-71 行の直後に置き、元の baseline 記述自体は残す構成になっている。rollout spec が「target contract であって現行実装の説明ではない」という同ファイル冒頭の位置づけと整合し、TODO-2026-011 が baseline を選ぶ判断材料として両方の semantics が読める。`common` 区分（31 行目）との矛盾も、再評価前提であることが明示されたため解消している。
+- 実装記録 §5 へ「`docs/components/avalonia_viewer/tauri_ux_rollout_spec.md`: TODO-2026-006 baselineとTauri現行pane-local semanticsの差、およびAvalonia導入時の再評価条件を注記」が追加され、恒久 docs 反映一覧と実ファイルが一致した。`meta.md` の `components` にも同ファイルが追加されている。
+
 ---
 
 ## 3. 改善提案
@@ -114,8 +136,10 @@ docs/components/avalonia_viewer/tauri_ux_rollout_spec.md:71
 
 **severity**: Low
 **blocking**: **non-blocking**
-**工程**: Phase 3（2 行の入れ替え）または follow-up
-**status**: 未解決（現時点の挙動は正しい。退行ではない）
+**工程**: Phase 3（2 行の入れ替え）
+**status**: **解決済み**（2026-07-28 再確認、commit `83e0ce8`）
+
+**対応**: `loadRoot` の 2 行を入れ替えて `reset-root` を先行させ、`common_pitfalls.md` へ順序規則を、実装記録へ対応内容を同期した。
 
 **根拠**: 実装は invariant 4（各 ordered ID は global `OpenDocumentTab[]` に実在する）を silent filter ではなく throw で守る設計（§4.5 / §9.2）を採っており、`resolveGroupTabs` は App の `useMemo`、すなわち **render path** で評価される（`App.tsx:197-205`）。したがって「group が global tabs に無い ID を持つ状態で render が走る」ことは、表示崩れではなく**復帰不能な throw** になる。
 
@@ -145,6 +169,13 @@ updateTabs(() => []);
 
 これにより invariant 4 は batching の有無にかかわらず全中間時点で成立し、3 経路の順序規則が「group ⊆ tabs を常に保つ」で統一される。併せて `docs/architecture/common_pitfalls.md` の `## 11. pane-local tab group` へ「global tabs と group を同時に変える時は、常に group ⊆ tabs が成り立つ順序で更新する」を 1 行加えると、resolver が throw する設計意図と対で残る。
 
+**確認 (`83e0ce8`)**: 推奨どおり 2 行が入れ替わり、docs も同期された。
+
+- `App.tsx:471-472` が `applySplitView({ type: "reset-root" });` → `updateTabs(() => []);` の順になった。中間状態を追跡すると、(1) `reset-root` 適用後は group = ∅、tabs = 旧 tabs（∅ ⊆ 旧 tabs で成立）、(2) `updateTabs(() => [])` 適用後は group = ∅、tabs = ∅（成立）、(3) 続く `openOrActivateTab` は `updateTabs`（tabs = [t]、group = ∅）→ `open-tab`（group = [t]）の順で、いずれも成立する。**全中間状態で `group ⊆ global tabs` が保たれ、React の batching に依存しない。**
+- 挙動は不変である。`reduceSplitView` は `tabsRef` を参照せず、2 行の間に両者を同時に読む処理も無いため、入れ替えによる副作用は生じない。設計 §8.6 の「scan 成功後だけ」という commit point も維持されている（`scan_directory` の `await` 成功後に実行）。`npm test` 77 tests と `npm run build` の成功も再確認した。
+- `docs/architecture/common_pitfalls.md` の `## 11. pane-local tab group` へ「global tabsとgroupを同時に更新する時は、すべての中間状態で`group ⊆ global tabs`が成立する順序を選ぶ。openはglobal data追加を先行し、close / root resetはgroup縮小を先行する。」が追加された。3 経路それぞれの正しい順序まで書かれており、`resolveGroupTabs` が missing ID を throw する（同節の次項）という設計意図と対で残る。
+- 実装記録へ §7「実装レビュー対応」が新設され、3 件の対応内容と「対応後も仕様差分はなく、root scan 成功後の commit point と既存の表示挙動を維持する」旨が記録された（旧 §7 既知制約は §8 へ繰り下げ、本文中に旧番号への参照は無いことを確認済み）。
+
 ---
 
 ## 4. 受け入れ条件トレース確認
@@ -162,7 +193,7 @@ updateTabs(() => []);
 | 手動確認で pointer / keyboard の双方から move でき、fallback、destination selection、focus、StatusBar / ErrorBanner routing が一致する | `move-tab` が `activePaneId` を destination へ更新し、`activeTab` は active pane の group view から導出（`App.tsx:206-208`） | ✓ 整合（実機確認は Phase 4-a） |
 | 手動確認で同じ Markdown / HTML を両 pane に開き、Mermaid / PlantUML / HTML ready・timeout が混線しない | global data 共有 + pane-local runtime を維持。両 group 参照は `open-tab` の dedupe append で成立 | ✓ 整合（実機確認は Phase 4-a） |
 | 既存 single / split view と HTML security boundary の回帰が無い | `documentPolicy.ts` / `imageViewer.ts` / `paneRuntime.ts` / `src-tauri` / capabilities いずれも差分なし | ✓ 整合 |
-| 恒久ドキュメント同期 | 12 ファイル更新。§15 の置換対象のうち `interface_spec.md` の 1 行が未置換（指摘 2.1） | △ ほぼ整合。1 行の残存を除き置換済み。Phase 4-a の合否基準（`development_workflow.md`）は正しく置換されている |
+| 恒久ドキュメント同期 | 13 ファイル更新（Round 1 fix で `avalonia_viewer/tauri_ux_rollout_spec.md` を追加）。設計 §15 の置換対象は全件反映済み | ✓ 整合。指摘 2.1 の残存 1 行は `83e0ce8` で置換済み。Phase 4-a の合否基準（`development_workflow.md`）も正しく置換されている |
 
 ---
 
@@ -174,7 +205,7 @@ Phase 2 で確定した契約が実装へ落ちているかを、設計レビュ
 | --- | --- | --- |
 | 1.1 pending navigation 規則を 10 action へ | `open-tab` は anchor 有無で設定/`null`（`splitView.ts:87-89`）、`select-tab` は常に `null`（`:104`）、`close-pane-tab` は active close のときだけ `null`（`:140`）、`move-tab` は source active move のときだけ `null` / destination は selection 変化時 `null`（`:167`, `:174-176`）、`disable-split` は secondary だけ `null`（`:125`）、`reset-root` は両 pane `null`（`:185-186`）。`assertSplitViewState` が pending = active を全出力で強制（`:275-280`） | ✓ 完全一致。旧 `remove-tab` の到達不能 guard も残っていない |
 | 1.2 初期化 signature / split payload / adjacent helper / test 移行 | `createInitialSplitViewState(): SplitViewState` は引数なしで両 group empty（`:57-65`）、`enable-split` / `disable-split` は payload なし（`:38-39`）、`findAdjacentTabId` は非 export の module-private（`:233`）。`splitView.test.ts` / `paneRuntime.test.ts` は共通 fixture へ移行済み | ✓ 完全一致 |
-| 1.3 恒久 docs の置換対象 | 12 ファイル更新。`interface_spec.md` の `Tab close` / `Split View 表示` 節、`detail_design.md:474`、`development_workflow.md:174-178`、`markdown-viewer-tauri/README.md` はいずれも置換済み | △ `interface_spec.md:55` の 1 行のみ未置換（指摘 2.1） |
+| 1.3 恒久 docs の置換対象 | `13c87a3` で 12 ファイル更新（`interface_spec.md` の `Tab close` / `Split View 表示` 節、`detail_design.md:474`、`development_workflow.md:174-178`、`markdown-viewer-tauri/README.md` ほか）、`83e0ce8` で `interface_spec.md:55` と Avalonia rollout spec を追加対応 | ✓ 完全一致。設計 §15 の置換対象は全件反映済み（指摘 2.1 / 2.2 解決済み） |
 | 2.1 / 3.8 runtime status の generic effect 一本化 | `setPanePreviewStatus` の呼び出しは `updatePanePreviewPhase`（`App.tsx:336`）と generic effect（`:1185`）の 2 箇所だけ。`loadRoot` / `reload` / `openOrActivateTab` / `closeTab` / `toggleSplitView` の直接 clear 5 箇所はすべて削除済み | ✓ 完全一致。設計 §9.1 の完了条件（2 経路限定）を達成 |
 | 2.2 hidden secondary 回復導線 | `hiddenSecondaryTabCount` を `mode === "single" && primaryTabs.length === 0` の時だけ算出（`App.tsx:1291-1295`）、`role="status"` で件数と `Enable Split View` 案内を表示（`:2407-2412`）。単数 / 複数の語形も分岐 | ✓ 完全一致（単複分岐は設計文言からの改善） |
 | 3.1 invariant 8 と旧 roving fallback 削除 | `assertSplitViewState` が nonempty ⇒ active non-null を強制（`splitView.ts:269-271`）、TabStrip は `tabIndex={isActive ? 0 : -1}` のみで旧 `activeTabId === null && index === 0` 分岐は削除済み（`App.tsx:2540`） | ✓ 完全一致 |
@@ -220,18 +251,18 @@ Phase 2 で確定した契約が実装へ落ちているかを、設計レビュ
 
 ## 7. 検証評価
 
-実装記録 §6 の自動検証結果を本レビューで再実行し、すべて一致することを確認した。
+実装記録 §6 の自動検証結果を、初回レビュー（`13c87a3` 時点）と Round 1 fix 後（`83e0ce8` 時点）の 2 回再実行し、いずれも一致することを確認した。下表の再実行結果は `83e0ce8` 時点のものである。
 
 | コマンド | 実装記録の記載 | 本レビューでの再実行結果 | 一致 |
 | --- | --- | --- | --- |
 | `cd markdown-viewer-tauri && npm test -- --run` | 成功。5 files / 77 tests passed | `Test Files 5 passed (5)` / `Tests 77 passed (77)` | ✓ |
-| `cd markdown-viewer-tauri && npm run build` | 成功。既知の chunk size warning のみ | `✓ built in 7.42s`。警告は `Some chunks are larger than 500 kB` のみ | ✓ |
+| `cd markdown-viewer-tauri && npm run build` | 成功。既知の chunk size warning のみ | `✓ built in 5.38s`。警告は `Some chunks are larger than 500 kB` のみ | ✓ |
 | `cd markdown-viewer-tauri/src-tauri && cargo fmt -- --check` | 成功 | 差分出力なし | ✓ |
 | `cd markdown-viewer-tauri/src-tauri && cargo check` | 成功 | `Finished dev profile` | ✓ |
 | `cd markdown-viewer-tauri/src-tauri && cargo test` | 成功。22 tests passed、0 failed | `test result: ok. 22 passed; 0 failed` | ✓ |
 | `git diff --check` | 成功 | 出力なし | ✓ |
 
-`docs/rules/development_workflow.md:156-164` の Tauri 検証コマンドおよび同 :219-225（`cargo fmt`、lint script 未定義のため `npm run build` の TypeScript compile を完了条件に含める運用）とも一致する。実装記録の記載に誇張や未実行のコマンドは無い。
+`docs/rules/development_workflow.md:156-164` の Tauri 検証コマンドおよび同 :219-225（`cargo fmt`、lint script 未定義のため `npm run build` の TypeScript compile を完了条件に含める運用）とも一致する。実装記録の記載に誇張や未実行のコマンドは無い。Round 1 fix は `loadRoot` の 2 行入れ替えと docs 4 ファイルのみで、test 件数（77）にも Rust 側（22）にも変化は無い。
 
 ---
 
@@ -245,7 +276,7 @@ Phase 2 で確定した契約が実装へ落ちているかを、設計レビュ
 | 参照集合による eviction | ✓ `closeTab` が reducer 適用**後**の state から `getReferencedTabIds` を評価し、最後の参照時だけ global data を削除（`App.tsx:772-778`）。設計 §4.3 の順序と一致。同 ID を両 group が参照する場合は data / revision / shared load state を維持 |
 | in-flight load と eviction の競合 | ✓ `updateTabIfCurrent` は id + revision 一致の `map` であり（`App.tsx:421-429`）、global tab 削除後は自動的に no-op になる。`nextTabIdRef` は単調増加のため ID 再利用による誤着地も起きない |
 | `useMemo` の再計算最小化 | ✓ `select-tab` / `activate-pane` / `enable-split` / `consume-navigation` / `set-requested-ratio` はいずれも `orderedTabIds` の参照を保持するため（spread による）、group view の再解決が起きない。`disable-split` も `...state.secondary` により配列参照を維持 |
-| App integration の更新順 | ✓ `closeTab`（group 先行縮小）と `openOrActivateTab`（tabs 先行追加）は中間状態も invariant 4 を満たす。`loadRoot` のみ逆順だが batching により実害なし（指摘 3.1） |
+| App integration の更新順 | ✓ `closeTab`（group 先行縮小）、`openOrActivateTab`（tabs 先行追加）、`loadRoot`（`reset-root` 先行、`83e0ce8` で修正）の 3 経路とも、全中間状態で `group ⊆ global tabs` が成立する。React の batching に依存しない（指摘 3.1 解決済み） |
 | move の focus 調停 | ✓ rAF 後に `tab-<destination>-<tabId>` を取得し `HTMLButtonElement` 判定の上で focus + `scrollIntoView`。欠落時のみ `document-pane-<destination>`（`tabIndex={-1}` で focusable）へ戻して `console.error`。source の消滅要素へは戻さない（`App.tsx:789-805`）。設計 §8.3-5 と一致 |
 | close の focus 調停 | ✓ `closeTab` の戻り値が source pane の fallback active tab。TabStrip の `close()` が fallback tab、無ければ `document-pane-<paneId>` へ focus（`App.tsx:2490-2497`）。設計 §9.4 と一致 |
 | 移動先 pane の active 化 | ✓ `move-tab` が `activePaneId` を destination へ更新（`splitView.ts:161`）。focus 移動で発火する `onFocusCapture` → `activatePane` は同一 pane のため no-op（`App.tsx:893-897`）。二重更新なし |
@@ -260,15 +291,15 @@ Phase 2 で確定した契約が実装へ落ちているかを、設計レビュ
 
 ---
 
-## 9. 対応優先度
+## 9. 指摘一覧と最終 status
 
-| # | 指摘 | severity | blocking | 工程 | 推奨対応時期 |
-| --- | --- | --- | --- | --- | --- |
-| 2.1 | `interface_spec.md:55` に旧 global 表示の記述が残存 | Medium | non-blocking | Phase 3 docs 修正 | Phase 4-b 完了処理まで |
-| 2.2 | Avalonia rollout spec が廃止済み split 継承規則を `common` baseline として保持 | Low | non-blocking | Phase 3 docs 追記 または TODO-2026-011 着手時 | Phase 4-b 完了処理まで（遅くとも TODO-2026-011 着手前） |
-| 3.1 | `loadRoot` の tabs / group 更新順が他 2 経路と逆 | Low | non-blocking | Phase 3（2 行入れ替え） または follow-up | 任意。現時点で挙動は正しい |
+| # | 指摘 | severity | blocking | status |
+| --- | --- | --- | --- | --- |
+| 2.1 | `interface_spec.md:55` に旧 global 表示の記述が残存 | Medium | non-blocking | **解決済み** (`83e0ce8`) |
+| 2.2 | Avalonia rollout spec が廃止済み split 継承規則を `common` baseline として保持 | Low | non-blocking | **解決済み** (`83e0ce8`) |
+| 3.1 | `loadRoot` の tabs / group 更新順が他 2 経路と逆 | Low | non-blocking | **解決済み** (`83e0ce8`) |
 
-いずれも Phase 4-a のユーザ検証を妨げない。2.1 / 2.2 は恒久ドキュメントのみ、3.1 は挙動を変えない堅牢化である。
+**検出指摘 3 件（Medium 1 / Low 2）はすべて解決済み。未解決指摘 0 件。** blocking 指摘は初回から 0 件であり、Phase 4 へ進行できる。
 
 ---
 
@@ -278,17 +309,18 @@ Phase 2 で確定した契約が実装へ落ちているかを、設計レビュ
 - **image viewer と move の組み合わせ**: §5 の注記のとおり viewer 表示中は shell が `inert` のため move / close は操作できない。Phase 4-a では「viewer を閉じてから move / close する」順で確認すれば十分であり、viewer 表示中に move できないこと自体は仕様である。
 - **throw の可視化**: 本実装は internal inconsistency を throw で顕在化する方針（設計 §4.5）を採るため、万一 invariant が破れた場合は WebView 上で例外として現れる。Phase 4-a で予期しない画面停止が発生した場合は、コンソールの `Pane tab group references missing tab` / `Active tab is not a member` / `Pending navigation does not match` 等のメッセージを記録すると原因特定が速い。
 - **memory**: split off 中も secondary group が global data を参照し続けるため、hidden secondary に大きな document を残したまま single で作業すると cache が解放されない。設計 §18 のとおり session-only・最大 2 group・data 共有であり通常利用では問題にならないが、Phase 4-a で大きな HTML / PlantUML を扱う場合は体感を確認しておくとよい。
-- **TODO-2026-025 / TODO-2026-011 への申し送り**: 指摘 2.2 のとおり、Avalonia rollout spec の Split View baseline は Tauri の現行仕様と乖離した。TODO-2026-011 着手時に、旧 baseline と pane-local group のどちらを Avalonia の目標とするかを先に確定する必要がある。
+- **TODO-2026-011 / TODO-2026-012 への申し送り**: 指摘 2.2 の対応により、Avalonia rollout spec には TODO-2026-006 baseline と Tauri 現行 semantics の差、および再評価条件が記録された。TODO-2026-011 着手時に、旧 baseline と pane-local group のどちらを Avalonia の目標とするかを先に確定する必要がある点は変わらないため、Phase 4-b の完了処理で TODO 側へも申し送っておくとよい。
 
 ---
 
 ## 11. 結論
 
-**判定: 承認 (Approved)。Phase 4 へ進行可。**
+**判定: 承認 (Approved)。Phase 4 へ進行可。未解決指摘 0 件。**
 
-- **blocking 指摘: 0 件。**
-- 承認済み設計 §6〜§18 の契約、および Phase 2 設計レビューで確定した 13 件の指摘対応は、`interface_spec.md` の 1 行を除きすべて実装・恒久ドキュメントへ反映されている。
+- **blocking 指摘: 0 件**（初回・再確認とも）。
+- 承認済み設計 §6〜§18 の契約、および Phase 2 設計レビューで確定した 13 件の指摘対応は、すべて実装・恒久ドキュメントへ反映されている。
 - 旧 schema・旧 action・旧 fallback・handler の直接 status clear はいずれも残存せず、単一路線化（設計 §13）が達成されている。
 - security 境界（trusted HTML、Mermaid、PlantUML、image viewer、Rust / capability / CSP）に退行は無い。
 - テストは旧仕様を緩めたものではなく、新 contract の境界値と失敗系を直接検証している。自動検証は全コマンドを再実行して実装記録との一致を確認した。
-- 未解決は Medium 1 件 / Low 2 件で、いずれも非ブロッキング。Phase 4-b 完了処理までに対応すれば足りる。
+- 初回検出の Medium 1 件 / Low 2 件は Round 1 fix (`83e0ce8`) ですべて解決済みで、**未解決指摘 0 件**である。再確認で新規指摘は検出しなかった。
+- Round 1 fix により、恒久 docs は設計 §15 の置換対象を全件反映し、`group ⊆ global tabs` の更新順規則は 3 経路すべてで batching 非依存となり、`common_pitfalls.md` と実装記録にも同期された。
