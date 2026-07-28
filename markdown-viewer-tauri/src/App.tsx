@@ -52,10 +52,12 @@ import {
   createInitialSplitViewState,
   getPaneState,
   getPrimaryPaneWidth,
+  getReferencedTabIds,
   getRequestedRatioForPrimaryWidth,
   getSplitPaneWidthBounds,
   getSplitRatioForKey,
   reduceSplitView,
+  resolveGroupTabs,
   type PaneId,
   type SplitViewAction,
   type SplitViewState,
@@ -192,8 +194,18 @@ function App() {
 
   splitViewRef.current = splitViewState;
   panePreviewStatusesRef.current = panePreviewStatuses;
+  const primaryTabs = useMemo(
+    () => resolveGroupTabs(splitViewState.primary.orderedTabIds, tabs),
+    [splitViewState.primary.orderedTabIds, tabs],
+  );
+  const secondaryTabs = useMemo(
+    () => resolveGroupTabs(splitViewState.secondary.orderedTabIds, tabs),
+    [splitViewState.secondary.orderedTabIds, tabs],
+  );
   const activePane = getPaneState(splitViewState, splitViewState.activePaneId);
-  const activeTab = tabs.find((tab) => tab.id === activePane.activeTabId) ?? null;
+  const activePaneTabs =
+    splitViewState.activePaneId === "primary" ? primaryTabs : secondaryTabs;
+  const activeTab = activePaneTabs.find((tab) => tab.id === activePane.activeTabId) ?? null;
   const activePaneStatus = panePreviewStatuses[splitViewState.activePaneId];
   const currentActivePaneStatus =
     activePaneStatus &&
@@ -458,8 +470,6 @@ function App() {
       setIsRootLoading(false);
       updateTabs(() => []);
       applySplitView({ type: "reset-root" });
-      setPanePreviewStatus("primary", null);
-      setPanePreviewStatus("secondary", null);
 
       const initialFile = findReadme(tree) ?? findFirstMarkdown(tree) ?? findFirstHtml(tree);
       if (initialFile) {
@@ -633,11 +643,6 @@ function App() {
           errorMessage: null,
           plantUmlDiagrams: [],
         }));
-        for (const paneId of ["primary", "secondary"] as const) {
-          if (getPaneState(splitViewRef.current, paneId).activeTabId === activeTab.id) {
-            setPanePreviewStatus(paneId, null);
-          }
-        }
         void loadTab(activeTab.id, activeTab.path, revision);
       }
     } catch (error) {
@@ -650,7 +655,7 @@ function App() {
   function openOrActivateTab(paneId: PaneId, filePath: string, anchor?: string) {
     const existing = tabsRef.current.find((tab) => tab.path === filePath);
     if (existing) {
-      applySplitView({ type: "select-tab", paneId, tabId: existing.id, anchor });
+      applySplitView({ type: "open-tab", paneId, tabId: existing.id, anchor });
       return;
     }
 
@@ -668,8 +673,7 @@ function App() {
       plantUmlDiagrams: [],
     };
     updateTabs((current) => [...current, tab]);
-    applySplitView({ type: "select-tab", paneId, tabId, anchor });
-    setPanePreviewStatus(paneId, null);
+    applySplitView({ type: "open-tab", paneId, tabId, anchor });
     void loadTab(tabId, filePath, tab.revision);
   }
 
@@ -766,26 +770,35 @@ function App() {
   }
 
   function closeTab(paneId: PaneId, tabId: string): string | null {
-    const current = tabsRef.current;
-    const closeIndex = current.findIndex((tab) => tab.id === tabId);
-    if (closeIndex < 0) {
-      return getPaneState(splitViewRef.current, paneId).activeTabId;
-    }
-
-    const next = current.filter((tab) => tab.id !== tabId);
-    const adjacent = next[closeIndex] ?? next[closeIndex - 1] ?? null;
-    updateTabs(() => next);
-    const state = applySplitView({
-      type: "remove-tab",
-      tabId,
-      fallbackTabId: adjacent?.id ?? null,
-    });
-    for (const id of ["primary", "secondary"] as const) {
-      if (panePreviewStatusesRef.current[id]?.tabId === tabId) {
-        setPanePreviewStatus(id, null);
-      }
+    const state = applySplitView({ type: "close-pane-tab", paneId, tabId });
+    if (!getReferencedTabIds(state).has(tabId)) {
+      updateTabs((current) => current.filter((tab) => tab.id !== tabId));
     }
     return getPaneState(state, paneId).activeTabId;
+  }
+
+  function moveTab(sourcePaneId: PaneId, tabId: string) {
+    const destinationPaneId: PaneId =
+      sourcePaneId === "primary" ? "secondary" : "primary";
+    applySplitView({
+      type: "move-tab",
+      sourcePaneId,
+      destinationPaneId,
+      tabId,
+    });
+    window.requestAnimationFrame(() => {
+      const destinationTab = document.getElementById(`tab-${destinationPaneId}-${tabId}`);
+      if (destinationTab instanceof HTMLButtonElement) {
+        destinationTab.focus();
+        destinationTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+        return;
+      }
+      const destinationPane = document.getElementById(`document-pane-${destinationPaneId}`);
+      destinationPane?.focus();
+      console.error(
+        `Moved tab focus target is missing: tab-${destinationPaneId}-${tabId}`,
+      );
+    });
   }
 
   function closeImageViewer() {
@@ -868,10 +881,9 @@ function App() {
     setActiveMenu(null);
     const action: SplitViewAction =
       splitViewRef.current.mode === "single"
-        ? { type: "enable-split", orderedTabIds: tabsRef.current.map((tab) => tab.id) }
-        : { type: "disable-split", orderedTabIds: tabsRef.current.map((tab) => tab.id) };
+        ? { type: "enable-split" }
+        : { type: "disable-split" };
     const next = applySplitView(action);
-    setPanePreviewStatus("secondary", null);
     if (next.mode === "single") {
       splitResizeRef.current = null;
       setIsSplitResizing(false);
@@ -1271,14 +1283,20 @@ function App() {
             >
               <DocumentPane
                 paneId="primary"
-                tabs={tabs}
+                tabs={primaryTabs}
                 splitViewState={splitViewState}
                 previewStatus={panePreviewStatuses.primary}
                 theme={theme}
                 isActive={splitViewState.activePaneId === "primary"}
+                hiddenSecondaryTabCount={
+                  splitViewState.mode === "single" && primaryTabs.length === 0
+                    ? secondaryTabs.length
+                    : 0
+                }
                 onActivatePane={activatePane}
                 onActivateTab={activateTab}
                 onCloseTab={closeTab}
+                onMoveTab={moveTab}
                 onPreviewStatus={updatePanePreviewPhase}
                 onPreviewElement={registerPreviewElement}
                 onPreviewClick={handlePreviewClick}
@@ -1325,14 +1343,16 @@ function App() {
               {splitViewState.mode === "split" ? (
                 <DocumentPane
                   paneId="secondary"
-                  tabs={tabs}
+                  tabs={secondaryTabs}
                   splitViewState={splitViewState}
                   previewStatus={panePreviewStatuses.secondary}
                   theme={theme}
                   isActive={splitViewState.activePaneId === "secondary"}
+                  hiddenSecondaryTabCount={0}
                   onActivatePane={activatePane}
                   onActivateTab={activateTab}
                   onCloseTab={closeTab}
+                  onMoveTab={moveTab}
                   onPreviewStatus={updatePanePreviewPhase}
                   onPreviewElement={registerPreviewElement}
                   onPreviewClick={handlePreviewClick}
@@ -2139,9 +2159,11 @@ type DocumentPaneProps = {
   previewStatus: PanePreviewStatus | null;
   theme: Theme;
   isActive: boolean;
+  hiddenSecondaryTabCount: number;
   onActivatePane: (paneId: PaneId) => void;
   onActivateTab: (paneId: PaneId, tabId: string) => void;
   onCloseTab: (paneId: PaneId, tabId: string) => string | null;
+  onMoveTab: (paneId: PaneId, tabId: string) => void;
   onPreviewStatus: (
     paneId: PaneId,
     tabId: string,
@@ -2171,9 +2193,11 @@ function DocumentPane({
   previewStatus,
   theme,
   isActive,
+  hiddenSecondaryTabCount,
   onActivatePane,
   onActivateTab,
   onCloseTab,
+  onMoveTab,
   onPreviewStatus,
   onPreviewElement,
   onPreviewClick,
@@ -2333,6 +2357,7 @@ function DocumentPane({
         previewStatus={previewStatus}
         onActivate={onActivateTab}
         onClose={onCloseTab}
+        onMove={onMoveTab}
       />
       <div
         className="preview-pane"
@@ -2379,6 +2404,12 @@ function DocumentPane({
               ? "Document preview failed."
               : "Loading document..."}
           </div>
+        ) : hiddenSecondaryTabCount > 0 ? (
+          <div className="preview-empty" role="status">
+            No document selected in this pane. {hiddenSecondaryTabCount}{" "}
+            {hiddenSecondaryTabCount === 1 ? "document remains" : "documents remain"} in the
+            secondary pane. Enable Split View to access {hiddenSecondaryTabCount === 1 ? "it" : "them"}.
+          </div>
         ) : (
           <div className="preview-empty">No document selected.</div>
         )}
@@ -2395,6 +2426,7 @@ type TabStripProps = {
   previewStatus: PanePreviewStatus | null;
   onActivate: (paneId: PaneId, tabId: string) => void;
   onClose: (paneId: PaneId, tabId: string) => string | null;
+  onMove: (paneId: PaneId, tabId: string) => void;
 };
 
 function TabStrip({
@@ -2405,6 +2437,7 @@ function TabStrip({
   previewStatus,
   onActivate,
   onClose,
+  onMove,
 }: TabStripProps) {
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
@@ -2487,7 +2520,7 @@ function TabStrip({
                 : null;
         return (
           <div
-            className={`tab-item ${isActive ? "active" : ""} tab-${presentationState}`}
+            className={`tab-item ${splitViewState.mode === "split" ? "tab-item-split" : ""} ${isActive ? "active" : ""} tab-${presentationState}`}
             key={tab.id}
           >
             <button
@@ -2504,7 +2537,7 @@ function TabStrip({
               role="tab"
               aria-selected={isActive}
               aria-controls={`document-preview-${paneId}`}
-              tabIndex={isActive || (activeTabId === null && index === 0) ? 0 : -1}
+              tabIndex={isActive ? 0 : -1}
               title={tab.path}
               onClick={() => onActivate(paneId, tab.id)}
               onKeyDown={(event) => handleKeyDown(event, index)}
@@ -2512,11 +2545,23 @@ function TabStrip({
               <span className="tab-name">{tab.displayName}</span>
               {stateLabel ? <span className="tab-state">{stateLabel}</span> : null}
             </button>
+            {splitViewState.mode === "split" ? (
+              <button
+                type="button"
+                className="tab-move"
+                aria-label={`Move ${tab.displayName} to ${paneId === "primary" ? "secondary" : "primary"} pane`}
+                title={`Move ${tab.displayName} to ${paneId === "primary" ? "secondary" : "primary"} pane`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => onMove(paneId, tab.id)}
+              >
+                {paneId === "primary" ? "→" : "←"}
+              </button>
+            ) : null}
             <button
               type="button"
               className="tab-close"
-              aria-label={`Close ${tab.displayName}`}
-              title={`Close ${tab.displayName}`}
+              aria-label={`Close ${tab.displayName} in ${paneId} pane`}
+              title={`Close ${tab.displayName} in ${paneId} pane`}
               tabIndex={isActive ? 0 : -1}
               onClick={() => close(tab.id)}
             >

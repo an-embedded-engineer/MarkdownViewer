@@ -19,8 +19,10 @@
 - Mermaid / PlantUML のfence言語判定はinfo stringの先頭tokenを小文字化して行う。`mermaid`, `plantuml`, `puml` の後ろに追加情報があっても先頭tokenを言語として扱う。
 - `OpenDocumentResponse` は Markdown / HTML の discriminated union とし、`sourceText` と `previewUrl` の混在や fallback を許可しない。
 - HTML message / URL 判定は副作用のない `documentPolicy.ts` へ集約し、iframe DOMへ React からアクセスしない。source、opaque origin、tab revision、message shape、transient user activation、duplicate をすべて満たす場合だけ外部 URL を開く。
-- document dataはglobal `OpenDocumentTab[]`へ集約し、表示選択とpending navigationは`SplitViewState`、Mermaid / HTML handshakeなどDOM固有状態はpane-local runtimeへ分離する。
+- document dataはglobal `OpenDocumentTab[]`へ集約し、paneごとの所属・順序・選択・pending navigationは`SplitViewState`のordered ID group、Mermaid / HTML handshakeなどDOM固有状態はpane-local runtimeへ分離する。同じdocument IDの両group参照を許可し、local close後の参照集合がemptyの場合だけglobal dataを破棄する。
 - Split Viewの状態遷移と幅計算は`splitView.ts`、pane / tab / revision guardとTabStrip表示状態の合成は`paneRuntime.ts`のpure functionで検証する。
+- pane間moveはsource removal / local fallbackとdestination dedupe add / selectを1つのtyped actionで更新する。group IDからdataを解決する境界ではmissing IDを黙ってfilterせず、内部不整合としてthrowする。
+- pane selectionやrevision変更後のpreview status clearはhandlerへ重複実装せず、`isPanePreviewStatusCurrent`を使うgeneric effectを唯一の正本にする。
 - 複数paneのMermaid描画はApp instance所有queueで直列化し、paneを含む一意なrender IDを指定する。module-global queueやpane間で共有するDOM refを作らない。
 
 ## Rust / Tauri

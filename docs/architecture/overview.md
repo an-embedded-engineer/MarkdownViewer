@@ -21,7 +21,7 @@ Tauri v2、React、TypeScript、Rust による Markdown Viewer 実装。
 - Rust command: `src-tauri/src/lib.rs`
 - Tauri config: `src-tauri/tauri.conf.json`, `src-tauri/capabilities/default.json`
 - Markdown 表示: `markdown-it` でHTML化し、React側で表示する。
-- Split View: `OpenDocumentTab[]`を共有データの正本とし、`SplitViewState`がprimary / secondaryの選択、active pane、session-only ratioを管理する。
+- Split View: `OpenDocumentTab[]`を共有document dataの正本とし、`SplitViewState`のprimary / secondaryがpane-localなordered tab ID、選択、pending navigationを管理する。openはactive groupへ追加し、local closeは最後の参照だけをglobal dataから破棄し、moveはsource fallbackとdestination選択をatomicに更新する。
 - Mermaid 表示: App instance所有queueでpaneごとの描画を直列化し、pane / tab / revision guardとpane固有render IDで結果の混線を防ぐ。
 - PlantUML 表示: Rust command がローカル Java / `plantuml.jar` を使ってSVG化し、React側でHTMLへ差し替える。
 - HTML 表示: Rust `DocumentStore` が current root と `open_document` / `mvhtml` protocol を管理し、React は `sandbox="allow-scripts"` の iframe へ preview URL を渡す。HTML source は frontend state へ返さない。
@@ -33,7 +33,7 @@ Tauri v2、React、TypeScript、Rust による Markdown Viewer 実装。
 2. フォルダ選択ダイアログでdocumentルートを選ぶ。
 3. ファイルツリーを構築し、Explorerに表示する。
 4. `.md` / `.markdown` は本文を読み込み、`.html` はroot-relative preview URLを生成する。
-5. MarkdownはReact DOM、trusted HTMLはsandboxed iframeでactiveなdocument paneに表示する。Split Viewでは左右paneが同じtab collectionから独立に選択する。
+5. MarkdownはReact DOM、trusted HTMLはsandboxed iframeでactiveなdocument paneに表示する。Appがglobal document dataをpane-local ordered ID groupから解決し、各TabStripへそのpaneのtabだけを渡す。
 6. Mermaidコードブロックを図として描画する。
 7. PlantUMLコードブロックをローカルPlantUML CLIでSVGとして描画する。
 8. 相対Markdownリンクはアプリ内遷移し、外部URLは既定ブラウザで開く。

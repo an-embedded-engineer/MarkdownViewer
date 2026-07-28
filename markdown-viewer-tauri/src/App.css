@@ -875,6 +875,11 @@ button {
   background: var(--chrome-bg);
 }
 
+.tab-item.tab-item-split {
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  min-width: 160px;
+}
+
 .tab-item.active {
   color: var(--text);
   background: var(--panel-bg);
@@ -886,6 +891,7 @@ button {
 }
 
 .tab-activate,
+.tab-move,
 .tab-close {
   min-width: 0;
   border: 0;
@@ -903,11 +909,13 @@ button {
 }
 
 .tab-activate:hover,
+.tab-move:hover,
 .tab-close:hover {
   background: var(--accent-soft);
 }
 
 .tab-activate:focus-visible,
+.tab-move:focus-visible,
 .tab-close:focus-visible {
   z-index: 1;
   outline: 2px solid var(--accent);
@@ -934,6 +942,7 @@ button {
   color: var(--error-text);
 }
 
+.tab-move,
 .tab-close {
   padding: 0;
   color: var(--muted);

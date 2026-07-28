@@ -11,7 +11,7 @@ OS 連携とファイルシステム境界は Rust command / `DocumentStore` へ
 - TypeScript renderer (`renderMarkdown` / `MarkdownPreview`): `markdown-it` のカスタム fence / image / heading ルール。相対画像を `convertFileSrc` 経由で asset URL へ。相対 `.md` リンクをアプリ内遷移へ。MermaidがReact外で置換したSVGを保持するため、生成HTMLと`dangerouslySetInnerHTML`値はMarkdown内容が変わるまで安定化する。
 - TypeScript policy (`documentPolicy.ts`): command responseの排他shape、HTML preview URL、opaque-origin messageをpure functionで検証する。
 - TypeScript policy (`explorerPane.ts`): Explorer幅の最小値、workspace実寸に応じたdynamic最大値、clamp、keyboard操作をpure functionで管理する。幅はsession-onlyで永続化しない。
-- TypeScript policy (`splitView.ts`): single / split、active pane、paneごとのtab / pending navigation、close / root reset、requested ratioとdynamic幅をpure functionで管理する。
+- TypeScript policy (`splitView.ts`): single / split、active pane、paneごとのordered tab ID / selection / pending navigation、open / local close / atomic move / root reset、参照集合、generic group resolver、requested ratioとdynamic幅をpure functionで管理する。
 - TypeScript policy (`paneRuntime.ts`): pane / tab / revisionのasync結果guardと、共有tab stateとpane-local preview stateからTabStrip表示stateを合成する。
 - TypeScript policy / DOM adapter (`imageViewer.ts`): image viewerのfit / zoom / pan / wheel / intrinsic size / activation判定をpure functionへ集約し、Markdown preview内で描画が完了した通常画像、Mermaid SVG、PlantUML SVGだけをtyped requestへ解決する。
 - Rust: canonical current root、Markdown / HTML open、`mvhtml` resource配信、PlantUML レンダリング、Recent Folders / Viewer settings の app config JSON 永続化。
@@ -54,14 +54,16 @@ PlantUML 結果も Rust とフロントエンドで対応する (`PlantUmlRender
 | `errorMessage` | `string \| null` | tab単位代表error |
 | `plantUmlDiagrams` | `PlantUmlDiagramResult[]` | tab単位のpending / SVG / error cache |
 
-`SplitViewState`は表示layoutの正本であり、`OpenDocumentTab`へpane情報を埋め込まない。
+`SplitViewState`は表示layoutとpane-local tab groupの正本であり、`OpenDocumentTab`へpane情報を埋め込まない。同じtab IDはprimary / secondaryの両groupから参照できる。
 
 | field | 型 | 補足 |
 |---|---|---|
 | `mode` | `single \| split` | 左右2 paneだけを提供する |
 | `activePaneId` | `primary \| secondary` | Explorer、Reload、StatusBar、代表errorの対象 |
-| `primary` / `secondary` | `PaneState` | paneごとの`activeTabId`とpending anchor。secondaryはsingle時に未選択 |
+| `primary` / `secondary` | `PaneState` | paneごとの`orderedTabIds`、group memberである`activeTabId`、active tabに一致するpending anchor。single時もsecondary groupを保持可能 |
 | `requestedSplitRatio` | number | 0より大きく1より小さいsession-only指定値。狭幅時のclamp値を書き戻さない |
+
+各group内のIDは一意、nonempty groupのactive tabはnon-nullかつmember、pending navigationのtab IDはactive tabと一致する。Explorer / relative link openはactive group末尾へdedupe追加し、local closeはsource groupだけを更新した後、両groupから参照されないglobal dataだけを破棄する。moveはsource removal / local fallbackとdestination dedupe add / selectを1つのtyped transitionで確定する。split off / onは両groupの所属・順序・選択を変更しない。
 
 `PanePreviewStatus`はMermaid / HTML iframeのDOM固有状態を`paneId + tabId + revision`へ帰属させる。document openとPlantUML結果は共有tab stateのまま維持し、同じtabを両paneへ表示してもread / PlantUML commandを重複させない。
 

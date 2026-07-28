@@ -9,7 +9,7 @@
 | `rootPath` | 選択中フォルダ | `string \| null` |
 | `fileTree` | Explorer 用 root ノード | `FileTreeNode \| null` |
 | `tabs` | open中Markdown / HTMLと描画cache | `OpenDocumentTab[]`。pathはcollection内で一意 |
-| `splitViewState` | single / split、active pane、paneごとのtab / pending anchor、requested ratio | `SplitViewState`。表示選択の唯一の正本 |
+| `splitViewState` | single / split、active pane、paneごとのordered tab ID / active tab / pending anchor、requested ratio | `SplitViewState`。pane-local所属・順序・表示選択の唯一の正本 |
 | `panePreviewStatuses` | Mermaid / HTML handshakeのpane-local状態 | primary / secondaryごとの`PanePreviewStatus \| null` |
 | `theme` | `"light" \| "dark"` | `<html data-theme>` に反映 |
 | `rootOperationError` | root / Recent Foldersの代表error | active tab errorより表示優先度が高い |
@@ -25,7 +25,7 @@
 | `isGlobalBusy` | `isRootLoading OR isRecentFoldersBusy` | root競合操作だけを抑止。tab activate / closeは許可 |
 | `nextTabIdRef` | tab ID採番 | close後も再利用しない単調増加counter |
 
-各tabの`revision`はReload時に増加し、MarkdownのMermaid / PlantUML再描画、HTML iframe remount、stale async response排除に使う。active tab、error、loading表示は`tabs + splitViewState + panePreviewStatuses`から導出し、旧global `activeTabId` / `pendingNavigation`を並存させない。`splitView.ts`が状態遷移と幅計算、`paneRuntime.ts`がpane / tab / revision guardとTabStrip表示state合成を担当する。
+各tabの`revision`はReload時に増加し、MarkdownのMermaid / PlantUML再描画、HTML iframe remount、stale async response排除に使う。active tab、error、loading表示は`tabs + splitViewState + panePreviewStatuses`から導出し、旧global `activeTabId` / `pendingNavigation`を並存させない。`splitView.ts`がpane-local group invariant、open / select / local close / atomic move、参照集合、generic resolver、split状態遷移と幅計算を担当し、`paneRuntime.ts`がpane / tab / revision guardとTabStrip表示state合成を担当する。Appはprimary / secondaryのordered IDを`useMemo`でglobal `tabs`へ解決し、missing IDはintegration errorとしてthrowする。
 
 ## クラス / モジュール図
 
@@ -55,6 +55,7 @@ package "Frontend (src/App.tsx)" {
     +loadTab(tabId, file, revision)
     +activateTab(paneId, tabId)
     +closeTab(paneId, tabId)
+    +moveTab(sourcePaneId, tabId)
     +handlePreviewClick(paneId, tab, preview, event)
   }
   class DocumentPane
@@ -295,12 +296,16 @@ stop
 ## Multi-tab処理
 
 - `OpenDocumentTab`はdocumentType、Markdown sourceまたはHTML preview URL、revision、loadState、error、PlantUML結果を保持する。
-- 新規openは末尾へtabを追加し、操作対象paneでactivateする。同一pathは重複せず、そのpaneだけを既存tabへ切り替える。
-- closeはglobal collectionから1回削除し、当該tabを選択していたpaneだけを右隣、なければ左隣へ移す。最後のtabなら両paneを未選択にする。
-- 各paneのTabStripは横overflow、roving tabindex、ArrowLeft / ArrowRight / Home / Endを提供する。
+- `PaneState.orderedTabIds`はpane-local所属と挿入順を保持し、同じIDのprimary / secondary両group参照を許可する。nonempty groupのactive tabは必ずmemberであり、pending navigationはactive tabと一致する。
+- 新規openはglobal dataを作成し、active pane group末尾へ追加・選択する。同一pathはdataを重複せず、そのpane groupへdedupe追加・選択する。
+- local closeはsource groupだけからIDを外し、activeならsource local順の右、なければ左へfallbackする。reducer適用後の両group参照集合がemptyの場合だけglobal dataを削除する。
+- moveはsource removal / fallbackとdestination dedupe add / selectを`move-tab` actionでatomicに更新する。destinationに同じIDがある場合は既存位置を維持し、move後はdestination tabへfocusする。
+- 各paneのTabStripはlocal viewだけを描画し、横overflow、roving tabindex、ArrowLeft / ArrowRight / Home / Endを提供する。split時はactive tabにpane間move buttonを加える。
+- split off / onは両groupの所属・順序・active tabを変更しない。singleでprimaryがempty、secondaryだけがnonemptyならhidden件数と`Enable Split View`案内を表示する。
 - Reloadはtree scan成功後、active paneのselected tabの同じIDでrevisionを増やし、旧content / URLをclearして再openする。共有tab revisionにより同じtabを表示する両paneが再描画される。
 - root scan成功をcommit pointとし、成功後に旧tabsを破棄して両pane選択をclearする。split mode / requested ratioは維持し、初期文書はprimaryへ開く。scan失敗時は旧root / tabs / pane stateを維持する。
 - document responseは`tabId + revision`、pane DOM結果は`paneId + tabId + revision`でguardし、close済み、Reload前、旧root、unmount済みpaneの結果を無視する。
+- pane preview statusのclearは`isPanePreviewStatusCurrent`を使うgeneric effectだけが行う。open / close / move / Reload / root reset / split toggle handlerは独自clearを持たない。
 
 ## リンク処理
 
@@ -466,7 +471,7 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
 
 `MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload`、separator、`Settings...`を持ち、`View` dropdown は theme切替と`role="menuitemcheckbox"`のSplit View切替を持つ。Settingsはapplication-wideな操作であり、dialog close後はFile triggerへfocusを戻す。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
 
-`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。Explorer幅は`explorerPane.ts`のpure policyで180pxからworkspace実寸に応じたdynamic最大幅へclampし、`ResizeObserver`によるwindow追従とpointer captureによるdragを`App`が調停する。Split Viewは`splitView.ts`でpreferred minimum 240px、separator 6px、16px keyboard stepを扱い、狭幅時の実効clampをrequested ratioへ書き戻さない。各`DocumentPane`は同じglobal tabsを受けるpane-local `TabStrip`とtabpanelを持ち、active paneはaccent枠で示す。Explorer、Reload、StatusBar、代表errorはactive paneを対象とする。`ErrorBanner`は`role="alert"`、StatusBarの`State`だけを`aria-live="polite"`とする。
+`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。Explorer幅は`explorerPane.ts`のpure policyで180pxからworkspace実寸に応じたdynamic最大幅へclampし、`ResizeObserver`によるwindow追従とpointer captureによるdragを`App`が調停する。Split Viewは`splitView.ts`でpreferred minimum 240px、separator 6px、16px keyboard stepを扱い、狭幅時の実効clampをrequested ratioへ書き戻さない。各`DocumentPane`はAppで解決済みのpane-local ordered tab viewを受ける`TabStrip`とtabpanelを持ち、active paneはaccent枠で示す。split時のtab itemはactivate / move / closeの3列とminimum 160pxを使い、single時はactivate / closeの2列を使う。Explorer、Reload、StatusBar、代表errorはactive paneを対象とする。`ErrorBanner`は`role="alert"`、StatusBarの`State`だけを`aria-live="polite"`とする。
 
 `html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠にはスクロールバーを出さない。Explorer titleは固定し、treeの縦横scrollは`.explorer-scroll`、documentのscrollは`.preview-pane`へ限定する。`.file-tree`と`.tree-row`は`width: max-content; min-width: 100%`を併用し、短いtreeのrow背景をpane端まで維持しながら、深い階層・長い名前で必要な場合だけ水平scrollを発生させる。tree rowはdisclosure / type icon / labelの3列を共通利用し、labelはellipsisしない。MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。`ErrorBanner` は条件付き描画のため、chrome 要素は CSS grid の自動配置に依存せず、`grid-row` で MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の行を明示する。
 
