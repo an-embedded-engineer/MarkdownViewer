@@ -15,7 +15,7 @@ components:
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "in_review"
+design_status: "done"
 impl_status: "not_started"
 completion_status: "not_started"
 verification_status: "not_started"
@@ -24,6 +24,10 @@ related_commits:
   - "e7fc3f7 : Phase 1 initialize Tauri pane-local tab groups workflow"
   - "996275a : Phase 2 prepare Tauri pane-local tab groups design"
   - "ffda6e3 : Phase 2 initial design review requests 12 changes"
+  - "e21fe5d : Phase 2 address initial design review findings"
+  - "7de22bb : Phase 2 approve design with one follow-up Low finding"
+  - "3542fbb : Phase 2 resolve final runtime status clear finding"
+  - "8ecbe5a : Phase 2 approve design with all 13 findings resolved"
 source_todo_path: "docs/todo/todo.md#todo-2026-023-tauri-pane-local-tab-group--pane-間移動"
 source_design_path: "docs/design_analysis/new_feature/20260726_tauri_split_view/"
 depends_on:
@@ -57,7 +61,7 @@ follow_up:
 | --- | --- |
 | Phase 0 Requirements | Done and approved (`a97c530`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
-| Phase 2 Design review | In review (initial review: 3 blocking Medium, 2 non-blocking Medium, 7 Low; all addressed for follow-up) |
+| Phase 2 Design review | Done and approved (`8ecbe5a`; 13 findings resolved, 0 unresolved) |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4-a User verification | Not started |
 | Phase 4-b Completion | Not started |
