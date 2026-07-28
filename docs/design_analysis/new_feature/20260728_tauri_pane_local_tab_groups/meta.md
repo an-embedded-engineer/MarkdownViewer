@@ -15,11 +15,11 @@ components:
   - "docs/components/avalonia_viewer/tauri_ux_rollout_spec.md"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "in_progress"
+status: "implemented"
 design_status: "done"
-impl_status: "draft"
+impl_status: "done"
 completion_status: "not_started"
-verification_status: "not_started"
+verification_status: "in_progress"
 related_commits:
   - "a97c530 : Phase 0 define TODO-2026-023 pane-local tab groups"
   - "e7fc3f7 : Phase 1 initialize Tauri pane-local tab groups workflow"
@@ -33,6 +33,8 @@ related_commits:
   - "cb10f6d : Phase 3 initial implementation review approved with 3 non-blocking findings"
   - "83e0ce8 : Phase 3 address all 3 implementation review findings"
   - "d0f8dac : Phase 3 approve implementation with all 3 findings resolved"
+  - "cea681a : Phase 3 stabilize TabStrip height after Phase 4-a feedback"
+  - "025a81b : Phase 3 approve TabStrip height stabilization with 0 unresolved findings"
 source_todo_path: "docs/todo/todo.md#todo-2026-023-tauri-pane-local-tab-group--pane-間移動"
 source_design_path: "docs/design_analysis/new_feature/20260726_tauri_split_view/"
 depends_on:
@@ -67,7 +69,7 @@ follow_up:
 | Phase 0 Requirements | Done and approved (`a97c530`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`8ecbe5a`; 13 findings resolved, 0 unresolved) |
-| Phase 3 Implementation and docs review | Reopened after Phase 4-a TabStrip height feedback; CSS and permanent docs fix prepared, review pending |
-| Phase 4-a User verification | NG: pane-local TabStrip height changed with state labels / empty content and split preview tops became misaligned; re-verification pending |
+| Phase 3 Implementation and docs review | Done after Phase 4-a feedback (`025a81b`; TabStrip height fix approved, 0 unresolved findings) |
+| Phase 4-a User verification | Initial verification NG recorded; TabStrip height fix approved and user re-verification pending |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |
