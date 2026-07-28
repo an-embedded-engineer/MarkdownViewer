@@ -1,13 +1,14 @@
 # TODO-2026-023 Tauri pane-local tab group / pane 間移動 設計レビュー
 
 **レビュー日**: 2026-07-28
-**再確認日**: 2026-07-28
+**再確認日**: 2026-07-28（Round 1 / Round 2）
 **対象ドキュメント**: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/design/tauri_pane_local_tab_groups_feature_design.md`
 **対象 meta**: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-023（統合済み TODO-2026-024 を含む）
 **初回レビュー対象コミット**: `996275a` (Phase 2 design Tauri pane-local tab groups)
 **Round 1 fix コミット**: `e21fe5d` (Phase 2 address pane-local tab groups design review)
-**判定**: **承認 (Approved)**。Phase 3 進行可。初回検出の **blocking Medium 3 件 / non-blocking Medium 2 件 / Low 7 件 = 全 12 件は Round 1 fix (`e21fe5d`) ですべて設計へ反映済み**と再確認した。**未解決の blocking 指摘 0 件**。再確認で新規 Low 1 件（3.8、非ブロッキング）を検出したが、実装挙動を変えない旧経路の削除範囲の記述漏れであり、Phase 3 実装時の対応で差し支えない。
+**Round 2 fix コミット**: `3542fbb` (Phase 2 resolve runtime status clear review finding)
+**判定**: **承認 (Approved)**。Phase 3 進行可。初回検出の **blocking Medium 3 件 / non-blocking Medium 2 件 / Low 7 件 = 全 12 件**は Round 1 fix (`e21fe5d`) で、Round 1 再確認で新規検出した **Low 1 件（3.8）**は Round 2 fix (`3542fbb`) で、それぞれ設計へ反映済みと再確認した。**検出指摘 13 件すべて解決済み、未解決指摘 0 件。**
 
 ---
 
@@ -32,7 +33,9 @@ TODO-2026-023 の Phase 2 設計レビュー（初回 + Round 1 再確認）。`
 
 Round 1 fix (`e21fe5d`) では、(1) §7 を「membership / selection 契約」「pending navigation 契約」の 2 列表へ再構成して 10 action すべての pending 規則を確定、(2) §6.3 / §7 / §9.2 で初期化関数・split payload・adjacent helper の契約を確定し §16.1「既存 test の移行方針」を新設、(3) §15 を置換対象表へ全面改稿、という形で 3 件とも構造的に解決されている。non-blocking Medium 2 件（runtime status の二重管理、split off 時の空 primary）と Low 7 件も、それぞれ推奨対応と一致する形で §6.2 / §8.1〜§8.5 / §9.1〜§9.4 / §11 / §12 / §13 / §14 / §16 / §17 / §18 へ反映されている。
 
-再確認の結果、対応による新たな invariant の穴、実装不能な契約、section 参照の破損は検出しなかった（§16 が 3 節から 4 節へ増えた影響も、design 内に旧番号を参照する記述が残っていないことを確認済み）。新規に検出したのは指摘 3.8（runtime status 直接 clear の削除対象が 5 call site 中 2 件しか列挙されていない）1 件のみで、挙動は変わらず旧経路が 3 箇所残るだけであるため Low・非ブロッキングとした。
+Round 1 再確認の結果、対応による新たな invariant の穴、実装不能な契約、section 参照の破損は検出しなかった（§16 が 3 節から 4 節へ増えた影響も、design 内に旧番号を参照する記述が残っていないことを確認済み）。新規に検出したのは指摘 3.8（runtime status 直接 clear の削除対象が 5 call site 中 2 件しか列挙されていない）1 件のみで、挙動は変わらず旧経路が 3 箇所残るだけであるため Low・非ブロッキングとした。
+
+Round 2 fix (`3542fbb`) では §9.1 と §14 の 2 行を改訂し、直接 clear を行わない handler を 6 種すべて列挙した上で、`setPanePreviewStatus` の残存呼び出しを「`updatePanePreviewPhase` 経由の status 設定」と「generic effect による clear」の 2 経路へ限定する実装完了条件を明示した。Round 2 再確認では、この 2 経路が現行実装の call site と過不足なく対応することを確認し、新たな指摘は検出しなかった。
 
 ---
 
@@ -132,7 +135,7 @@ Round 1 fix (`e21fe5d`) では、(1) §7 を「membership / selection 契約」�
 
 **severity**: Medium（初回 non-blocking）
 **工程**: Phase 2（責務の明記）
-**status**: **解決済み**（2026-07-28 再確認、commit `e21fe5d`）。ただし削除対象の列挙範囲に残課題（指摘 3.8）。
+**status**: **解決済み**（2026-07-28 再確認、commit `e21fe5d`。削除対象の列挙範囲は指摘 3.8 として切り出し、commit `3542fbb` で解決済み）。
 
 **対応**: §8.2 / §8.3-4 / §8.4 / §9.1 で `isPanePreviewStatusCurrent` を使う既存 generic effect を唯一の正本と定め、close / move / toggle handler の直接 clear を行わない方針へ一本化した。現行 `closeTab` の両 pane 無条件 clear を削除対象として §8.2 / §14 へ明記した。
 
@@ -278,11 +281,13 @@ Round 1 fix (`e21fe5d`) では、(1) §7 を「membership / selection 契約」�
 
 ### 3.8 runtime status の直接 clear 削除対象が 5 call site 中 2 件しか列挙されていない（新規）
 
-**severity**: Low（**非ブロッキング**、指摘 2.1 の残課題）
-**工程**: Phase 2（§8.1 / §8.5 / §8.6 / §14 への追記）または Phase 3（実装時に反映）
-**status**: **未解決**
+**severity**: Low（非ブロッキング、指摘 2.1 の残課題）
+**工程**: Phase 2（§9.1 / §14 への追記）
+**status**: **解決済み**（2026-07-28 Round 2 再確認、commit `3542fbb`）
 
-**ドキュメント記載**: §8.2「pane preview statusのstale判定は`isPanePreviewStatusCurrent`を使う既存generic effectを**唯一の正本**とし、close handlerでは直接clearしない。現行`closeTab`の…両paneから無条件clearする処理は削除する。」§8.4「toggle handlerから直接clearしない。」§9.1「close / move handlerはpane runtime statusを直接clearせず、既存generic effectへ委ねる。」§14 `App.tsx` 行「close / toggleの直接runtime clearを削除」。
+**対応**: §9.1 で直接 clear を行わない handler を close / move / open / reload / root reset / split toggle の 6 種へ拡張し、`setPanePreviewStatus(..., null)` による clear を generic effect だけに限定した上で、他の呼び出しを `updatePanePreviewPhase` 経由の status 設定へ限る実装完了条件を明記した。§14 の `App.tsx` 行も同じ列挙と 2 経路限定へ改訂した。
+
+**ドキュメント記載（Round 1 時点）**: §8.2「pane preview statusのstale判定は`isPanePreviewStatusCurrent`を使う既存generic effectを**唯一の正本**とし、close handlerでは直接clearしない。現行`closeTab`の…両paneから無条件clearする処理は削除する。」§8.4「toggle handlerから直接clearしない。」§9.1「close / move handlerはpane runtime statusを直接clearせず、既存generic effectへ委ねる。」§14 `App.tsx` 行「close / toggleの直接runtime clearを削除」。
 
 **根拠 / 差異**: 指摘 2.1 の解決により「generic effect が唯一の正本」という原則は確定したが、削除対象として名指しされているのは `closeTab`（`App.tsx:785`）と `toggleSplitView`（`App.tsx:874`）の 2 件だけである。現行 `App.tsx` には `setPanePreviewStatus(..., null)` による直接 clear が計 5 箇所ある。
 
@@ -303,17 +308,25 @@ Round 1 fix (`e21fe5d`) では、(1) §7 を「membership / selection 契約」�
 
 いずれの場合も、削除後に status を `null` にする経路が generic effect だけになることを §9.1 に 1 文で明記すると、Phase 3 の完了判定が機械的に行える。
 
+**確認 (`3542fbb`)**: 推奨案 (a) が採用され、指摘した 3 つの検証点すべてを満たしている。
+
+- **handler の網羅**: §9.1 が「close / **move / open / reload / root reset** / split toggle handlerはpane runtime statusを直接clearせず、既存generic effectへ委ねる」へ改訂された。現行 5 call site（`loadRoot` の `App.tsx:461-462` = root reset、`reload` の `:638` = reload、`openOrActivateTab` の `:672` = open、`closeTab` の `:785` = close、`toggleSplitView` の `:874` = split toggle）と新設 `moveTab` = move が 1:1 で対応し、**列挙漏れは無い**。§14 の `App.tsx` 行も同じ 6 handler 列挙へ更新され、影響範囲表と責務記述が一致した。
+- **clear 経路の限定**: 同行へ「`setPanePreviewStatus(..., null)`によるclearはこの**generic effectだけに限定**し」が入り、指摘 2.1 で確定した「唯一の正本」が call site レベルまで降りた。
+- **実装完了条件**: 「`setPanePreviewStatus`の他の呼び出しは`updatePanePreviewPhase`経由のstatus設定だけにする」により、削除後の残存 call site が `updatePanePreviewPhase`（`App.tsx:324`）と generic effect（`App.tsx:1173`）の 2 箇所だけになる。現行の 7 call site（設定 1 + 直接 clear 5 + effect 1）から算術的に 2 へ収束することを確認しており、Phase 3 完了判定は `setPanePreviewStatus` の呼び出し数の確認だけで機械的に行える。
+
+削除しても表示が壊れないことも再検算した。generic effect は `!isPanePreviewStatusCurrent` のときだけ clear するため、status が保持されるのは「その pane で当該 tab がその revision で選択中」の場合に限られる。root reset（`tabs` が空）、reload（revision +1）、open（selection 変化）はいずれもこの条件を外すため、generic effect だけで必ず clear される。§9.1 / §14 の記述と実装挙動に齟齬は無い。
+
 ---
 
 ## 4. 受け入れ条件トレース確認
 
-Round 1 fix (`e21fe5d`) 反映後の状態で再評価した。初回 △ だった 2 行と ✗ だった 1 行はすべて ✓ へ更新した。
+Round 1 fix (`e21fe5d`) と Round 2 fix (`3542fbb`) 反映後の状態で再評価した。初回 △ だった 2 行と ✗ だった 1 行はすべて ✓ へ更新した。**全行 ✓、未達の完了条件は無い。**
 
 | `docs/todo/todo.md` TODO-2026-023 完了条件 | 設計書での対応箇所 | 結果 |
 | --- | --- | --- |
 | 各 pane の TabStrip にはその pane で開いた tab だけが表示され、他 pane の tab 追加・close で意図せず増減しない | §4.1、§6.1、§6.2、§7、§9.3、§9.4、§16.2 | ✓ 整合。ordered ID collection と local close で閉じており、invariant 8 の追加で「非空 group + 未選択」という中間状態も排除された |
 | tab activate / close、Reload、relative link、root 変更、split on / off で pane-local tab collection と active tab が一貫して復旧する | §7（2 列 action 表）、§8.1-§8.6、§16.2 | ✓ 整合。指摘 1.1 の対応で `pendingNavigation` が全 10 action に定義され、invariant 3 が全経路で閉じた。Reload 対象も 1 件へ明確化済み（指摘 3.5） |
-| Markdown / HTML / Mermaid / PlantUML の非同期結果と loading / error 表示が pane 間で混線しない | §8.2、§8.3、§8.4、§9.1、§9.5、§10.1、§10.2、§16.3 | ✓ 整合。stale 判定が `isPanePreviewStatusCurrent` の generic effect へ一本化され（指摘 2.1）、`paneRuntime.ts` の pane / tab / revision guard を変更せずに済む理由も正しい。直接 clear の削除範囲だけ列挙漏れが残る（指摘 3.8、挙動不変） |
+| Markdown / HTML / Mermaid / PlantUML の非同期結果と loading / error 表示が pane 間で混線しない | §8.2、§8.3、§8.4、§9.1、§9.5、§10.1、§10.2、§16.3 | ✓ 整合。stale 判定が `isPanePreviewStatusCurrent` の generic effect へ一本化され（指摘 2.1）、直接 clear の削除対象も 6 handler すべてと実装完了条件まで確定した（指摘 3.8）。`paneRuntime.ts` の pane / tab / revision guard を変更せずに済む理由も正しい |
 | 移動元は隣接 tab または未選択へ復旧し、移動先では対象 tab が選択される | §7 (`move-tab`)、§8.3、§12 | ✓ 整合。source 変更前順序を基準にした右→左→null fallback、destination dedupe、source / destination の pending 規則、image viewer の identity 3 ケースまで確定した |
 | keyboard だけでも移動操作へ到達でき、focus と accessible name / state が維持される | §4.4、§9.4、§11、§17-7 | ✓ 整合。roving order、Tab 順への含め方、move 後 focus、pane 名込み accessible name に加え、split 時の tab 幅 160px 確保で操作対象の判別性も担保された（指摘 3.6） |
 | `npm test`、`npm run build`、`cargo check` が成功する | §16.4 | ✓ 整合。`docs/rules/development_workflow.md:156-164` の Tauri 検証コマンドと一致し、`cargo fmt --check` / `cargo test` / `git diff --check` を上乗せしている |
@@ -337,7 +350,7 @@ Round 1 fix (`e21fe5d`) 反映後の状態で再評価した。初回 △ だっ
 | local close + unreferenced eviction の順序（§4.3、§8.2、§9.1） | ✓ 妥当。「reducer 適用後の次 state の両 group 参照集合」で判定するため順序依存が閉じている。同 ID を両 group が参照する場合に global tab / revision / shared load state を維持する規則も、in-flight `loadTab` が `updateTabIfCurrent`（`App.tsx:409-417`）で正しく着地する構造と一致する |
 | eviction 後の late async result（§8.2） | ✓ 妥当。`updateTabIfCurrent` は id + revision 一致の map であり、global tab 削除後は自動的に no-op になる。`nextTabIdRef`（`App.tsx:190`）が単調増加のため ID 再利用による誤着地も起きない |
 | `move-tab` の atomic 契約（§7、§8.3、§12） | ✓ 妥当。source removal + fallback と destination dedupe add + select を 1 action で返す設計は正本が 1 つに保たれる。destination に同 ID がある場合に既存位置を維持する規則も §10.2 の iframe key 安定性と整合する |
-| generic stale status effect への一本化（§8.2、§8.3、§8.4、§9.1） | ✓ 妥当。`resolvePaneTabPresentationState`（`paneRuntime.ts:82-88`）と `currentActivePaneStatus`（`App.tsx:198-204`）がいずれも tabId / revision 一致を要求するため、先行 clear を廃止しても 1 commit 分の誤表示は生じない。削除対象の列挙範囲だけ残課題（指摘 3.8） |
+| generic stale status effect への一本化（§8.2、§8.3、§8.4、§9.1、§14） | ✓ 妥当。`resolvePaneTabPresentationState`（`paneRuntime.ts:82-88`）と `currentActivePaneStatus`（`App.tsx:198-204`）がいずれも tabId / revision 一致を要求するため、先行 clear を廃止しても 1 commit 分の誤表示は生じない。§9.1 / §14 が close / move / open / reload / root reset / split toggle の 6 handler を列挙し、残存 call site を `updatePanePreviewPhase` 経由の設定と generic effect の clear の 2 経路へ限定したことで、正本が 1 つであることが call site 数として検証可能になった |
 | `paneRuntime.ts` を変更しない判断（§9.5、§14） | ✓ 妥当。`isPaneSelectionCurrent`（`paneRuntime.ts:33-42`）は pane ごとの `activeTabId` 比較、`isTabRevisionCurrent`（同 44-50）は global identity 比較であり、membership の概念を必要としない |
 | split off 中の secondary result 拒否（§8.4、§16.3） | ✓ 妥当。`isPaneSelectionCurrent` が `paneId === "secondary" && mode !== "split"` で false を返す既存実装（`paneRuntime.ts:38-40`）により、group 保持と result 拒否・runtime status clear が追加実装なしで両立する |
 | Mermaid / PlantUML の扱い（§10.1） | ✓ 妥当。render ID を `paneId + tabId + revision + index` とする既存実装（`App.tsx:2225`）と queue の App instance 所有（`App.tsx:189`）を維持し、move を DOM ownership 変更として `isPaneResultCurrent` + `isConnected` で stale 化する説明は現行 effect の構造（`App.tsx:2228-2274`）と一致する |
@@ -357,7 +370,7 @@ Round 1 fix (`e21fe5d`) 反映後の状態で再評価した。初回 △ だっ
 | 1.1 | `pendingNavigation` の遷移規則が未定義で invariant §6.2-3 が閉じない | Medium | blocking | **解決済み** (`e21fe5d`) |
 | 1.2 | 公開 API・既存 test の契約破壊範囲が §14 / §16 に無い | Medium | blocking | **解決済み** (`e21fe5d`) |
 | 1.3 | 恒久 docs の矛盾記述（置換対象）が §15 で特定されていない | Medium | blocking | **解決済み** (`e21fe5d`) |
-| 2.1 | pane runtime status clear が既存 generic effect と二重管理 | Medium | non-blocking | **解決済み** (`e21fe5d`)。削除範囲の残課題は 3.8 |
+| 2.1 | pane runtime status clear が既存 generic effect と二重管理 | Medium | non-blocking | **解決済み** (`e21fe5d` + `3542fbb`) |
 | 2.2 | split off 時に primary group が空だと開いている文書が不可視になる | Medium | non-blocking | **解決済み** (`e21fe5d`) |
 | 3.1 | 非空 group ⇒ 非 null active の invariant 未明示、TabStrip 旧 fallback が残る | Low | non-blocking | **解決済み** (`e21fe5d`) |
 | 3.2 | `open-tab` / `close-pane-tab` の single + secondary 契約が非対称 | Low | non-blocking | **解決済み** (`e21fe5d`) |
@@ -366,8 +379,13 @@ Round 1 fix (`e21fe5d`) 反映後の状態で再評価した。初回 △ だっ
 | 3.5 | §8.5 Reload の対象記述が曖昧 | Low | non-blocking | **解決済み** (`e21fe5d`) |
 | 3.6 | split 時 tab item 幅（`min-width` / `32vw`）の見直し根拠が無い | Low | non-blocking | **解決済み** (`e21fe5d`) |
 | 3.7 | ADR 非追加の再評価条件が未記載 | Low | non-blocking | **解決済み** (`e21fe5d`) |
-| 3.8 | runtime status 直接 clear の削除対象が 5 call site 中 2 件しか列挙されていない | Low | — （再確認で新規検出） | **未解決**（非ブロッキング。Phase 3 実装時の対応可） |
+| 3.8 | runtime status 直接 clear の削除対象が 5 call site 中 2 件しか列挙されていない | Low | — （Round 1 再確認で新規検出） | **解決済み** (`3542fbb`) |
 
-**未解決 blocking 指摘: 0 件。** 初回 12 件はすべて解決済みで、Phase 3 へ進行できる。
+**検出指摘 13 件（Medium 5 / Low 8）はすべて解決済み。未解決指摘 0 件。** Phase 3 へ進行できる。
 
-指摘 3.8 は挙動を変えない旧経路の削除範囲に関する記述漏れであり、Phase 3 で `App.tsx` の `setPanePreviewStatus` 呼び出しを整理する際に併せて対応すれば足りる。Phase 3 実装レビューでは、`setPanePreviewStatus` による `null` 化が generic effect（`App.tsx:1166-1176` 相当）だけに残っていることを確認観点とする。
+Phase 3 実装レビューでの追跡観点（設計で確定済みの契約が実装へ落ちているかの確認点）:
+
+- `splitView.ts`: §7 の pending navigation 契約が 10 action すべてに実装され、§6.2 invariant 1〜3 / 7〜8 が reducer で守られていること。`createInitialSplitViewState` が引数なし、`enable-split` / `disable-split` に payload が無く、`findAdjacentTabId` が export されていないこと。
+- `App.tsx`: `setPanePreviewStatus` の呼び出しが `updatePanePreviewPhase` 経由の設定と generic effect の clear の 2 箇所だけであること（指摘 2.1 / 3.8）。`resolveGroupTabs` の呼び出しが `useMemo` の 2 回だけで、`DocumentPane` / `TabStrip` 内に再解決が無いこと（指摘 3.3）。TabStrip に `activeTabId === null` の roving fallback が残っていないこと（指摘 3.1）。
+- 恒久 docs: §15 の置換対象 6 箇所が追記ではなく置換として反映され、`docs/rules/development_workflow.md` に旧 split toggle / close の合否基準が残っていないこと（指摘 1.3）。
+- test: §16.1 の移行方針どおり、意味を維持した test と旧仕様のため置換した test が区別できる形になっていること（指摘 1.2）。
