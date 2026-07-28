@@ -288,3 +288,24 @@ review checkpoint 2（不要な重複実装 / 責務分離）に該当する。
 | 3.7 | ADR 非追加の再評価条件が未記載 | Low | non-blocking | Phase 2 |
 
 Phase 3 着手条件: 1.1 / 1.2 / 1.3 を設計へ反映し、2.1 / 2.2 について採る方針を設計内で確定させること。3.1〜3.7 は Phase 2 での追記を推奨するが、Phase 3 実装時の反映でも差し支えない。
+
+---
+
+## 7. 初回指摘への対応（実装担当、follow-up review待ち）
+
+`ai-review-response-workflow`に従い、blocking / non-blockingを含む全12件を設計へ反映した。対応commitはfollow-up promptで通知する。
+
+| # | 対応 | status |
+| --- | --- | --- |
+| 1.1 | §7をpending navigation列付きaction表へ変更し、open / select / close / move / toggle / rootのclear・保持規則を確定。旧`remove-tab`の到達不能guard削除とpending invariant testを§14 / §16へ追加 | 対応済み・再確認待ち |
+| 1.2 | §6.3で`createInitialSplitViewState()`引数廃止、§7 / §9.2でsplit payload削除とprivate adjacent helperを確定。§16.1に既存test 34 call siteの移行・置換方針と共通fixture helperを追加 | 対応済み・再確認待ち |
+| 1.3 | §15を恒久docsの置換対象表へ変更し、`interface_spec.md`、`detail_design.md`、`development_workflow.md`、Tauri READMEの旧確定記述と節単位の置換方針を明記 | 対応済み・再確認待ち |
+| 2.1 | §8.2 / §8.3 / §9.1で`isPanePreviewStatusCurrent` generic effectを唯一の正本とし、close / move / toggle handlerの直接clearと現行両pane無条件clearを削除する方針へ一本化 | 対応済み・再確認待ち |
+| 2.2 | §8.4 / §12でprimary empty・secondary nonempty時にhidden件数と`Enable Split View`回復案内を表示する推奨案(a)を採用。§17-9へ手動確認追加 | 対応済み・再確認待ち |
+| 3.1 | §6.2 invariant 8へ「nonempty group ⇒ active non-null」を追加。§9.4で旧roving fallback削除、§16.2でinvalid fixture testを追加 | 対応済み・再確認待ち |
+| 3.2 | §7でsingle modeのsecondary open / select / close / activate / moveをthrowと対称定義し、§16.2へtest追加 | 対応済み・再確認待ち |
+| 3.3 | §9.1 / §9.2へgeneric `resolveGroupTabs<T>` signatureとApp `useMemo` integration boundaryを確定。DocumentPane内の再解決を禁止 | 対応済み・再確認待ち |
+| 3.4 | §8.3-7 / §12 / §17-6へmove時image viewerのidentity 3ケースを追加 | 対応済み・再確認待ち |
+| 3.5 | §8.5を「active paneのselected global tab 1件」へ明確化 | 対応済み・再確認待ち |
+| 3.6 | §11 / §17-12 / §18でsplit時minimum 160px、`min(220px, 32vw)` viewport基準維持、horizontal overflowを確定 | 対応済み・再確認待ち |
+| 3.7 | §13へTODO-2026-025またはTODO-2026-011で同model採用時のADR再評価条件を追加 | 対応済み・再確認待ち |
