@@ -317,6 +317,7 @@ pane result guardとpresentation合成の責務は変更しない。`activeTabId
 - move後focusはdestination activate button、close後focusはsource fallback activate button、emptyならsource pane region。
 - focus移動でdestination paneがactiveになる。StatusBar / ErrorBanner / Explorer highlightも同destination tabへ更新する。
 - CSSはsingle時2列、split時3列を使う。split時だけ`.tab-item`の`min-width`を3列分の160pxへ引き上げ、document名領域を確保する。`width: min(220px, 32vw)`のwindow viewport基準、horizontal overflow、focus-visible、loading / error表示は維持する。
+- TabStrip行は通常1行、Loading / Rendering / Error時2行、empty、水平scrollbar表示のいずれでも58px固定とする。primary / secondaryが個別の内容量から行高を決めないことで、preview上端の段差とtab移動後の高さ変動を防ぐ。name / stateは16px / 12pxのline-heightで固定高内へ収める。
 - symbolは視覚補助であり、意味は`aria-label` / `title`を正とする。
 
 ## 12. Error handlingとデフォルト動作
@@ -354,7 +355,7 @@ pane result guardとpresentation合成の責務は変更しない。`activeTabId
 | `markdown-viewer-tauri/src/splitView.ts` | `createInitialSplitViewState`引数廃止、ordered IDs、group actions、pending規則、generic resolver、reference helper、split payload削除、private adjacent fallback |
 | `markdown-viewer-tauri/src/splitView.test.ts` | 既存initial / split toggle / selection testをgroup schemaへ置換し、add / close / move / root / pending / invalid invariant testを追加 |
 | `markdown-viewer-tauri/src/App.tsx` | open、local close、cache eviction、move、App境界のgroup view解決、hidden secondary案内、focus integration。close / move / open / reload / root reset / split toggleの直接runtime clearをすべて削除し、`setPanePreviewStatus`の呼び出しを`updatePanePreviewPhase`経由のstatus設定とgeneric effectによるclearの2経路だけに限定 |
-| `markdown-viewer-tauri/src/App.css` | split時move buttonを含むtab item grid / hover / focus |
+| `markdown-viewer-tauri/src/App.css` | split時move buttonを含むtab item grid / hover / focus。Phase 4-a feedbackで両pane共通の58px TabStrip行高とname / state line-heightを追加 |
 | `markdown-viewer-tauri/src/paneRuntime.test.ts` | 引数付きinitial stateと非member select前提をgroup membership helperへ書換え、move / retained secondary / same ID両groupのguard回帰を追加 |
 | `paneRuntime.ts` | 原則変更なし。型変更に伴う参照調整のみ |
 | `documentPolicy.ts`, `imageViewer.ts` | 変更なし |
@@ -473,3 +474,13 @@ Rust差分は予定しないが、frontend / Tauri境界とsecurity回帰のた�
 - HTML security、Mermaid queue、PlantUML cache、image viewer identityを弱めていないか。
 - keyboard / ARIA / focus設計がinline move controlとpane-local roving orderを網羅するか。
 - unit testと手動matrixがTODOの受け入れ条件、境界値、回帰を追跡できるか。
+
+## 21. Phase 4-a feedback: TabStrip高さの安定化
+
+2026-07-28のユーザ動作確認で、tab追加・pane間moveを繰り返した際にTabStripが低く見える場合と、Error / Rendering表示があるpaneと無いpaneでpreview上端に段差が生じることが確認された。Phase 4-aをNGとしてPhase 3へ差し戻す。
+
+原因は`.document-pane`の先頭grid rowが`auto`で、各paneがTabStrip高を独立に内容依存で決めていたことである。通常tabはname 1行、状態付きtabはname + stateの2行、empty groupは内容なしとなり、さらにhorizontal scrollbarの有無も高さへ加算される。moveや状態遷移でこれらの条件がpane間を移るため、高さが操作途中で変化する。
+
+修正はApp stateやDOMを増やさず、`.app-shell`の`--tab-strip-height: 58px`を`.document-pane`先頭rowと`.tab-strip`へ適用する。`.tab-name` / `.tab-state`のline-heightを16px / 12pxへ固定し、既存padding 13px、gap 1px、classic horizontal scrollbar領域を含めて固定高へ収める。通常、状態付き、empty、scrollbar表示のすべてで左右のpreview開始位置を一致させる。
+
+drag and drop moveは技術的には実現可能だが、drop target、drag feedback、pointer cancel、keyboard代替、同一pane reorderとの区別を別途設計する必要があり、§3.2の非対象を維持する。現行のmove buttonはkeyboard / assistive technologyから到達可能な明示操作として残す。

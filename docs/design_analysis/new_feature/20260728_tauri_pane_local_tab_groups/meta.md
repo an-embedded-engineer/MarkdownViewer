@@ -15,9 +15,9 @@ components:
   - "docs/components/avalonia_viewer/tauri_ux_rollout_spec.md"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "in_progress"
 design_status: "done"
-impl_status: "done"
+impl_status: "draft"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -67,7 +67,7 @@ follow_up:
 | Phase 0 Requirements | Done and approved (`a97c530`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`8ecbe5a`; 13 findings resolved, 0 unresolved) |
-| Phase 3 Implementation and docs review | Done and approved (`d0f8dac`; 3 findings resolved, 0 unresolved) |
-| Phase 4-a User verification | Not started |
+| Phase 3 Implementation and docs review | Reopened after Phase 4-a TabStrip height feedback; CSS and permanent docs fix prepared, review pending |
+| Phase 4-a User verification | NG: pane-local TabStrip height changed with state labels / empty content and split preview tops became misaligned; re-verification pending |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |

@@ -174,6 +174,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - `View > Split View`でsingle / 左右2 paneを切り替え、初回secondary groupがemptyであること、split off / onで両groupの所属・順序・選択を変更せずsecondaryを復元すること、primary empty / secondary nonemptyのsingle viewでhidden件数と`Enable Split View`案内が表示されること
 - Explorer / relative Markdown linkからactive paneへtabが追加され、primary / secondaryのTabStripが他paneのopen / closeで意図せず増減せず、同じdocumentを両groupへ追加できること
 - primary / secondaryのTabStripから別文書または同じ文書を独立に選択し、pointer / focusでactive paneを変えるとExplorer強調、Reload、相対Markdown link、StatusBar、ErrorBannerの対象が切り替わること
+- split左右で通常tab、Loading / Rendering / Error表示tab、empty group、水平scrollbar表示を組み合わせてもTabStripが58px固定高を維持し、preview上端に段差が出ないこと。tab追加・close・pane間moveの反復でも高さが変動しないこと
 - Split separatorをpointer / ArrowLeft / ArrowRight / Home / Endで操作し、preferred minimum 240px、狭幅時の等幅縮退、ARIA値、focus維持、再拡大時のrequested ratio復元を確認すること
 - active / non-active tabをlocal closeし、source local順の右→左→未選択fallback、shared IDの反対group / data / runtime維持、最後の参照close時だけglobal data破棄、root変更後の両group resetが一貫し、無効tab IDが残らないこと
 - split中にpointer / keyboardで`→` / `←` move buttonへ到達し、source fallback、destination選択、destinationに同じIDがある場合のdedupe、destination focus、StatusBar / ErrorBanner routingが一致すること。image viewer表示中はorigin selectionが変わるmoveで閉じ、identity不変のdestination viewerは維持すること

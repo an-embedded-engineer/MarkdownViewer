@@ -114,7 +114,18 @@ Claude実装レビュー `cb10f6d` はblocking 0件で承認し、非ブロッ�
 
 対応後も仕様差分はなく、root scan成功後のcommit pointと既存の表示挙動を維持する。
 
-## 8. 既知制約
+## 8. Phase 4-a feedback対応
+
+2026-07-28のユーザ動作確認で、tab追加・moveの反復後にTabStripが低くなる場合と、状態表示があるpane / 無いpaneでpreview上端に段差が生じることが報告された。Phase 4-aをNGとしてPhase 3へ差し戻した。
+
+- 原因: `.document-pane`のTabStrip rowが`auto`で、各paneがname 1行、state 2行、empty、horizontal scrollbarの内容量から高さを独立計算していた。
+- 修正: `--tab-strip-height: 58px`を`.document-pane`先頭rowと`.tab-strip`へ適用し、name / state line-heightを16px / 12pxへ固定した。
+- 維持事項: tab幅、horizontal overflow、loading / error表現、pane-local state、focus、security境界は変更しない。
+- drag and drop: 技術的には可能だが現行scope外。drop target、drag feedback、pointer cancel、keyboard代替、reorderとの区別を別設計とし、現行move buttonを維持する。
+
+再確認では、通常 / 状態付き / empty / scrollbar有無を左右で組み合わせ、tab追加・close・moveを反復しても両TabStripが同じ高さを維持することを確認する。
+
+## 9. 既知制約
 
 - drag and drop、group内reorder、pin、複数選択、一括move / closeは対象外。
 - 上下split、3 pane以上、split treeは対象外。
