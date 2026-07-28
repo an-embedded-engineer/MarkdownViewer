@@ -1,58 +1,44 @@
 # TODO
 
-## TODO-2026-023 Tauri pane-local tab group / pane 間移動
+## TODO-2026-026 Tauri TabStrip 状態表現・scroll・drag move UX改善
 
 - status: open
 - workflow: new-feature
-- depends_on: TODO-2026-006
-- source_todo: TODO-2026-024
-- source_design: `docs/design_analysis/new_feature/20260726_tauri_split_view/`
-- summary: Tauri版のprimary / secondaryでTabStripの所属・表示順を分離し、各paneで開いたtabだけを表示して、明示操作でpane間を移動できるようにする。
-- integrated_todo: TODO-2026-024
-- feasibility: 実現可能。現行の共有`OpenDocumentTab[]`はdocument cacheとして維持し、paneごとのordered tab ID collection、active tab、移動元 / 移動先のfallbackを1つのtyped transitionとして設計する。
+- depends_on: TODO-2026-023
+- source_feedback: TODO-2026-023 Phase 4-a
+- summary: Tauri版TabStripをcompactな1行表示へ整理し、上端indicatorによる状態表現、必要時だけのhorizontal scrollbar、選択tab全体の自動scroll、pane間drag and drop移動を追加する。
+- feasibility: 実現可能。既存のtyped `move-tab` transitionは再利用できる。visual stateは`resolvePaneTabPresentationState`を入力にCSS class / pseudo-elementで表現し、dragはHTML Drag and DropまたはPointer EventsをWebView別に評価する。tab activate buttonだけでなくtab item全体をscroll targetにする必要がある。
 - target_users:
-  - Tauri版Markdown Viewerで、比較対象ごとに左右の作業文脈を分け、多数のopen documentから各paneに必要なtabだけを表示したい利用者。
-  - Explorerやrelative linkで開いたdocumentを現在操作中のpaneへ追加し、必要に応じてkeyboardを含む明示操作で反対paneへ移したい利用者。
-- use_cases:
-  - primaryで仕様書群、secondaryで設計書群を開き、各TabStripをpane固有の表示順とactive tabで操作する。
-  - ExplorerまたはMarkdown内relative linkからdocumentを開き、active paneのtab groupへ追加して表示する。
-  - 同じpathを両paneのtab groupへ追加し、共有document dataを参照しながらpaneごとに独立したpreview runtimeと選択状態で確認する。
-  - split表示中にtabを反対paneへ移動し、移動先で選択されたdocumentを確認しつつ、移動元は隣接tabまたは未選択へ復旧する。
-  - tab close、Reload、root変更、split off / on後も、paneごとの所属・表示順・active tabが有効な状態へ復旧する。
-- prerequisites:
-  - TODO-2026-006で導入した左右2pane、active pane routing、pane-local selection / runtime、pane / tab / revision guardを基盤とする。
-  - document本文、revision、PlantUML cacheなどの正本はglobal `OpenDocumentTab[]`に維持し、pane-local groupにはordered tab IDと選択状態だけを保持する。
-  - current root内でpath一意というdocument data契約と、trusted HTMLのsandbox / CSP / root boundary / external link policyを維持する。
+  - 多数のtabを左右paneで扱い、状態を判別しつつpreview領域を広く保ちたい利用者。
+  - pointerでtabを直接反対paneへ移動したい一方、keyboardや支援技術でも同じ操作へ到達したい利用者。
 - scope:
-  - primary / secondaryごとにtabの所属と表示順を管理する。
-  - Explorerまたはlinkから開いたdocumentはactive paneのTabStripへ追加する。
-  - 同じpathを両paneで開く場合のdocument data共有とpane-local runtime分離を両立する。
-  - split表示中のtabをprimary / secondary間で明示操作により移動し、所属変更、移動元fallback、移動先選択、active pane更新を1つの型付き状態遷移として扱う。
-  - single viewではprimary groupを表示し、secondary groupはsession内で保持してsplit再有効化時に復元する。
+  - active / error / rendering状態をtab上端のindicatorへ統一し、Error / Renderingのvisible textを廃止する。
+  - Errorは赤い上端線、Renderingは別色または左から伸びるindeterminate animationで表現する。実progress値が無いため進捗率とは扱わない。
+  - visible text廃止後も状態をaccessible name / description、`aria-busy`等の適切なARIAで通知する。
+  - 1行tabに合わせてTabStrip固定高をcompact化し、通常 / error / rendering / empty / overflowで高さを変えない。
+  - horizontal scrollbarはpointer hoverまたはkeyboard focus時だけ視認可能にし、表示切替でTabStripやpreviewがlayout shiftしないようにする。
+  - overflow中のtabをactivateまたはfocusした時、titleだけでなくmove / close buttonを含むtab item全体が表示範囲へ入るようscroll位置を調整する。
+  - split表示中、tabを反対paneへdrag and dropして既存`move-tab` transitionを実行する。drop target / drag feedback / cancelを明示する。
+  - 既存の矢印move buttonをkeyboard / assistive technology向けの代替導線として維持する。
 - non_scope:
-  - drag and drop、group内tab reorder / pin、複数選択・一括移動、3pane以上、split tree。
-  - tab groupやsplit layoutの再起動後永続化、Avalonia版への水平展開。
-- follow_up:
-  - 上下・左右split方向はTODO-2026-025で扱い、本機能のpane-local group modelを再利用できるようにする。
+  - 同一pane内reorder、pin、複数選択、一括move / close。
+  - 実数のrender progress表示。現行runtimeに進捗率が無いためindeterminate表現までとする。
+  - dragだけを唯一の移動導線にすること、または矢印move buttonの廃止。
 - integration_points:
-  - `markdown-viewer-tauri/src/splitView.ts`の`SplitViewState` / typed action、tab activate / close、split on / off、root reset、pending navigationのpure transition。
-  - `markdown-viewer-tauri/src/App.tsx`のglobal `OpenDocumentTab[]`、`DocumentPane` / `TabStrip`、Explorer open、relative link、Reload、active pane routing。
-  - `markdown-viewer-tauri/src/paneRuntime.ts`のpane / tab / revision guardとTabStrip表示state合成。同一documentを両groupで参照してもruntimeを共有しない。
-  - `markdown-viewer-tauri/src/App.css`のpane-local TabStrip、tab移動導線、focus / active / loading / error表示。
-  - `markdown-viewer-tauri/src/splitView.test.ts` / `paneRuntime.test.ts`と、`docs/components/tauri_viewer/`、`docs/architecture/`、`docs/rules/development_workflow.md`の恒久仕様・検証手順。
+  - `markdown-viewer-tauri/src/App.tsx`の`TabStrip`、tab item refs、focus / scroll調停、drag event wiring。
+  - `markdown-viewer-tauri/src/App.css`のactive / error / rendering indicator、compact height、scrollbar visibility、drag / drop feedback、reduced motion。
+  - `markdown-viewer-tauri/src/splitView.ts`の既存atomic `move-tab` action。drag専用の重複state transitionは追加しない。
+  - `markdown-viewer-tauri/src/paneRuntime.ts`のpresentation state合成とARIA state導出。
 - completion:
-  - 各paneのTabStripにはそのpaneで開いたtabだけが表示され、他paneのtab追加・closeで意図せず増減しない。
-  - tab activate / close、Reload、relative link、root変更、split on / offでpane-local tab collectionとactive tabが一貫して復旧する。
-  - Markdown / HTML / Mermaid / PlantUMLの非同期結果とloading / error表示がpane間で混線しない。
-  - 移動元は隣接tabまたは未選択へ復旧し、移動先では対象tabが選択される。
-  - keyboardだけでも移動操作へ到達でき、focusとaccessible name / stateが維持される。
+  - Error / Renderingのvisible textが無くても、通常・active・error・renderingを上端indicatorとaccessible stateで識別できる。
+  - Error indicatorはtab上端に赤で表示され、Rendering indicatorはError / activeと混同しない。animationを使う場合は`prefers-reduced-motion`へ対応する。
+  - TabStripがcompactな固定高を維持し、左右pane、empty、overflow、状態遷移でpreview上端に段差や高さ変動が生じない。
+  - horizontal scrollbarはhover / focus時だけ視認可能で、表示切替によるlayout shiftがない。
+  - overflow中に右端を含む任意tabをactivate / focusすると、title、move、close controlを含むtab item全体が自動的に表示範囲へ入る。
+  - pointer dragでprimary / secondary間を移動でき、source fallback、destination selection、focus、runtime guardが矢印moveと一致する。cancel時はstateを変更しない。
+  - keyboardだけでも既存move buttonから同じ移動を実行でき、drag state / drop targetが支援技術を妨げない。
+  - Light / Dark、single / split、narrow window、horizontal overflow、HTML / Mermaid / PlantUML表示で回帰がない。
   - `npm test`、`npm run build`、`cargo check`が成功する。
-- success_metrics:
-  - frontend policy testでpane別の追加・activate・close、同一documentの両group参照、pane間移動、split off / on、root reset、stale async result拒否を検証できる。
-  - 手動確認でExplorer / relative linkからactive paneへtabが追加され、左右のTabStripが独立して増減・選択されることを確認できる。
-  - 手動確認でpointerとkeyboardの双方からtabを反対paneへ移動でき、移動元fallback、移動先選択、focus、StatusBar / ErrorBannerのroutingが一致する。
-  - 手動確認で同じMarkdown / HTML documentを両paneに開き、Mermaid / PlantUML / HTML ready・timeoutを含む表示状態が混線しない。
-  - `npm test -- --run`、`npm run build`、`cargo check`が成功し、既存single / split viewとHTML security boundaryの回帰がない。
 
 ## TODO-2026-025 Tauri上下・左右split方向対応
 

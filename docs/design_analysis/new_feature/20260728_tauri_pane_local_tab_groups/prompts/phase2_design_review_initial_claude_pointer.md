@@ -1,0 +1,1 @@
+docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/prompts/phase2_design_review_initial_claude.md を読んで、レビューを開始してください。

@@ -57,3 +57,12 @@
 - tab / tabpanel / paneのIDはpane prefixを含める。単一表示でもprimary prefixを使い、single専用IDとの互換経路を残さない。
 - HTMLの`ready`はpaneごとのiframe sourceと照合する。片paneのready / timeoutをglobal tab stateへ書くと、同じHTML tabを表示する他paneへ状態が混線する。
 - iframe上を通過するseparator dragはpointer captureで継続する。cursor表示はiframe documentへ継承されないため、実機で操作上の違和感も確認する。
+
+## 11. pane-local tab group
+
+- local closeでglobal tabを先に削除すると、同じdocumentを参照する反対paneの表示まで壊れる。reducer適用後の両group参照集合を調べ、最後の参照だけをglobal dataから破棄する。
+- global tabsとgroupを同時に更新する時は、すべての中間状態で`group ⊆ global tabs`が成立する順序を選ぶ。openはglobal data追加を先行し、close / root resetはgroup縮小を先行する。
+- group IDをglobal tabsからsilent filterするとactive / pending invariantの破損を隠す。App integration boundaryのgeneric resolverでmissing IDをthrowする。
+- split off / onでsecondary groupをprimaryへ暗黙mergeしたり隣接tabを自動追加したりしない。両groupの所属・順序・選択をsession内で保持し、visible paneだけを切り替える。
+- close / move / open / Reload / root reset / split toggle handlerでpane runtime statusを個別clearしない。generic stale effectとpane / tab / revision guardへ一本化する。
+- move後はdestination tabへfocusする。React commit後も要素が無い場合だけdestination paneへ戻してintegration errorを記録し、消滅したsource要素へ戻さない。

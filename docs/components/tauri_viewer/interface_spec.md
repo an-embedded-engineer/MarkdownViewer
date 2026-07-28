@@ -5,10 +5,11 @@
 - Open Folder: MenuBar の File dropdown からフォルダ選択ダイアログを開く。
 - Recent Folders: MenuBar の File dropdown から最近開いた root folder を開く。
 - Remove Recent Folder: Recent Folders entry の delete button から該当 entry を削除する。
-- Explorer item click: 未openのMarkdown / HTMLは新規tabを開き、同一pathがopen済みならactive paneでactivateする。
+- Explorer item click: 未openのMarkdown / HTMLはglobal document dataを作成し、active pane group末尾へtabを追加・選択する。同一pathがopen済みならdataを再利用し、active pane groupへdedupe追加・選択する。
 - Explorer resize: ExplorerとPreview間のseparatorをpointerでdragする。separatorへfocus後、ArrowLeft / ArrowRightは16px単位、Home / Endは現在の最小 / dynamic最大幅へ移動する。
 - Tab activate: TabStripから表示するdocumentを切り替える。ArrowLeft / ArrowRight / Home / Endでもfocusとselectionを移動できる。
-- Tab close: global tabを両paneのTabStripから削除する。閉じたtabを選択していたpaneだけ右隣、なければ左隣へ移り、最後のtab close後は両paneが未選択表示になる。
+- Tab close: 操作元pane groupだけからtabを削除する。active tabならsource local順の右隣、なければ左隣、なければ未選択へ移る。反対groupに同じIDが残る場合はglobal document dataと表示を維持し、どのgroupからも参照されなくなった時だけdataを破棄する。
+- Tab move: split時だけactive tabの`→` / `←` buttonで反対paneへ移動する。source removal / fallbackとdestination add / selectをatomicに行い、destinationに同じIDがある場合は既存位置を維持してsourceだけから外す。完了後はdestination tabへfocusする。
 - Reload: MenuBar の File dropdown から root treeとactive paneのselected tabだけを再読み込みする。同じtabを両paneで表示している場合は共有revision更新により両方を再描画する。
 - Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
 - Split View: MenuBarの`View > Split View`でsingle / 左右2 paneを切り替える。pane内をpointer操作またはfocusするとそのpaneがactiveになる。
@@ -51,18 +52,22 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 
 ## TabStrip 表示
 
-- 同一root内でopenしたMarkdown / HTMLをopen順に表示する。同一pathのtabは重複作成しない。
+- 各TabStripは自paneのgroupに属するMarkdown / HTMLだけを表示する。global document dataはroot内でpath一意とし、同一pathのdocumentを重複作成しない。
 - active / Loading / Rendering / Errorを表示し、長いfile nameはellipsis、absolute pathは`title`で確認できる。
 - 多数tabは横scrollで到達可能にする。`role="tablist"` / `role="tab"` とroving tabindexを使う。
-- activate buttonとactive tabのclose buttonだけをTabキーのfocus順に含める。非active tabをcloseする場合は、先に矢印キーでactivateしてからclose buttonへ移動する。
-- single / splitの各paneに同じglobal tab collectionを表示する。選択とLoading / Rendering / Error表示はpaneごとで、同じtabを両paneへ選択してもtabを複製しない。
+- 各TabStripは自paneの`orderedTabIds`に属するtabだけをlocal挿入順で表示する。ArrowLeft / ArrowRight / Home / Endもlocal順へ適用する。
+- single時はactivate / closeの2領域、split時はactivate / move / closeの3領域を持つ。activate buttonとactive tabのmove / close buttonだけをTabキーのfocus順に含める。非active tabを操作する場合は、先に矢印キーでactivateする。
+- move buttonはprimaryで`→`、secondaryで`←`を表示し、accessible nameへdocument名とdestination paneを含める。close buttonもdocument名とsource paneを含める。
+- 同じtab IDを両groupで参照できるが、document dataだけを共有し、選択とLoading / Rendering / Error表示、Markdown DOM、HTML iframeはpaneごとに分離する。
+- TabStripはname 1行、Loading / Rendering / Errorのstate 2行目、empty、水平scrollbar有無にかかわらず58px固定高とし、split時の左右preview上端を一致させる。
 - DOM IDは`tab-${paneId}-${tabId}`、`document-preview-${paneId}`、`document-pane-${paneId}`とし、single時もprimary prefixを使う。
 - tab永続化、reorder、pinは対象外。
 
 ## Split View 表示
 
-- 初期modeはsingle、requested ratioは0.5。split on時はprimaryを維持し、右隣、なければ左隣の別tabをsecondaryへ選ぶ。別tabがなければsecondaryは未選択とする。
-- split off時はselected tabを持つactive paneをprimaryへ引き継ぐ。active secondaryが未選択なら既存primaryを維持し、両pane未選択でtabが残る場合だけ先頭tabへ復旧する。
+- 初期modeはsingle、requested ratioは0.5、両groupはempty。split on時は両groupの所属・順序・選択を変更せずprimaryをactiveにするため、初回secondaryはemptyである。
+- split off時はprimary / secondary groupをmerge、copy、clearせず、両groupの順序とactive tabを保持したままsingle / active primaryへ戻す。secondary pending navigationだけをclearし、split再有効化時は保持したsecondary groupを復元する。
+- primary groupがempty、secondary groupだけがnonemptyのsingle viewでは、hidden document件数と`Enable Split View`の回復案内をprimary previewへ表示する。
 - separator幅は6px、preferred pane minimumは240px。狭幅では`min(240, floor((workspaceWidth - 6) / 2))`まで等幅方向へ縮める。自動clampはrequested ratioへ書き戻さず、再拡大時に直前の指定比率へ戻す。
 - `role="separator"`は計測完了後に描画し、`aria-controls="document-pane-primary document-pane-secondary"`とclamp済みpxのmin / max / nowを持つ。
 - split mode、選択、比率はsession-onlyで、再起動後はsingle / 0.5へ戻る。上下分割、3 pane以上、layout persistenceは対象外。

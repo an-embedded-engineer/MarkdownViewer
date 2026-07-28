@@ -1,5 +1,37 @@
 # TODO Archive 2026
 
+## TODO-2026-023 Tauri pane-local tab group / pane 間移動
+
+- Status: `done`
+- Category: `new-feature`
+- Created: `2026-07-28`
+- Completed: `2026-07-29`
+- Branch: `new-feature/tauri-pane-local-tab-groups`
+- Depends on: `TODO-2026-006`
+- Integrated TODO: `TODO-2026-024`
+- Source design: `docs/design_analysis/new_feature/20260726_tauri_split_view/`
+- Design analysis: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/`
+- Change report: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/change_report.md`
+- Verification: `docs/design_analysis/new_feature/20260728_tauri_pane_local_tab_groups/verification/phase4a_user_verification.md`
+- Summary:
+  - global `OpenDocumentTab[]`をdocument dataの正本として維持し、primary / secondaryへordered tab IDsとactive tabを持つpane-local groupを追加した。
+  - Explorer / relative linkからactive paneへtabを追加し、paneごとのactivate / close / fallback、split off / on保持、root resetをtyped transitionで一貫させた。
+  - 同じdocument dataを両paneから参照しながらpreview runtimeをpane / tab / revisionで分離し、明示操作によるatomicなpane間moveとfocus復旧を実装した。
+  - Phase 4-aの指摘を受けてTabStripを固定高にし、状態表示やscrollbar有無による左右paneの段差と過度な縮小を解消した。
+  - Rust command、custom protocol、capability、CSP、trusted HTML security boundaryは変更していない。
+- Verification:
+  - ユーザーがpane-local tab追加・選択・close・pane間moveを確認し、固定高修正後に高さが一定で過度な縮小も再発しないことを2026-07-29に確認した。
+  - `npm test -- --run`: 5 files / 77 tests、0 failures。`npm run build`: 成功（既知のchunk size warningのみ）。
+  - `cargo fmt -- --check` / `cargo check`: 成功。`cargo test`: 22 tests、0 failures。
+  - design reviewは13件、implementation reviewは初回3件と追加feedback 1件をすべて解決し、最終未解決0件でApprovedとなった。
+  - `diff.zip`はbase `a97c530`からPhase 4-a確定commit `c807c1a`までのbinary full-index patchを収録し、`unzip -t`で整合確認した。
+- Follow-up:
+  - `TODO-2026-025`: Tauri上下・左右split方向。
+  - `TODO-2026-026`: TabStrip上端indicator、compact固定高、scroll UX、pane間drag and drop移動。
+  - Avalonia版のpane / multi-tab水平展開は`TODO-2026-011` / `TODO-2026-012`で扱う。
+- Completion:
+  - Phase 4-b成果物を作成済み。Phase 4-cの`main` mergeはユーザー承認待ち。
+
 ## TODO-2026-007 Tauri 先行 UX 評価と Avalonia 反映仕様化
 
 - Status: `done`

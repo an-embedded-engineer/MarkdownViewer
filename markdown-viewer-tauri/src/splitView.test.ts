@@ -2,164 +2,398 @@ import { describe, expect, it } from "vitest";
 import {
   createInitialSplitViewState,
   getPrimaryPaneWidth,
+  getReferencedTabIds,
   getRequestedRatioForPrimaryWidth,
   getSplitPaneWidthBounds,
   getSplitRatioForKey,
   initialSplitRatio,
   reduceSplitView,
+  resolveGroupTabs,
   splitSeparatorWidth,
+  type PaneId,
+  type PaneState,
+  type SplitViewState,
 } from "./splitView";
 
-describe("split view state policy", () => {
-  it("creates a single primary view", () => {
-    expect(createInitialSplitViewState("a")).toEqual({
+type PaneFixture = {
+  orderedTabIds?: string[];
+  activeTabId?: string | null;
+  pendingNavigation?: PaneState["pendingNavigation"];
+};
+
+function stateWithPaneTabs({
+  primary = {},
+  secondary = {},
+  activePaneId = "primary",
+  mode = "split",
+  requestedSplitRatio = initialSplitRatio,
+}: {
+  primary?: PaneFixture;
+  secondary?: PaneFixture;
+  activePaneId?: PaneId;
+  mode?: SplitViewState["mode"];
+  requestedSplitRatio?: number;
+} = {}): SplitViewState {
+  const pane = (fixture: PaneFixture): PaneState => {
+    const orderedTabIds = fixture.orderedTabIds ?? [];
+    return {
+      orderedTabIds,
+      activeTabId: fixture.activeTabId ?? orderedTabIds[0] ?? null,
+      pendingNavigation: fixture.pendingNavigation ?? null,
+    };
+  };
+  return {
+    mode,
+    activePaneId,
+    primary: pane(primary),
+    secondary: pane(secondary),
+    requestedSplitRatio,
+  };
+}
+
+describe("pane-local tab group policy", () => {
+  it("creates an empty single primary view", () => {
+    expect(createInitialSplitViewState()).toEqual({
       mode: "single",
       activePaneId: "primary",
-      primary: { activeTabId: "a", pendingNavigation: null },
-      secondary: { activeTabId: null, pendingNavigation: null },
+      primary: { orderedTabIds: [], activeTabId: null, pendingNavigation: null },
+      secondary: { orderedTabIds: [], activeTabId: null, pendingNavigation: null },
       requestedSplitRatio: 0.5,
     });
   });
 
-  it("selects the right adjacent tab when enabling split", () => {
-    const state = reduceSplitView(createInitialSplitViewState("b"), {
-      type: "enable-split",
-      orderedTabIds: ["a", "b", "c"],
-    });
-    expect(state.mode).toBe("split");
-    expect(state.activePaneId).toBe("primary");
-    expect(state.secondary.activeTabId).toBe("c");
-  });
-
-  it("uses the left tab only when there is no right tab", () => {
-    const state = reduceSplitView(createInitialSplitViewState("b"), {
-      type: "enable-split",
-      orderedTabIds: ["a", "b"],
-    });
-    expect(state.secondary.activeTabId).toBe("a");
-  });
-
-  it("leaves secondary empty for one tab or an empty primary", () => {
-    expect(
-      reduceSplitView(createInitialSplitViewState("a"), {
-        type: "enable-split",
-        orderedTabIds: ["a"],
-      }).secondary.activeTabId,
-    ).toBeNull();
-    expect(
-      reduceSplitView(createInitialSplitViewState(), {
-        type: "enable-split",
-        orderedTabIds: ["a", "b"],
-      }).secondary.activeTabId,
-    ).toBeNull();
-  });
-
-  it("keeps pane-local selections and navigation", () => {
-    const split = reduceSplitView(createInitialSplitViewState("a"), {
-      type: "enable-split",
-      orderedTabIds: ["a", "b"],
-    });
-    const selected = reduceSplitView(split, {
-      type: "select-tab",
-      paneId: "secondary",
+  it("opens primary tabs in local insertion order and deduplicates membership", () => {
+    const opened = reduceSplitView(createInitialSplitViewState(), {
+      type: "open-tab",
+      paneId: "primary",
       tabId: "a",
+    });
+    const second = reduceSplitView(opened, {
+      type: "open-tab",
+      paneId: "primary",
+      tabId: "b",
       anchor: "details",
     });
-    expect(selected.primary.activeTabId).toBe("a");
-    expect(selected.secondary).toEqual({
-      activeTabId: "a",
-      pendingNavigation: { tabId: "a", anchor: "details" },
+    const reopened = reduceSplitView(second, {
+      type: "open-tab",
+      paneId: "primary",
+      tabId: "a",
     });
-    expect(selected.activePaneId).toBe("secondary");
+    expect(reopened.primary).toEqual({
+      orderedTabIds: ["a", "b"],
+      activeTabId: "a",
+      pendingNavigation: null,
+    });
+  });
+
+  it("allows the same document in both pane groups", () => {
+    const split = reduceSplitView(
+      stateWithPaneTabs({ mode: "single", primary: { orderedTabIds: ["a"] } }),
+      { type: "enable-split" },
+    );
+    const shared = reduceSplitView(split, {
+      type: "open-tab",
+      paneId: "secondary",
+      tabId: "a",
+      anchor: "shared",
+    });
+    expect(shared.primary.orderedTabIds).toEqual(["a"]);
+    expect(shared.secondary).toEqual({
+      orderedTabIds: ["a"],
+      activeTabId: "a",
+      pendingNavigation: { tabId: "a", anchor: "shared" },
+    });
+    expect(shared.activePaneId).toBe("secondary");
+  });
+
+  it("selects only members and clears pending navigation", () => {
+    const state = stateWithPaneTabs({
+      primary: {
+        orderedTabIds: ["a", "b"],
+        activeTabId: "a",
+        pendingNavigation: { tabId: "a", anchor: "old" },
+      },
+    });
+    const selected = reduceSplitView(state, {
+      type: "select-tab",
+      paneId: "primary",
+      tabId: "b",
+    });
+    expect(selected.primary.activeTabId).toBe("b");
+    expect(selected.primary.pendingNavigation).toBeNull();
+    expect(() =>
+      reduceSplitView(state, { type: "select-tab", paneId: "primary", tabId: "missing" }),
+    ).toThrow("not a member");
+  });
+
+  it("closes an active tab with right, left, then empty fallback", () => {
+    const right = reduceSplitView(
+      stateWithPaneTabs({
+        primary: { orderedTabIds: ["a", "b", "c"], activeTabId: "b" },
+      }),
+      { type: "close-pane-tab", paneId: "primary", tabId: "b" },
+    );
+    expect(right.primary).toEqual({
+      orderedTabIds: ["a", "c"],
+      activeTabId: "c",
+      pendingNavigation: null,
+    });
+
+    const left = reduceSplitView(right, {
+      type: "close-pane-tab",
+      paneId: "primary",
+      tabId: "c",
+    });
+    expect(left.primary.activeTabId).toBe("a");
+    const empty = reduceSplitView(left, {
+      type: "close-pane-tab",
+      paneId: "primary",
+      tabId: "a",
+    });
+    expect(empty.primary).toEqual({
+      orderedTabIds: [],
+      activeTabId: null,
+      pendingNavigation: null,
+    });
+  });
+
+  it("keeps source selection, pending navigation, and the other group on non-active close", () => {
+    const state = stateWithPaneTabs({
+      primary: {
+        orderedTabIds: ["a", "b"],
+        activeTabId: "a",
+        pendingNavigation: { tabId: "a", anchor: "keep" },
+      },
+      secondary: { orderedTabIds: ["b"] },
+    });
+    const closed = reduceSplitView(state, {
+      type: "close-pane-tab",
+      paneId: "primary",
+      tabId: "b",
+    });
+    expect(closed.primary).toEqual({
+      orderedTabIds: ["a"],
+      activeTabId: "a",
+      pendingNavigation: { tabId: "a", anchor: "keep" },
+    });
+    expect(closed.secondary).toBe(state.secondary);
+    expect(getReferencedTabIds(closed)).toEqual(new Set(["a", "b"]));
+  });
+
+  it("moves an active tab atomically and selects the destination", () => {
+    const moved = reduceSplitView(
+      stateWithPaneTabs({
+        primary: { orderedTabIds: ["a", "b"], activeTabId: "a" },
+        secondary: { orderedTabIds: ["c"] },
+      }),
+      {
+        type: "move-tab",
+        sourcePaneId: "primary",
+        destinationPaneId: "secondary",
+        tabId: "a",
+      },
+    );
+    expect(moved.primary).toEqual({
+      orderedTabIds: ["b"],
+      activeTabId: "b",
+      pendingNavigation: null,
+    });
+    expect(moved.secondary).toEqual({
+      orderedTabIds: ["c", "a"],
+      activeTabId: "a",
+      pendingNavigation: null,
+    });
+    expect(moved.activePaneId).toBe("secondary");
+  });
+
+  it("keeps a non-active source selection and deduplicates an existing destination", () => {
+    const state = stateWithPaneTabs({
+      primary: {
+        orderedTabIds: ["a", "b"],
+        activeTabId: "a",
+        pendingNavigation: { tabId: "a", anchor: "keep" },
+      },
+      secondary: {
+        orderedTabIds: ["b", "c"],
+        activeTabId: "b",
+        pendingNavigation: { tabId: "b", anchor: "destination" },
+      },
+    });
+    const moved = reduceSplitView(state, {
+      type: "move-tab",
+      sourcePaneId: "primary",
+      destinationPaneId: "secondary",
+      tabId: "b",
+    });
+    expect(moved.primary).toEqual({
+      orderedTabIds: ["a"],
+      activeTabId: "a",
+      pendingNavigation: { tabId: "a", anchor: "keep" },
+    });
+    expect(moved.secondary).toEqual(state.secondary);
+  });
+
+  it("moves the last source tab and clears changed destination pending navigation", () => {
+    const moved = reduceSplitView(
+      stateWithPaneTabs({
+        primary: { orderedTabIds: ["a"] },
+        secondary: {
+          orderedTabIds: ["b"],
+          pendingNavigation: { tabId: "b", anchor: "old" },
+        },
+      }),
+      {
+        type: "move-tab",
+        sourcePaneId: "primary",
+        destinationPaneId: "secondary",
+        tabId: "a",
+      },
+    );
+    expect(moved.primary.activeTabId).toBeNull();
+    expect(moved.primary.orderedTabIds).toEqual([]);
+    expect(moved.secondary.activeTabId).toBe("a");
+    expect(moved.secondary.pendingNavigation).toBeNull();
+  });
+
+  it("rejects invalid move and unavailable secondary actions", () => {
+    const single = stateWithPaneTabs({
+      mode: "single",
+      primary: { orderedTabIds: ["a"] },
+      secondary: { orderedTabIds: ["b"] },
+    });
+    expect(() =>
+      reduceSplitView(single, {
+        type: "move-tab",
+        sourcePaneId: "primary",
+        destinationPaneId: "secondary",
+        tabId: "a",
+      }),
+    ).toThrow("split view");
+    for (const action of [
+      { type: "open-tab", paneId: "secondary", tabId: "b" },
+      { type: "select-tab", paneId: "secondary", tabId: "b" },
+      { type: "close-pane-tab", paneId: "secondary", tabId: "b" },
+      { type: "activate-pane", paneId: "secondary" },
+    ] as const) {
+      expect(() => reduceSplitView(single, action)).toThrow("unavailable");
+    }
+
+    const split = stateWithPaneTabs({ primary: { orderedTabIds: ["a"] } });
+    expect(() =>
+      reduceSplitView(split, {
+        type: "move-tab",
+        sourcePaneId: "primary",
+        destinationPaneId: "primary",
+        tabId: "a",
+      }),
+    ).toThrow("different");
+    expect(() =>
+      reduceSplitView(split, {
+        type: "move-tab",
+        sourcePaneId: "primary",
+        destinationPaneId: "secondary",
+        tabId: "missing",
+      }),
+    ).toThrow("not a member");
+  });
+
+  it("preserves both groups across split off and on while clearing hidden pending navigation", () => {
+    const split = stateWithPaneTabs({
+      activePaneId: "secondary",
+      primary: { orderedTabIds: ["a"] },
+      secondary: {
+        orderedTabIds: ["b", "c"],
+        activeTabId: "c",
+        pendingNavigation: { tabId: "c", anchor: "hidden" },
+      },
+    });
+    const single = reduceSplitView(split, { type: "disable-split" });
+    expect(single.mode).toBe("single");
+    expect(single.activePaneId).toBe("primary");
+    expect(single.primary).toBe(split.primary);
+    expect(single.secondary.orderedTabIds).toEqual(["b", "c"]);
+    expect(single.secondary.activeTabId).toBe("c");
+    expect(single.secondary.pendingNavigation).toBeNull();
+
+    const enabled = reduceSplitView(single, { type: "enable-split" });
+    expect(enabled.secondary.orderedTabIds).toEqual(["b", "c"]);
+    expect(enabled.secondary.activeTabId).toBe("c");
+    expect(enabled.activePaneId).toBe("primary");
+  });
+
+  it("keeps mode and ratio while resetting root groups", () => {
+    const state = stateWithPaneTabs({
+      requestedSplitRatio: 0.7,
+      activePaneId: "secondary",
+      primary: { orderedTabIds: ["a"] },
+      secondary: { orderedTabIds: ["b"] },
+    });
+    const reset = reduceSplitView(state, { type: "reset-root" });
+    expect(reset.mode).toBe("split");
+    expect(reset.requestedSplitRatio).toBe(0.7);
+    expect(reset.activePaneId).toBe("primary");
+    expect(reset.primary.orderedTabIds).toEqual([]);
+    expect(reset.secondary.orderedTabIds).toEqual([]);
+  });
+
+  it("consumes only matching navigation identity", () => {
+    const state = stateWithPaneTabs({
+      primary: {
+        orderedTabIds: ["a"],
+        pendingNavigation: { tabId: "a", anchor: "details" },
+      },
+    });
     expect(
-      reduceSplitView(selected, {
+      reduceSplitView(state, {
+        type: "consume-navigation",
+        paneId: "primary",
+        tabId: "a",
+        anchor: "other",
+      }),
+    ).toBe(state);
+    expect(
+      reduceSplitView(state, {
         type: "consume-navigation",
         paneId: "primary",
         tabId: "a",
         anchor: "details",
-      }),
-    ).toBe(selected);
+      }).primary.pendingNavigation,
+    ).toBeNull();
   });
 
-  it("inherits a selected active secondary pane when disabling split", () => {
-    let state = reduceSplitView(createInitialSplitViewState("a"), {
-      type: "enable-split",
-      orderedTabIds: ["a", "b"],
-    });
-    state = reduceSplitView(state, {
-      type: "select-tab",
-      paneId: "secondary",
-      tabId: "b",
-      anchor: "target",
-    });
-    const single = reduceSplitView(state, {
-      type: "disable-split",
-      orderedTabIds: ["a", "b"],
-    });
-    expect(single.primary).toEqual({
-      activeTabId: "b",
-      pendingNavigation: { tabId: "b", anchor: "target" },
-    });
-    expect(single.secondary.activeTabId).toBeNull();
-    expect(single.activePaneId).toBe("primary");
+  it("rejects invalid group invariants", () => {
+    const valid = stateWithPaneTabs({ primary: { orderedTabIds: ["a"] } });
+    const invalidStates: SplitViewState[] = [
+      { ...valid, primary: { ...valid.primary, orderedTabIds: ["a", "a"] } },
+      { ...valid, primary: { ...valid.primary, activeTabId: "missing" } },
+      { ...valid, primary: { ...valid.primary, activeTabId: null } },
+      {
+        ...valid,
+        primary: {
+          ...valid.primary,
+          pendingNavigation: { tabId: "missing", anchor: "bad" },
+        },
+      },
+      { ...valid, mode: "single", activePaneId: "secondary" },
+    ];
+    for (const state of invalidStates) {
+      expect(() => reduceSplitView(state, { type: "enable-split" })).toThrow();
+    }
   });
 
-  it("does not erase primary when an empty secondary is active", () => {
-    let state = reduceSplitView(createInitialSplitViewState("a"), {
-      type: "enable-split",
-      orderedTabIds: ["a"],
-    });
-    state = reduceSplitView(state, { type: "activate-pane", paneId: "secondary" });
+  it("resolves pane-local order, rejects missing IDs, and derives references", () => {
+    const tabs = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(resolveGroupTabs(["c", "a"], tabs)).toEqual([{ id: "c" }, { id: "a" }]);
+    expect(() => resolveGroupTabs(["missing"], tabs)).toThrow("missing tab");
+    expect(() => resolveGroupTabs(["a", "a"], tabs)).toThrow("Duplicate IDs");
     expect(
-      reduceSplitView(state, { type: "disable-split", orderedTabIds: ["a"] }).primary
-        .activeTabId,
-    ).toBe("a");
-  });
-
-  it("falls back to the first tab only when both panes are empty", () => {
-    let state = reduceSplitView(createInitialSplitViewState(), {
-      type: "enable-split",
-      orderedTabIds: ["b", "c"],
-    });
-    state = reduceSplitView(state, { type: "activate-pane", paneId: "secondary" });
-    expect(
-      reduceSplitView(state, { type: "disable-split", orderedTabIds: ["b", "c"] })
-        .primary.activeTabId,
-    ).toBe("b");
-  });
-
-  it("updates every pane that references a closed tab", () => {
-    let state = reduceSplitView(createInitialSplitViewState("a"), {
-      type: "enable-split",
-      orderedTabIds: ["a", "b"],
-    });
-    state = reduceSplitView(state, {
-      type: "select-tab",
-      paneId: "secondary",
-      tabId: "a",
-    });
-    const closed = reduceSplitView(state, {
-      type: "remove-tab",
-      tabId: "a",
-      fallbackTabId: "b",
-    });
-    expect(closed.primary.activeTabId).toBe("b");
-    expect(closed.secondary.activeTabId).toBe("b");
-  });
-
-  it("keeps mode and ratio while resetting root selection", () => {
-    const state = {
-      ...reduceSplitView(createInitialSplitViewState("a"), {
-        type: "enable-split" as const,
-        orderedTabIds: ["a", "b"],
-      }),
-      requestedSplitRatio: 0.7,
-    };
-    const reset = reduceSplitView(state, { type: "reset-root" });
-    expect(reset.mode).toBe("split");
-    expect(reset.requestedSplitRatio).toBe(0.7);
-    expect(reset.primary.activeTabId).toBeNull();
-    expect(reset.secondary.activeTabId).toBeNull();
+      getReferencedTabIds(
+        stateWithPaneTabs({
+          primary: { orderedTabIds: ["a", "b"] },
+          secondary: { orderedTabIds: ["b", "c"] },
+        }),
+      ),
+    ).toEqual(new Set(["a", "b", "c"]));
   });
 
   it("rejects invalid ratios", () => {

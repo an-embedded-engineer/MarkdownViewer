@@ -69,6 +69,7 @@ Avaloniaへの反映区分は次のとおりとする。
 - document data collectionはglobal、表示選択とpreview runtimeはpane-localとする。同じdocumentを両paneへ選択してもdataを複製しない。
 - split on時はprimaryを維持し、可能なら隣接する別tabをsecondaryへ選ぶ。候補がなければsecondaryの未選択を正当なstateとする。
 - split off時は選択済みactive paneをprimaryへ引き継ぐ。active paneが未選択なら既存primaryを維持し、両pane未選択かつtabが残る時だけ先頭tabへfallbackする。
+- 上記split on / off規則はTODO-2026-006のbaselineである。TauriではTODO-2026-023で両groupの所属・順序・選択を保持するpane-local tab group仕様へ置換済みであり、TODO-2026-011 / TODO-2026-012でAvaloniaへ採用するsemanticsを確定する。
 - Explorer、Reload、relative link、StatusBar、ErrorBannerはactive paneを対象にし、HTML bridgeやimage viewer等の発生元がある操作はoriginating paneを保持する。
 - separatorはpointer / keyboardで操作し、requested ratioとclamp後の実幅を分離する。狭い領域では両paneを等しく縮退させ、再拡大時にrequested ratioを復元する。
 - pane間でMarkdown / HTML / Mermaid / PlantUMLのloading、error、ready、timeout、生成DOM ID、focusが混線しない。
