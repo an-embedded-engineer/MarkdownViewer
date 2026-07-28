@@ -9,7 +9,11 @@
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-023（統合済み TODO-2026-024 を含む）
 **初回レビュー対象コミット**: `13c87a3` (Phase 3 implement Tauri pane-local tab groups)
 **Round 1 fix コミット**: `83e0ce8` (Phase 3 address pane-local tab groups implementation review)
-**判定**: **承認 (Approved)**。Phase 4（ユーザ検証・完了処理）へ進行可。**blocking 指摘 0 件**。初回検出の **Medium 1 件 / Low 2 件 = 全 3 件は Round 1 fix (`83e0ce8`) ですべて解決済み**と再確認した。**未解決指摘 0 件。** 再確認で新規指摘は検出しなかった。
+**Round 2 (Phase 4-a feedback) fix コミット**: `cea681a` (Phase 3 stabilize pane-local tab strip height)
+**判定**: **承認 (Approved)**。Phase 4-a 再実施へ進行可。**未解決指摘 0 件。**
+
+- Round 1: 初回検出の Medium 1 件 / Low 2 件は `83e0ce8` ですべて解決済み。
+- Round 2: Phase 4-a ユーザ動作確認で NG となった TabStrip 高さの内容依存変動と split preview 上端の段差（指摘 4.1、Medium / Phase 4-a blocking）は `cea681a` で解決済み。CSS 5 宣言のみの修正で App state・pane runtime・security 境界へ波及は無く、自動検証も全コマンド再現した。新規指摘は検出しなかった（残リスクと再確認観点は §12.5 / §12.6 に記録）。
 
 ---
 
@@ -324,3 +328,128 @@ Phase 2 で確定した契約が実装へ落ちているかを、設計レビュ
 - テストは旧仕様を緩めたものではなく、新 contract の境界値と失敗系を直接検証している。自動検証は全コマンドを再実行して実装記録との一致を確認した。
 - 初回検出の Medium 1 件 / Low 2 件は Round 1 fix (`83e0ce8`) ですべて解決済みで、**未解決指摘 0 件**である。再確認で新規指摘は検出しなかった。
 - Round 1 fix により、恒久 docs は設計 §15 の置換対象を全件反映し、`group ⊆ global tabs` の更新順規則は 3 経路すべてで batching 非依存となり、`common_pitfalls.md` と実装記録にも同期された。
+
+なお本節は Round 1 までの結論である。Phase 4-a のユーザ動作確認で TabStrip 高さの問題が検出され Phase 3 へ差し戻されたため、その再開レビューを §12 に記録する。**Round 2 を含めた最終判定は §12.7 を正とする。**
+
+---
+
+## 12. Phase 4-a feedback / Round 2: TabStrip 高さの安定化
+
+**対象コミット**: `cea681a` (Phase 3 stabilize pane-local tab strip height)
+**差分規模**: `markdown-viewer-tauri/src/App.css` の 5 宣言（変数 1、`grid-template-rows` 1、`height` 1、`line-height` 2）と恒久 docs / 設計 / 実装記録 / meta の同期のみ。**TypeScript ソース、test、`src-tauri/` に差分は無い。**
+
+### 12.1 指摘 4.1 Phase 4-a NG: TabStrip 高さが内容依存で変動し、split の preview 上端に段差が生じる
+
+**severity**: Medium
+**blocking**: **blocking（Phase 4-a に対して）**。Phase 4-a を NG として Phase 3 へ差し戻す判断は妥当である
+**工程**: Phase 3（CSS 修正 + docs 同期）
+**status**: **解決済み**（2026-07-28 Round 2 再確認、commit `cea681a`）
+
+**報告内容**: tab 追加・pane 間 move を繰り返した後に TabStrip が低く見える場合がある。Error / Rendering 表示がある pane と無い pane で preview 上端に段差が生じる。
+
+**原因分析の妥当性**: 実装担当の原因分析（`.document-pane` 先頭 grid row が `auto` で、pane ごとに内容量から高さを独立計算していた）は**妥当である**。修正前の CSS と DOM を追って再現条件を検算した。
+
+- `.document-pane { grid-template-rows: auto minmax(0, 1fr) }` により、TabStrip 行の高さは各 pane の内容だけで決まっていた。`.document-pane` は 2 つ独立したサブツリーであり、行高を共有する仕組みは無い（`.preview-grid` は列だけを定義する grid で、subgrid も使っていない）。したがって左右の行高が一致するのは偶然、内容が同型のときだけである。
+- 高さを決める要因は 4 つあり、いずれも pane 間を移動しうる。
+  1. **state label の有無**: `.tab-activate` は `display: grid; gap: 1px` で、`.tab-name` の下に `Loading` / `Rendering` / `Error` の `.tab-state` が条件付きで増える（`App.tsx:2545-2546`）。1 行 tab と 2 行 tab で `.tab-item` の高さが約 13px 変わる。`resolvePaneTabPresentationState` は **pane ごとに** 表示 state を合成する（`paneRuntime.ts:72-100`）ため、同じ document でも片 pane だけが 2 行になりうる。これが「Error / Rendering がある pane と無い pane で段差」の直接原因である。
+  2. **empty group**: `.tab-strip` に `.tab-item` が 1 つも無いと flex 行が生まれず、高さは `border-bottom` の 1px だけになる。pane-local group 導入で「片 pane だけ empty」が正常状態になった（初回 split on、last tab の move / close、hidden secondary）ため、この条件が日常的に発生するようになった。
+  3. **horizontal scrollbar**: `.tab-strip { overflow-x: auto }` で、tab が溢れた pane にだけ scrollbar 分の高さが加算される。tab 数は move / close で pane 間を移動する。
+  4. **font metrics**: 修正前の `.tab-name` / `.tab-state` は `line-height` 未指定で `normal`（font 依存）だった。同一 pane 内でも font fallback の差で高さが揺れうる。
+- 「tab 追加・move を繰り返した後に低く見える」は要因 1 と 3 の組み合わせで説明できる。例えば唯一の Error tab を反対 pane へ move すると、source pane の全 tab が 1 行になり行高が約 13px 縮む。**報告された 2 症状は同一の根本原因から生じており、分析は現行 DOM / CSS と一致する。**
+
+**修正の妥当性**: `cea681a` の修正は原因に直接対応しており、必要十分である。
+
+- `.app-shell` へ `--tab-strip-height: 58px` を定義し（`App.css:58`）、`.document-pane` 先頭 row（`:804`）と `.tab-strip` 自身の `height`（`:860`）へ適用した。**行高が内容から独立し、要因 1〜3 がすべて高さへ影響しなくなる。** 変数は `.app-shell` に置かれ、`.document-pane` / `.tab-strip` はその子孫であるため確実に届く。dark theme block（`:root[data-theme="dark"] .app-shell`）は色だけを上書きするため、高さは theme 非依存である。
+- `.tab-name` に `line-height: 16px`、`.tab-state` に `line-height: 12px` を固定した（`:936`, `:942`）。要因 4 の font 依存が除去され、固定高の予算計算が font に左右されなくなる。
+- 高さ予算を検算した。`* { box-sizing: border-box }`（`App.css:19`）が効いているため `.tab-strip` の border box は 58px、`border-bottom: 1px` を引いた content box は **57px**。`.tab-strip` は `display: flex` で `align-items` 既定 `stretch`、`.tab-item` は `flex: 0 0 auto`（主軸のみ）で cross-size 指定が無いため、**flex 行の cross size まで伸びる**。`.tab-activate` は `padding: 7px 8px 6px 12px`（上下計 13px）、`display: grid; align-content: center; gap: 1px`。必要高は 1 行 tab が `13 + 16 = 29px`、2 行 tab が `13 + 16 + 1 + 12 = 42px`。**58px = 1px(border) + 42px(2 行 tab) + 15px(classic horizontal scrollbar 相当)** であり、実装記録および設計 §21 の説明（padding 13px + gap 1px + classic scrollbar 領域）と一致する。
+- content clipping と preview overlap を条件別に確認した。`.document-pane { overflow: hidden }` かつ 2 行目が `minmax(0, 1fr)` のため、TabStrip が row を超えて preview に被る経路は無い。`.tab-strip` 自身も border box 58px ちょうどで row と一致し、1px の食い違いも生じない。
+
+| 条件 | `.tab-item` に与えられる高さ | 2 行 tab の必要高 42px に対する余裕 |
+| --- | --- | --- |
+| overlay scrollbar（macOS WKWebView 既定） | 57px | +15px |
+| `scrollbar-width: thin` 有効（Chromium / WebView2、約 11px） | 約 46px | +4px |
+| classic scrollbar 15px（`scrollbar-width` 非対応環境） | 42px | ±0px |
+| 水平 scrollbar 非表示（tab が溢れていない） | 57px | +15px |
+| empty group | 57px（item 無し） | 該当なし |
+
+通常 1 行、state 2 行、empty、scrollbar 有無のいずれでも左右の row 高は 58px で一致し、**報告された 2 症状はどの組み合わせでも再発しない**。
+
+### 12.2 退行確認（Light/Dark、single/split、overflow、focus、ARIA）
+
+| 観点 | 確認結果 |
+| --- | --- |
+| Light / Dark | ✓ `--tab-strip-height` は `.app-shell` の共通宣言で、dark theme block は色のみ上書き。高さは theme に依存しない |
+| single / split | ✓ `.document-pane` は single / split とも同じ規則を通る。single 時も 58px 固定で、mode 切替による高さ変化が無い |
+| tab overflow | ✓ `.tab-strip { overflow-x: auto }`、`.tab-item { flex: 0 0 auto; width: min(220px, 32vw); min-width: 130px / split 160px }` はいずれも未変更。横 overflow と TODO-2026-021 の viewport 基準契約は維持 |
+| focus-visible | ✓ `.tab-activate / .tab-move / .tab-close:focus-visible { outline: 2px solid; outline-offset: -2px }` は未変更。item が高くなっても outline は button 全体を囲み、`overflow-y: hidden` による切れも生じない（outline は item 内に収まる） |
+| active inset | ✓ `.tab-item.active { box-shadow: inset 0 2px var(--accent) }` は item 上端に描画され、高さ変更の影響を受けない |
+| error inset | ✓ `.tab-item.tab-error { box-shadow: inset 0 -2px var(--error-text) }` は item 下端に描画される。§12.5 に既存の優先順位に関する観察を記録 |
+| viewport 幅 | ✓ 変更は高さのみ。`.app-shell { min-width: 680px }`、`.preview-grid` の列定義、split separator の幅 policy に影響しない |
+| keyboard / ARIA | ✓ `App.tsx` に差分が無く、DOM 構造・`role` / `aria-*`・roving tabindex・move / close の Tab 順はすべて不変。CSS のみの変更で支援技術への露出は変わらない |
+| App state / pane runtime / security | ✓ `App.tsx`、`splitView.ts`、`paneRuntime.ts`、`documentPolicy.ts`、`imageViewer.ts`、test、`src-tauri/`、Tauri config / capabilities のいずれにも差分が無い。**CSS-only 修正として必要十分であり、過剰な変更も無い** |
+
+### 12.3 自動検証の再現
+
+`cea681a` 時点で 6 コマンドを再実行し、すべて実装記録および prompt 記載と一致した。CSS-only 修正のため test 件数にも Rust 側にも変化は無い。
+
+| コマンド | 結果 |
+| --- | --- |
+| `npm test -- --run` | `Test Files 5 passed (5)` / `Tests 77 passed (77)` |
+| `npm run build` | `✓ built in 6.02s`。警告は既知の chunk size のみ |
+| `cargo fmt -- --check` | 差分出力なし |
+| `cargo check` | `Finished dev profile` |
+| `cargo test` | `test result: ok. 22 passed; 0 failed` |
+| `git diff --check` | 出力なし |
+
+### 12.4 ドキュメント同期の確認
+
+| 文書 | 記載 | 結果 |
+| --- | --- | --- |
+| 設計書 §11 | 「TabStrip行は通常1行、Loading / Rendering / Error時2行、empty、水平scrollbar表示のいずれでも58px固定とする。…name / stateは16px / 12pxのline-heightで固定高内へ収める」 | ✓ 実装と一致 |
+| 設計書 §14 | `App.css` 行へ「Phase 4-a feedbackで両pane共通の58px TabStrip行高とname / state line-heightを追加」 | ✓ 影響範囲が追跡可能 |
+| 設計書 §21（新設） | Phase 4-a NG の事実、原因、修正方針、drag and drop を非対象に据え置く判断 | ✓ 差し戻しの経緯が設計側に残る |
+| `interface_spec.md` | 「TabStripはname 1行、Loading / Rendering / Errorのstate 2行目、empty、水平scrollbar有無にかかわらず58px固定高とし、split時の左右preview上端を一致させる」 | ✓ 恒久 interface 契約として記録 |
+| `detail_design.md` | 「TabStrip rowはstate labelやhorizontal scrollbarの有無に左右されない58px固定高とし、split左右のpreview上端を揃える」 | ✓ 実装契約として記録 |
+| `development_workflow.md` | 「split左右で通常tab、Loading / Rendering / Error表示tab、empty group、水平scrollbar表示を組み合わせてもTabStripが58px固定高を維持し、preview上端に段差が出ないこと。tab追加・close・pane間moveの反復でも高さが変動しないこと」 | ✓ **Phase 4-a の再確認条件が合否基準として追加され、報告された 2 症状の両方を直接カバーする** |
+| 実装記録 §8（新設） | 原因、修正、維持事項、drag and drop の判断、再確認観点 | ✓ 旧 §8 既知制約は §9 へ繰り下げ。本文に旧番号への参照は無い |
+| `meta.md` | `status: in_progress` / `impl_status: draft`、Phase 3 を Reopened、Phase 4-a を NG（症状付き）と再検証待ちへ更新 | ✓ 差し戻し状態を正確に記録（本レビューでは変更していない） |
+
+**Phase 4-a NG と再確認条件は design / permanent docs / impl / manual verification / meta の 5 系統すべてに正確に記録されている。**
+
+### 12.5 残リスク（いずれも defect ではない）
+
+- **classic scrollbar 環境での余裕**: 58px の内訳は `1 + 42 + 15` であり、`scrollbar-width: thin` が効かず水平 scrollbar が 15px を占める環境では 2 行 tab の余裕が **±0px** になる。scrollbar が 16px 以上の環境では 2 行 tab の content が上下 1px 前後 clip されうる（`align-content: center` のため上下均等）。macOS は overlay scrollbar、Windows WebView2 は `scrollbar-width: thin`（約 11px）で余裕があるため実害は想定しにくいが、Linux WebKitGTK の scrollbar 設定次第では境界に触れる。将来 state label の行数や font size を変える場合は、この 15px 予算を併せて見直す必要がある。
+- **overlay scrollbar 環境での高さ増**: 修正前の TabStrip は 1 行のみで約 30px、state 表示時で約 43px だった。修正後は常に 58px となるため、macOS では従来の最大より約 15px 高くなる。安定性と引き換えの意図した trade-off だが、利用者が視覚的に許容できるかは Phase 4-a で確認する価値がある。
+- **empty group でも 58px を占有する**: 文書未選択の single view でも 58px の空 TabStrip が表示される（修正前は border の 1px のみ）。片 pane が empty のときに左右を揃えるという目的上は必要な挙動であり、`.tab-strip:empty` で折り畳むと段差が再発するため現行方式が正しい。ただし起動直後・root 未選択時の見え方は変化する。
+- **`.tab-item.tab-error` と `.tab-item.active` の box-shadow 優先順位（既存）**: 両者は同じ詳細度（`0,2,0`）で、`.tab-error`（`App.css:891`）が `.active`（`:885`）より後にあるため、active かつ error の tab では上端の accent inset が下端の error inset に置き換わる。TODO-2026-006 から存在する挙動で本修正が導入したものではなく、active tab は背景色と文字色でも識別できる。気になる場合は 1 つの `box-shadow` へ合成する follow-up が考えられる。
+
+### 12.6 Phase 4-a 再確認観点
+
+`docs/rules/development_workflow.md:177` に追加された項目が正本である。実施時は次を明示的に踏むと、報告された 2 症状の解消を確実に判定できる。
+
+1. split 表示で、片 pane に `Loading` / `Rendering` / `Error` 表示の tab、他 pane に通常 tab だけを置き、**両 preview の上端が揃う**こと。
+2. 片 pane を empty（last tab を move / close）にしても、残る pane と TabStrip の高さが変わらないこと。
+3. 片 pane だけ tab を溢れさせて水平 scrollbar を出し、左右の高さが変わらないこと。scrollbar 表示中も 2 行 tab の `Loading` / `Error` 文字が欠けないこと。
+4. tab 追加 → move → close を反復し、途中で TabStrip の高さが動かないこと。
+5. Light / Dark、single / split の切替、および狭幅 window で 1〜4 を再確認すること。
+6. 併せて Round 1 までの未確認項目（move 後 destination focus と active pane、close 後 fallback focus、split 時 160px での tab 名判別、hidden secondary 回復案内の `role="status"` 読み上げ）も実施すること。
+
+### 12.7 drag and drop を非対象に据え置く判断
+
+**妥当である。** 次の 3 点で確認した。
+
+- `docs/todo/todo.md` TODO-2026-023 の `non_scope` に「drag and drop、group内tab reorder / pin、複数選択・一括移動」が明記されており、設計 §3.2 とも一致する。Phase 4-a の feedback を機に scope を広げる根拠は、受け入れ条件側には無い。
+- 同 TODO の完了条件は「**keyboardだけでも移動操作へ到達でき**、focusとaccessible name / stateが維持される」である。drag and drop は単独ではこの条件を満たせず、いずれにせよ現行 move button 相当の keyboard 経路が必要になる。move button を残す判断はこの完了条件と直接整合する。
+- 設計 §21 と実装記録 §8 が挙げる追加設計項目（drop target、drag feedback、pointer cancel、keyboard 代替、同一 pane reorder との区別）は、いずれも新しい state・DOM・ARIA を要する。設計 §4.4 が context menu を退けた理由（1 操作の最小提供範囲を超える）と同じ基準であり、判断が一貫している。将来採用する場合は §19 の follow-up 方針どおり別 TODO とするのが適切である。
+
+### 12.8 Round 2 判定
+
+**承認 (Approved)。Phase 4-a 再実施へ進行可。未解決指摘 0 件。**
+
+- 指摘 4.1（Medium / Phase 4-a blocking）は `cea681a` で解決済み。原因分析は現行 DOM / CSS と一致し、修正は 4 つの高さ変動要因すべてを断つ形で必要十分である。
+- 58px 固定 row は通常 / state 2 行 / empty / 水平 scrollbar 有無のすべてで左右を揃え、content clipping と preview overlap を生まない。
+- Light / Dark、single / split、tab overflow、focus-visible、active / error inset、viewport 幅、keyboard / ARIA に退行は無い。
+- CSS 5 宣言のみの修正で、App state・pane runtime・security 境界への波及は無い。自動検証 6 コマンドは全件再現した。
+- Phase 4-a NG と再確認条件は design / permanent docs / impl / manual verification / meta の 5 系統に正確に記録されている。
+- drag and drop を現行 scope へ混ぜず move button を維持する判断は、TODO の non_scope と完了条件の双方に整合する。
+- §12.5 の 4 項目は defect ではなく残リスク・既存事項であり、§12.6 の観点で Phase 4-a 実施時に確認されたい。
