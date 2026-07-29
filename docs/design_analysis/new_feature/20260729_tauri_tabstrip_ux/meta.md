@@ -16,9 +16,9 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "in_progress"
+status: "implemented"
 design_status: "done"
-impl_status: "in_review"
+impl_status: "done"
 completion_status: "not_started"
 verification_status: "in_progress"
 related_commits:
@@ -34,6 +34,8 @@ related_commits:
   - "ca48356 : Phase 3 implementation review follow-up approves Phase 4-a with 0 unresolved findings"
   - "76daecf : Phase 3 fix scrollbar focus modality after Phase 4-a feedback"
   - "d9ebeaa : Phase 3 review follow-up approves Phase 4-a re-verification with 0 unresolved findings"
+  - "db2f066 : Phase 3 replace scrollbar hover dependency with explicit pointer boundary state"
+  - "55bd8b9 : Phase 3 Round 3 review approves Phase 4-a re-verification with 0 unresolved findings"
 source_todo_path: "docs/todo/todo.md#todo-2026-026-tauri-tabstrip-状態表現scroll・drag-move-ux改善"
 source_feedback: "TODO-2026-023 Phase 4-a"
 depends_on:
@@ -64,7 +66,7 @@ depends_on:
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`0c0dd98`); initial 17 findings resolved, 3 non-blocking implementation follow-ups carried into Phase 3 |
-| Phase 3 Implementation and docs review | Reopened again after Phase 4-a Round 2; explicit pointer-boundary state fix complete and review pending |
+| Phase 3 Implementation and docs review | Done after Phase 4-a Round 2 feedback (`55bd8b9`); explicit pointer-boundary state approved, 0 unresolved |
 | Phase 4-a User verification | NG after Round 2; accepted features remain good, but native scrollbar thumb visibility is still timing-dependent during fast TabStrip / preview pointer movement; Round 3 re-verification pending |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |

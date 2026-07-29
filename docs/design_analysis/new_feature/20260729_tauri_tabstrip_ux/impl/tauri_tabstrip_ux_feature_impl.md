@@ -100,3 +100,5 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 修正コミット`76daecf`はRound 2レビュー`d9ebeaa`で新規指摘0件、未解決0件として承認され、Phase 4-a再実施可となった。`:has()`は既存CSS機能より対応下限が低く互換性上のblocking riskはないが、focus-visibleのUA heuristicとscrollbar pseudo-elementの再描画は実WebViewで再確認する。
 
 再確認では、TabStripとpreviewをpointerで上下に往復した際にthumbが残る場合と消える場合があり、素早い移動で残りやすいと報告された。`:hover`とnative scrollbar pseudo-elementのstate / repaintへpointer表示を委ねる方式を廃止し、TabStrip enter / leaveとwindow capture pointermoveの矩形判定から`tab-scrollbar-pointer-active` classを管理する。enter時にrefを同期更新してlistener登録raceを避け、ref無効時のpointermoveはgeometryを読まず即returnする。keyboard表示の`:has(:focus-visible)`は維持する。`tabStrip.ts`へ矩形境界policyとunit testを追加した。
+
+Round 3修正`db2f066`はレビュー`55bd8b9`で新規指摘0件、未解決0件として承認され、Phase 4-a Round 3再実施可となった。Markdown previewに加えてtrusted HTML iframe境界、primary / secondary間移動、drag中、layout変更後の次pointer moveを実WebViewで確認する。
