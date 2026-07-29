@@ -11,16 +11,21 @@ components:
   - "markdown-viewer-tauri/src/paneRuntime.ts"
   - "markdown-viewer-tauri/src/splitView.test.ts"
   - "markdown-viewer-tauri/src/paneRuntime.test.ts"
+  - "markdown-viewer-tauri/src/tabStrip.ts"
+  - "markdown-viewer-tauri/src/tabStrip.test.ts"
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "draft"
+design_status: "in_review"
 impl_status: "not_started"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
   - "c8edd30 : Phase 0 define TODO-2026-026 TabStrip UX scope"
+  - "a1ba28b : Phase 1 initialize Tauri TabStrip UX workflow"
+  - "affc977 : Phase 2 prepare Tauri TabStrip UX design"
+  - "6fdb8ed : Phase 2 initial design review requests 17 changes"
 source_todo_path: "docs/todo/todo.md#todo-2026-026-tauri-tabstrip-状態表現scroll・drag-move-ux改善"
 source_feedback: "TODO-2026-023 Phase 4-a"
 depends_on:
@@ -50,7 +55,7 @@ depends_on:
 | --- | --- |
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
-| Phase 2 Design review | Draft prepared; review not started |
+| Phase 2 Design review | In review; initial 17 findings addressed, Claude follow-up pending |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4-a User verification | Not started |
 | Phase 4-b Completion | Not started |

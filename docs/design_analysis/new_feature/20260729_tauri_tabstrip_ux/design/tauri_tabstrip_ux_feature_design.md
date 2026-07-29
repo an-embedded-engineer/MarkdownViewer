@@ -41,7 +41,7 @@
 1. split表示中、tab名を表示するactivate button上でprimary pointerを押す。
 2. 6 CSS px以上移動した時だけdragを開始する。閾値未満のpress / releaseは従来どおりtab activate clickとして扱う。
 3. drag開始後はsource item、pointer追従preview、反対paneのTabStrip drop targetを視覚表示し、live statusでcancel方法を通知する。
-4. pointerが反対paneのTabStrip上にある状態でreleaseすると、既存`moveTab(sourcePaneId, tabId)`を1回だけ呼ぶ。
+4. pointerが反対paneのTabStrip上にある状態でreleaseすると、drop時に再判定したdestinationを明示して`moveTab(sourcePaneId, destinationPaneId, tabId)`を1回だけ呼ぶ。
 5. `Escape`、`pointercancel`、`lostpointercapture`、source unmount、split解除、drop target外releaseではcancelし、tab stateを変更しない。
 6. move完了後は既存処理によりdestinationのactivate buttonへfocusする。cancel後は接続済みsource activate buttonにfocusを維持する。
 
@@ -95,7 +95,7 @@ native DnDは`draggable`、`DataTransfer`、UA drag image、`dragstart` / `drago
 
 - `getTabRevealDelta(viewportStart, viewportEnd, itemStart, itemEnd, padding): number`
 - `hasExceededTabDragThreshold(startX, startY, currentX, currentY): boolean`
-- `resolveTabDropPane(sourcePaneId, candidatePaneId, mode): PaneId | null`
+- `resolveTabDropPane(sourcePaneId: PaneId, candidatePaneId: string | null, mode: ViewMode): PaneId | null`
 
 DOM ref、pointer capture、focus、`elementFromPoint`、React stateは`TabStrip` / `App`に残す。exported pure functionは既存の`splitView.ts` / `paneRuntime.ts`と同じTypeScript policy module patternであり、mutable module-global stateは追加しない。class wrapperはstateを持たず責務を明確にしないため追加しない。
 
@@ -107,9 +107,9 @@ DOM ref、pointer capture、focus、`elementFromPoint`、React stateは`TabStrip
 
 ### 4.5 採用: scrollbar geometry固定 + thumb visibility切替
 
-`overflow-x: auto`と6pxのscrollbar寸法を維持し、通常時はthumb / trackをtransparent、`:hover` / `:focus-within`時だけthumbをmuted colorへ切り替える。Firefox系の`scrollbar-color`とWebKit系pseudo-elementの両方を定義する。
+`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparent、`:hover` / `:focus-within`時だけthumbをmuted colorへ切り替える。Firefox系の`scrollbar-color`とWebKit系pseudo-elementの両方を定義する。
 
-scrollbar自体の追加・除去や`overflow-x: hidden`切替は行わない。classic scrollbarでは常に同じ内部寸法を確保し、overlay scrollbar環境でもTabStrip外寸40pxを維持する。overflowがない場合はthumbが生成されないため、不要なbarは見えない。
+scrollbar自体の追加・除去や`overflow-x: auto | hidden`切替は行わない。classic scrollbarではtransparentなtrackを含め常に同じ6px内部寸法を確保し、overlay scrollbar環境でもTabStrip外寸40pxを維持する。overflowがない場合も透明trackの領域は保持するがthumbは生成されず、不要なbarは視認できない。これによりtab追加・closeがoverflow境界を跨いでもtab itemの内寸を34pxから変えない。
 
 ### 4.6 不採用案一覧
 
@@ -160,7 +160,7 @@ error / loading / rendering indicatorがactive上端線より優先されるた�
 
 ### 6.3 accessible nameとfocus model
 
-- activate buttonのaccessible nameはreadyならdisplay name、その他は`<display name>, Loading|Rendering|Error`とする。
+- activate buttonへ`aria-label`を設定し、readyならdisplay name、その他は`<display name>, Loading|Rendering|Error`とする。visible `.tab-name`がaccessible nameの先頭と完全一致する順序を維持し、音声操作のname-in-name要件を守る。
 - `title`はfull pathを維持するがaccessible stateの正本にはしない。
 - role `tab`、`aria-selected`、`aria-controls`、roving `tabIndex`は維持する。
 - loading / renderingだけ`aria-busy=true`をrole `tab`へ付ける。
@@ -178,7 +178,9 @@ error / loading / rendering indicatorがactive上端線より優先されるた�
 - `.tab-item`はstretchし、indicator用pseudo-elementを持つ`position: relative`とする。
 - `.tab-activate`は1行中央揃え、`.tab-state`要素と2行gridを削除する。
 - move / close各30px、single itemのmin width 130px、split itemのmin width 160pxは維持する。
-- scrollbarは6px。content control領域は最低33pxを確保し、indicator 2〜3pxをoverlayしてbutton layoutを押し下げない。
+- `.tab-strip`は`overflow-x: scroll`と6pxのtransparent trackを常時持つ。content control領域は最低33pxを確保し、indicator 2〜3pxをoverlayしてbutton layoutを押し下げない。
+- `.app-shell`とdark theme側へ`--tab-indicator-loading` / `--tab-indicator-rendering` / `--tab-indicator-error`のsemantic tokenを追加する。component ruleへ固定RGBを書かず、Light / Darkの`--chrome-bg`とactive時`--panel-bg`の双方で視認できる値を各theme定義へ置く。error tokenは`--error-text`を参照してよい。
+- drag開始は`pointerType === "mouse"`だけを対象とし、`.tab-activate`へ`touch-action: none`を付けない。touch / penでは従来のhorizontal pan、tap activate、move buttonを維持する。
 
 ### 7.2 reveal policy
 
@@ -188,13 +190,15 @@ error / loading / rendering indicatorがactive上端線より優先されるた�
 2. item左端がviewport左端より外なら、左端をpadding位置へ合わせる負delta。
 3. item右端がviewport右端より外なら、右端をpadding位置へ合わせる正delta。
 4. item幅がviewport幅を超える将来条件では左端を優先し、frameごとの左右往復を起こさない。
-5. 非finite geometryはprogramming / DOM integration errorとしてscrollせず、testで到達させない。silent fallback値は返さない。
+5. 非finite geometryはprogramming / DOM integration errorとして`getTabRevealDelta`がthrowする。呼び出し側はcatchして0へfallbackせず、DOM rect不整合を顕在化させる。
 
 revealは次で呼ぶ。
 
 - `activeTabId`またはtabs membership変更後の`requestAnimationFrame`。
 - `.tab-item`の`onFocusCapture`。activate / move / closeのどこへTab移動しても同じitemを対象にする。
 - destination move後のfocus処理。focusより先にDOMを取得し、focus captureと同じrevealを通す。
+
+TabStrip / Appが実行するroving navigation、close後、move後、pane fallbackのprogrammatic focusはすべて`focus({ preventScroll: true })`を使う。UA focusing stepsによるancestor scrollを抑え、水平位置は`getTabRevealDelta` + `strip.scrollBy`だけが変更する。現行roving契約では非active tabを矢印キーでactivateした後、active item内のactivate → move → closeへTab移動した時に`onFocusCapture` revealが働く。
 
 pointerによる単なるhoverでは自動scrollしない。利用者のmanual scroll位置を不要に変更しないためである。
 
@@ -218,33 +222,34 @@ type TabDragSession = {
 };
 ```
 
-- mutable current sessionとpointer座標は`App`またはTabStrip coordinatorのReact `useRef`に置く。
+- mutable current session、pointer座標、click抑止identityは`App`のReact `useRef`に置く。`TabStrip` componentは`App.tsx`内に維持し、pure policyだけを`tabStrip.ts`へ分ける。
 - React stateは`dragging`開始、drop target変更、終了時だけ更新し、pointermoveごとのApp rerenderを避ける。
-- pointer追従previewのtransformは専用DOM refへ直接反映する。document dataやpreview DOMは変更しない。
+- pointer追従previewは`.app-shell`のsiblingとしてReact root直下に1つだけmountし、`position: fixed`と専用DOM refの`transform: translate(...)`で追従する。`aria-hidden=true` / `pointer-events:none`を維持し、pane / app shellの`overflow:hidden`でclipさせず、`elementFromPoint`のdrop判定にも混入させない。document dataやpreview DOMは変更しない。
 
 ### 8.2 start
 
-- split mode、primary pointer、button 0、未開始session、activate button本体からのpointerdownだけを受理する。
+- split mode、`pointerType === "mouse"`、primary pointer、button 0、未開始session、activate button本体からのpointerdownだけを受理する。touch / penはdrag sessionを開始せず、horizontal pan、tap activate、move buttonへ委ねる。
 - move / close buttonからは開始しない。
 - pending開始時にpointer captureを設定するが、閾値到達まではdrag feedbackと`preventDefault`を有効にしない。
-- 6px閾値到達時にdraggingへ遷移し、click抑止flag、source / preview feedback、body class、live statusを有効化する。
+- 6px閾値到達時にdraggingへ遷移し、`{ pointerId, sourcePaneId, tabId }`でscopedなclick抑止identity、source / preview feedback、`.app-shell.tab-dragging` class、live statusを有効化する。
 - drag開始時にsource paneをactive化するが、source tab selectionはmove完了まで変更しない。non-active tabの直接dragを許可する。
 
 ### 8.3 move / target
 
-- pointer coordinateで`elementFromPoint`し、closest `[data-tab-drop-pane]`からcandidate paneを得る。
+- pointer coordinateで`elementFromPoint`し、closest `[data-tab-drop-pane]`のdatasetから`string | null`のcandidate paneを得る。viewport外や対象なしで`elementFromPoint`が`null`の場合もinvalid targetとする。
 - source自身、single mode、DOMから外れたpane、unknown valueはinvalid targetとする。
 - targetが変わった時だけReact presentation stateとlive statusを更新する。
 - destination TabStripはoutline / inset background、source itemはopacity、app cursorは`grabbing`でfeedbackする。
 
 ### 8.4 drop / cancel / cleanup
 
-- valid target上のpointerupだけ`moveTab`を1回呼ぶ。
+- pointerupの`clientX` / `clientY`で`elementFromPoint`と`resolveTabDropPane`を再実行し、その結果がvalidな時だけdestinationを明示して`moveTab`を1回呼ぶ。sessionの`dropPaneId`はfeedback表示専用であり、drop確定には使わない。
 - move実行前にlatest `splitViewRef`でsplit modeとsource membershipを再確認する。内部不整合は既存reducerがthrowし、drag専用fallbackで吸収しない。
 - invalid target上のpointerupはcancelでno-op。
-- Escapeはdefaultを抑止し、captureを安全にreleaseしてcancelする。
+- dragging中だけ`document`へcapture phaseの`keydown` listenerをeffectで登録する。Escapeでは`preventDefault`と`stopPropagation`を行ってdrag cancelを優先し、captureを安全にreleaseする。cleanupでlistenerを必ず解除し、menu等の別document-level Escape handlerを同じeventでは実行させない。
 - `pointercancel` / `lostpointercapture` / unmount / split解除はno-op cleanupする。
-- cleanupはsession ref、presentation state、body class、preview transform、live statusを一つの関数で解除する。lost capture後の二重cleanupはcurrent pointer ID不一致なら何もしない。
+- drag成立後のsource activate buttonには`onClickCapture`を置き、click抑止identityが同じsource tabかつpointerup直後の有効期間内なら`preventDefault` / `stopPropagation`してidentityを消費する。pointerup handlerはsessionをfinalizeしてからcaptureをreleaseし、source click dispatchより後になる次の`requestAnimationFrame`でidentityを必ずclearする。成功dropでsource itemがunmountしてclickが来なくても次のtab clickへ持ち越さない。新しいpointerdownもstale identityを先にclearする。Escape / pointercancel / pointerupを経ないunexpected lost captureではclickが生成されないため同期clearする。pointerup後のimplicit `lostpointercapture`はsessionが既にfinalize済みなのでno-opとし、scheduled clearを早めない。
+- cleanupはsession ref、presentation state、`.app-shell.tab-dragging` classに対応するReact state、preview transform、live status、keydown listenerを一つの経路で解除する。click抑止identityだけは前項のevent順序に従ってclearする。lost capture後の二重cleanupはcurrent pointer ID不一致なら何もしない。
 - move後のsource item unmountは正常であり、destination focusは既存`moveTab`の`requestAnimationFrame`経路を使う。
 
 ## 9. component・module責務
@@ -252,9 +257,10 @@ type TabDragSession = {
 ### 9.1 `App.tsx`
 
 - cross-pane drag session、drag preview、live status、latest split state照合を所有する。
-- `moveTab`をpointer dropとmove buttonの唯一のintegration pointとして再利用する。
+- `moveTab(sourcePaneId, destinationPaneId, tabId)`をpointer dropとmove buttonの唯一のintegration pointとして再利用する。move buttonは2 pane UI上の反対paneを明示して渡し、dragはdrop再判定結果を渡す。reducer契約は不変とする。
 - pointermoveごとにdocument / tab / preview React stateを更新しない。
 - split解除、root reset、該当tab close / moveによるsession無効化をeffectでcleanupする。
+- dragging中のdocument capture keydown、App root直下のfixed `.tab-drag-layer` / preview、app shell classをReact lifecycleで管理する。`document.body.classList`は変更しない。
 
 ### 9.2 `TabStrip`
 
@@ -263,6 +269,7 @@ type TabDragSession = {
 - tab itemへpresentation class、accessible state、drag source classを付ける。
 - rootへ`data-tab-drop-pane=<paneId>`とdrop target classを付ける。
 - pointer eventをcoordinatorへ渡すが、pane membershipを直接更新しない。
+- programmatic focusは`focus({ preventScroll: true })`、source activate click抑止はidentity付き`onClickCapture`を使い、通常clickとdrag成立後clickを分離する。
 
 ### 9.3 `tabStrip.ts`
 
@@ -286,7 +293,8 @@ type TabDragSession = {
 
 - compact fixed height、indicator、scrollbar、drag source / target / preview、reduced motionを定義する。
 - state / hover / focus切替でgrid rowやouter heightを変更しない。
-- Light / Dark双方で既存theme tokenを使い、固定RGBを追加しない。
+- Light / Dark双方の`.app-shell`へTabStrip用semantic tokenを定義し、component ruleには固定RGBを追加しない。
+- fixed drag previewのsibling layerにもtheme tokenを供給するため、Lightは`.app-shell, .tab-drag-layer`、Darkは`:root[data-theme="dark"] .app-shell, :root[data-theme="dark"] .tab-drag-layer`の共通selectorで同じsemantic tokenを定義する。sibling間のCSS variable継承には依存しない。
 
 ## 10. データ・サービス・永続化・migration
 
@@ -320,6 +328,9 @@ type TabDragSession = {
 | active sourceが最後の1件 | sourceはempty / unselected、destination選択 |
 | reduced motion | rendering animation停止、static patternで識別 |
 | item幅がviewport超過 | left edge優先、無限revealループを避ける |
+| reveal geometryが非finite | pure policyがthrowし、silent 0 / nullへfallbackしない |
+| programmatic focus | `preventScroll:true`でancestorを動かさず、TabStripだけmanual reveal |
+| drag成立後のsource click | matching `onClickCapture`で抑止。成功dropでunmountしclickが無くても次frameでidentity clear |
 | focus target欠落 | existing destination pane focus + console error。silent no-opにしない |
 
 ## 13. テスト設計
@@ -328,8 +339,9 @@ type TabDragSession = {
 
 - fully visible / left clipped / right clipped / exact edge / paddingのreveal delta。
 - item widthがviewport以下 / 超過の場合のdeterministic alignment。
+- NaN / Infinityを含む非finite geometryがthrowすること。
 - 6px未満、exact threshold、超過、diagonalのdrag threshold。
-- primary→secondary、secondary→primary、same pane、single、unknown candidateのdrop target判定。
+- primary→secondary、secondary→primary、same pane、single、`string | null`のunknown / absent candidateのdrop target判定。
 
 ### 13.2 `paneRuntime.test.ts`
 
@@ -362,28 +374,37 @@ Rust差分は予定しないが、Tauri application全体の回帰確認とし�
 ## 14. ユーザー確認matrix
 
 1. ready / active / loading / rendering / errorの上端indicatorとaccessible state。
-2. Light / Darkと`prefers-reduced-motion`で色・pattern・active背景が識別可能。
+2. Light / Darkと`prefers-reduced-motion`で色・pattern・active背景が識別可能。loading / rendering / error tokenがinactiveの`--chrome-bg`とactiveの`--panel-bg`の双方で視認できる。
 3. primary / secondary、empty、overflow、状態遷移で40px固定高とpreview上端が一致。
-4. overflowなしではbarが見えず、overflow時はhover / focusでthumbが現れ、切替時にlayout shiftしない。
-5. 先頭・中間・末尾tabのactivate / move / closeへfocusし、item全体が見える。
+4. overflowなしではbarが見えず、overflow時はhover / focusでthumbが現れる。tabをoverflow境界前後で増減してもtransparent trackの6px内部寸法、itemの見た目高さ、preview上端が変わらない。
+5. 矢印キーで先頭・中間・末尾tabをactivateし、Tabでactive item内のactivate → move → closeへ移動してitem全体が見える。focus時にpreview / Explorer / shellが縦横に動かない。
 6. primary→secondary、secondary→primaryのactive / non-active tab drag。
 7. destination same ID、source最後のtab、invalid target release、Escape cancel。
-8. drag後とmove button後のsource fallback、destination selection、focus、StatusBar / ErrorBanner一致。
+8. drag後とmove button後のsource fallback、destination selection、focus、StatusBar / ErrorBanner一致。move後のfocusでもpreview / Explorer / shellが動かない。
 9. keyboardだけでroving navigation、move button、closeへ到達できる。
 10. narrow window、split resize、Explorer resize中のoverflow / drag feedback。
 11. Markdown / HTML / Mermaid / PlantUML表示中のmoveとruntime guard。
 12. HTML iframe上へ外れたrelease、split解除、tab close、root changeによるcancel。
+13. invalid drop cancel後と成功drag直後に別tabをclickし、最初の1回でactivateされる。source unmount有無の両方を確認する。
+14. mouse dragが成立し、touch / penはdragを開始せずhorizontal pan、tap activate、move buttonを維持する。
 
 ## 15. 恒久ドキュメント更新予定
 
-- `docs/components/tauri_viewer/detail_design.md`: TabStrip state、scroll、drag lifecycle、責務分割。
-- `docs/components/tauri_viewer/interface_spec.md`: visual / ARIA、pointer / keyboard操作契約。
-- `docs/components/tauri_viewer/README.md`: 利用方法と制約。
-- `docs/architecture/code_patterns.md`: pane間moveは単一transition、TabStrip pure policy、high-frequency pointer stateの扱い。
-- `docs/architecture/common_pitfalls.md`: captured pointerのdrop hit test、cleanup、item全体reveal、scrollbar geometry。
-- `docs/rules/development_workflow.md`: compact height、state、scroll、drag / cancel手動確認。
-- `docs/tests/README.md`: `tabStrip.test.ts`と関連回帰観点。
-- `docs/history/`: Phase 4-bで実装・検証結果を記録する。
+Phase 3では次の既存確定記述を検索・置換し、新旧仕様を並存させない。行番号は設計時点の目安であり、置換は記述内容で照合する。
+
+| file / 現行箇所 | 現行記述 | 置換後の要旨 |
+| --- | --- | --- |
+| `docs/components/tauri_viewer/detail_design.md` Multi-tab末尾（現行約474行） | state label / scrollbarによらない58px固定高 | 40px固定高、1行name、上端indicator、transparent 6px track、item全体reveal、Pointer Events drag lifecycle |
+| `docs/components/tauri_viewer/interface_spec.md` Tab move（現行約12行） | split時はactive tabの矢印buttonだけで移動 | 矢印buttonに加えてmouse dragを提供。pointerはnon-active tabも直接drag可能、keyboardはactive tab controlsを使う |
+| `docs/components/tauri_viewer/interface_spec.md` TabStrip focus（現行約59行） | activate buttonとactive tab controlsだけがTab順、非activeは矢印でactivate | keyboard契約は維持し、pointer dragだけが非active tabを直接扱う。programmatic focusは`preventScroll` |
+| `docs/components/tauri_viewer/interface_spec.md` TabStrip height / state（現行約62行） | name 1行 + state 2行目、58px固定高 | state visible textを廃止し、40px固定高 + visual / accessible indicator + hover / focus scrollbarへ置換 |
+| `docs/rules/development_workflow.md` TabStrip手動確認（現行約177行） | 58px固定高と2 pane段差確認 | 40px、state / reduced motion、overflow境界、item reveal、drag / cancel / click抑止matrixへ置換 |
+| `docs/components/tauri_viewer/basic_design.md` TypeScript policy一覧 | `tabStrip.ts`なし | reveal / threshold / drop narrowingを扱うpure policyを追加 |
+| `docs/components/tauri_viewer/README.md` file map / module表 | `tabStrip.ts` / testなし | 新規policy / testのパスと責務を追加し、利用方法・mouse drag制約も記録 |
+| `docs/architecture/code_patterns.md` Tauri frontend pattern | TabStrip interaction policyなし | 単一`move-tab` integration、pure policy、high-frequency pointer coordinateをrefで扱うpatternを追加 |
+| `docs/architecture/common_pitfalls.md` pane-local tab group | captured drag / reveal注意なし | capture中の`elementFromPoint`、pointerup再判定、click identity cleanup、`preventScroll`、fixed preview、scrollbar geometryを追加 |
+| `docs/tests/README.md` frontend tests | `tabStrip.test.ts`なし | pure geometry / threshold / drop / accessibility mappingとDOM手動検証の境界を追加 |
+| `docs/history/` | 本機能履歴なし | Phase 4-bで実装・検証結果を追加 |
 
 ADRは追加しない。Pointer EventsとTabStrip policyは現時点ではTauri component固有の案件詳細であり、`docs/adr/README.md`の複数案件で再利用される採用済み横断判断という起票条件を満たさない。Avalonia展開または複数componentで共通原則になった時に再評価する。
 
@@ -400,6 +421,7 @@ ADRは追加しない。Pointer EventsとTabStrip policyは現時点ではTauri 
 | reduced motionでrendering不明 | loadingとの混同 | static repeating patternを使用 |
 | scrollがouter paneを動かす | preview / shell位置変化 | manual strip-only delta、item外枠ref |
 | drag targetを広げすぎる | accidental move | destination TabStripだけをvalid targetに限定 |
+| DOM lifecycleをunit testできない | capture / focus / click cleanup regression | pure policyを自動testし、DOM event順・CSS・focusは§14手動matrixを必須にする |
 
 ## 17. 実装順序
 

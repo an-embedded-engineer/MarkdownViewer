@@ -261,3 +261,29 @@ TODO-2026-026 の Phase 2 設計レビュー（初回）。現行実ソース（
 1.1 と 1.2 は設計へ各 1〜2 文の契約追記で閉じる。1.3 は `overflow-x` の値を A / B いずれかへ確定する判断のみ。1.4 は §15 を置換対象表へ改稿する（TODO-2026-023 で確立済みの形式へ戻す）。non-blocking Medium 3 件と Low 10 件は、同じ改訂機会でまとめて反映することを推奨する。
 
 blocking 4 件の反映後に再確認レビューを行い、新たな穴が無ければ Phase 3 へ進行可とする。
+
+---
+
+## 6. 指摘対応 Round 1（実装担当、再確認待ち）
+
+初回17件を設計書とmetaへ反映した。レビュー担当によるfollow-up確認前のため、最終解決判定は未確定とする。
+
+| 指摘 | 対応 | 状態 |
+| --- | --- | --- |
+| 1.1 focusによるancestor scroll | §7.2 / §9.2 / §12 / §14へ全programmatic focusの`preventScroll:true`とmanual reveal単一路線を追記 | 対応済み・再確認待ち |
+| 1.2 click抑止flag lifecycle | §8.1–8.4 / §9.2 / §12 / §14へgesture identity、matching click capture、次frame / 次pointerdown clear、unmount経路を確定 | 対応済み・再確認待ち |
+| 1.3 scrollbar内部寸法 | §4.5 / §7.1で`overflow-x: scroll` + transparent 6px track常時確保へ確定し、§14へoverflow境界確認を追加 | 対応済み・再確認待ち |
+| 1.4 恒久docs置換対象 | §15をfile / 現行記述 / 置換後要旨の表へ改稿し、既知の矛盾箇所を列挙 | 対応済み・再確認待ち |
+| 2.1 indicator theme token | §7.1 / §9.6 / §14へtheme別semantic tokenと2背景上の視認条件を追記 | 対応済み・再確認待ち |
+| 2.2 非finite geometry | §7.2 / §12 / §13.1でthrowへ確定しtest対象化 | 対応済み・再確認待ち |
+| 2.3 touch / pen競合 | §7.1 / §8.2 / §14でmouseだけをdrag対象とし、touch / penのpan・tap・buttonを維持 | 対応済み・再確認待ち |
+| 3.1 candidate型 | §4.3 / §8.3 / §13.1で`string | null`入力とnarrowingを確定 | 対応済み・再確認待ち |
+| 3.2 pointerup再判定 | §8.4でpointerup座標を正本、session targetをfeedback専用へ確定 | 対応済み・再確認待ち |
+| 3.3 session所有者 | §8.1 / §9.1でApp所有へ一本化し、TabStrip componentは`App.tsx`内維持と明記 | 対応済み・再確認待ち |
+| 3.4 Escape listener | §8.4 / §9.1でdragging中だけdocument capture listener、drag cancel優先、cleanup解除を確定 | 対応済み・再確認待ち |
+| 3.5 preview mount | §8.1 / §9.1 / §9.6でapp shell siblingのfixed要素へ確定 | 対応済み・再確認待ち |
+| 3.6 body class不整合 | §8.2 / §8.4 / §9.1でReact state由来の`.app-shell.tab-dragging`へ統一 | 対応済み・再確認待ち |
+| 3.7 accessible name実装 | §6.3で`aria-label`方式とname-in-name条件を確定 | 対応済み・再確認待ち |
+| 3.8 module登録先 | meta componentsと§15へ`tabStrip.ts` / test、basic design、READMEを追加 | 対応済み・再確認待ち |
+| 3.9 destination暗黙導出 | §2.3 / §8.4 / §9.1で`moveTab(source,destination,tabId)`へ明示化。reducerは不変 | 対応済み・再確認待ち |
+| 3.10 roving前提 | §7.2 / §14で矢印activate後にTabでcontrolsへ進む手順を明記 | 対応済み・再確認待ち |
