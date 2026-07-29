@@ -66,3 +66,7 @@ outer shellと明示的なpointer / keyboard stateへ一本化した後も、poi
 次のbuildでは`View > Debug Information`をOFFにすると診断処理を停止し、ONにするとErrorBannerとStatusBarの間へ複数行パネルを表示して診断を開始する。起動後OFFのまま残留を再現し、その場でONへ切り替えて、パネル値とthumbの変化を同時に確認する。
 
 OFF / ON比較では、起動直後のOFFで残留し、ONでは非表示が正常化した。さらに一度ONにした後はOFFへ戻しても正常な描画が継続した。これはReact stateの消失ではなく、native scrollbar pseudo-elementの初回style / paint invalidation不足と整合する。通常経路でも表示policyまたはtab数が変わった次frameにoverflowを確認し、layoutとthumb computed styleを1回読むWebKit向けflushを追加して、Debug OFFの起動直後から再確認する。
+
+style flush buildは起動直後のDebug OFF、Debug ON、再度OFFのすべてで期待どおり表示・非表示が動作し、horizontal scrollbar問題は解決と確認された。
+
+追加確認では、見切れたtabをclickすると選択tab全体は表示されるが、さらに同方向の隣接tabが見えず、連続移動にはmanual scrollが必要だった。次回は、左見切れなら前tabの右半分、右見切れなら次tabの左半分を選択tabと同時に表示する。先頭 / 末尾では従来どおり選択tabを端へ揃え、幅不足時は選択tab全体を優先する。

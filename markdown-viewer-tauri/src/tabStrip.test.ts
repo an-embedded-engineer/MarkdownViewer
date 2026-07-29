@@ -50,6 +50,24 @@ describe("tab reveal policy", () => {
     expect(getTabRevealDelta(0, 100, 30, 150, 4)).toBe(26);
   });
 
+  it("reveals half of the previous item when the selected item is clipped on the left", () => {
+    expect(getTabRevealDelta(0, 300, -40, 120, 4, -120, 120)).toBe(-124);
+  });
+
+  it("reveals half of the next item when the selected item is clipped on the right", () => {
+    expect(getTabRevealDelta(0, 300, 180, 340, 4, 180, 420)).toBe(124);
+  });
+
+  it("prioritizes the complete selected item when the requested neighbor peek cannot fit", () => {
+    expect(getTabRevealDelta(0, 200, -20, 170, 4, -100, 170)).toBe(-26);
+    expect(getTabRevealDelta(0, 200, 30, 220, 4, 30, 300)).toBe(26);
+  });
+
+  it("rejects peek geometry that points inside the selected item", () => {
+    expect(() => getTabRevealDelta(0, 300, 40, 200, 4, 60, 200)).toThrow("invalid");
+    expect(() => getTabRevealDelta(0, 300, 40, 200, 4, 40, 180)).toThrow("invalid");
+  });
+
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
     "rejects non-finite geometry: %s",
     (value) => {

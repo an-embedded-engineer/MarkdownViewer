@@ -93,7 +93,7 @@ native DnDは`draggable`、`DataTransfer`、UA drag image、`dragstart` / `drago
 
 新規`tabStrip.ts` / `tabStrip.test.ts`へ次の副作用なしpolicyを置く。
 
-- `getTabRevealDelta(viewportStart, viewportEnd, itemStart, itemEnd, padding): number`
+- `getTabRevealDelta(viewportStart, viewportEnd, itemStart, itemEnd, padding, leadingPeekStart?, trailingPeekEnd?): number`
 - `hasExceededTabDragThreshold(startX, startY, currentX, currentY): boolean`
 - `resolveTabDropPane(sourcePaneId: PaneId, candidatePaneId: string | null, mode: ViewMode): PaneId | null`
 
@@ -187,10 +187,10 @@ error / loading / rendering indicatorがactive上端線より優先されるた�
 `getTabRevealDelta`はTabStrip content viewportとitem外枠のleft / rightを比較する。
 
 1. item全体がpadding込みで入っている場合は0。
-2. item左端がviewport左端より外なら、左端をpadding位置へ合わせる負delta。
-3. item右端がviewport右端より外なら、右端をpadding位置へ合わせる正delta。
-4. item幅がviewport幅を超える将来条件では左端を優先し、frameごとの左右往復を起こさない。
-5. 非finite geometryはprogramming / DOM integration errorとして`getTabRevealDelta`がthrowする。呼び出し側はcatchして0へfallbackせず、DOM rect不整合を顕在化させる。
+2. item左端がviewport左端より外れ、前tabがある場合は、選択item全体に加えて前tabの右半分を表示する。先頭tabならitem左端をpadding位置へ合わせる。
+3. item右端がviewport右端より外れ、次tabがある場合は、選択item全体に加えて次tabの左半分を表示する。末尾tabならitem右端をpadding位置へ合わせる。
+4. itemと隣接tab半分を同時に収められない場合はitem全体を優先する。item幅自体がviewport幅を超える将来条件では左端を優先し、frameごとの左右往復を起こさない。
+5. 非finiteまたは隣接peekがitem内を指すgeometryはprogramming / DOM integration errorとして`getTabRevealDelta`がthrowする。呼び出し側はcatchして0へfallbackせず、DOM rect不整合を顕在化させる。
 
 revealは次で呼ぶ。
 

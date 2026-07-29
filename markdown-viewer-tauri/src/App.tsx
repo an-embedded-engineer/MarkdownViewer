@@ -2951,12 +2951,27 @@ function TabStrip({
     }
     const stripRect = strip.getBoundingClientRect();
     const itemRect = item.getBoundingClientRect();
+    const itemIndex = tabs.findIndex((tab) => tab.id === tabId);
+    const previousItem =
+      itemIndex > 0 ? itemRefs.current.get(tabs[itemIndex - 1].id) ?? null : null;
+    const nextItem =
+      itemIndex >= 0 && itemIndex < tabs.length - 1
+        ? itemRefs.current.get(tabs[itemIndex + 1].id) ?? null
+        : null;
+    const previousRect = previousItem?.getBoundingClientRect();
+    const nextRect = nextItem?.getBoundingClientRect();
+    const leadingPeekStart = previousRect
+      ? previousRect.left + previousRect.width / 2
+      : itemRect.left;
+    const trailingPeekEnd = nextRect ? nextRect.left + nextRect.width / 2 : itemRect.right;
     const delta = getTabRevealDelta(
       stripRect.left,
       stripRect.right,
       itemRect.left,
       itemRect.right,
       4,
+      leadingPeekStart,
+      trailingPeekEnd,
     );
     if (delta !== 0) {
       strip.scrollBy({ left: delta, behavior: "auto" });

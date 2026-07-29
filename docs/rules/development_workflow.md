@@ -177,7 +177,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - split左右でready / active / Loading / Rendering / Error、empty group、水平overflowを組み合わせてもTabStripが40px固定高を維持し、preview上端に段差が出ないこと。Light / Dark、reduced motion、overflow境界のtab追加・closeでもindicator、WebKit scrollbar track実寸、item高さが変動しないこと
 - overflowしたTabStripではpointer滞在中だけhorizontal scrollbar thumbが見え、tab領域とpreviewを低速・高速で繰り返し往復しても領域外では確実に隠れること。tabをpointer clickしてfocusを残した場合とscrollbar上を通過した場合も同じであること。keyboardでtab controlへfocusした場合はpointerが領域外でもthumbが見え、focusがTabStrip外へ移ると隠れること
 - `View > Debug Information`がOFFの時は診断領域と採取処理が無効で、ONの時はErrorBannerとStatusBarの間にprimary / secondary TabStripの複数行診断が表示され、狭幅では領域内scrollで全文へ到達できること
-- overflow中に矢印activate後、Tabでmove / closeへ移動してもitem外枠全体だけがTabStrip内へrevealされ、preview / Explorer / app shellがscrollしないこと
+- overflow中に見切れたtabをactivateするとitem外枠全体と進行方向の隣接tab 50%がrevealされ、連続clickで先頭 / 末尾まで移動できること。先頭 / 末尾または幅不足時は選択item全体を優先し、矢印activate後にTabでmove / closeへ移動してもpreview / Explorer / app shellがscrollしないこと
 - split左右でactive / non-active tabをmouse dragし、反対TabStrip drop、invalid release、Escape、pointer cancel、split解除、source close、root変更、destination same IDでatomic moveまたはno-op cleanupになること。非active tabのdrag中にEscapeし、source上でmouse buttonをreleaseしてもselectionが変わらないこと。drag中の追加pointerdownでもclick抑止が失われず、drag直後のtab clickが最初の1回でactivateし、touch / penとkeyboard move buttonが維持されること
 - error / loading tabのactivate buttonへkeyboard focusを置いても、focus outlineと上端indicatorを同時に判別できること
 - Split separatorをpointer / ArrowLeft / ArrowRight / Home / Endで操作し、preferred minimum 240px、狭幅時の等幅縮退、ARIA値、focus維持、再拡大時のrequested ratio復元を確認すること

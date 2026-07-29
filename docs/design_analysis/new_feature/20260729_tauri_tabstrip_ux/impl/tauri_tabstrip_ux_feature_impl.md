@@ -112,3 +112,5 @@ Round 4実WebView確認でも症状は変わらなかった。window `pointermov
 診断除去publishでthumb残留が再発したため、`View > Debug Information`で切り替える汎用`DebugPanel`を追加した。OFF時は採取処理を停止し、ON時だけTabStripがpointermoveをanimation frame単位にまとめ、geometry / focus / computed scrollbar styleを採取してgeneric entry eventを発行する。stateが変わらない領域内外の移動も最新座標として更新する。Appはprovider ID別のentryを保持し、ErrorBannerとStatusBar間の最大180px・複数行scroll領域へ表示する。`tabStrip.ts`へ4行formatterを追加し、false / unavailable値を欠落させないunit testを追加した。
 
 実WebViewではDebug ONで正常化し、その後OFFへ戻しても正常状態が継続した。通常のscrollbar表示class transitionとtab数変更後にも、overflow時だけ次frameでlayoutとthumb computed backgroundを1回読むstyle flush effectを追加した。診断providerはOFF時に停止したままであり、workaroundは連続pointermove採取やApp再renderに依存しない。
+
+scrollbar修正確認後の追加feedbackとして、見切れたtabをactivateしてもその隣が表示されず連続clickしにくい点へ対応した。`revealTab`は対象itemの前後refから隣接itemの中点を求め、見切れ方向の隣接tabを50%だけpeek目標へ含める。pure `getTabRevealDelta`は選択item全体を必ず優先し、先頭 / 末尾、狭幅、oversized、invalid geometryを決定的に扱う。unit testを108件から113件へ拡張した。

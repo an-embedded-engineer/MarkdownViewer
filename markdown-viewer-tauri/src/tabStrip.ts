@@ -39,9 +39,25 @@ export function getTabRevealDelta(
   itemStart: number,
   itemEnd: number,
   padding: number,
+  leadingPeekStart: number = itemStart,
+  trailingPeekEnd: number = itemEnd,
 ): number {
-  assertFiniteGeometry([viewportStart, viewportEnd, itemStart, itemEnd, padding]);
-  if (viewportEnd < viewportStart || itemEnd < itemStart || padding < 0) {
+  assertFiniteGeometry([
+    viewportStart,
+    viewportEnd,
+    itemStart,
+    itemEnd,
+    padding,
+    leadingPeekStart,
+    trailingPeekEnd,
+  ]);
+  if (
+    viewportEnd < viewportStart ||
+    itemEnd < itemStart ||
+    padding < 0 ||
+    leadingPeekStart > itemStart ||
+    trailingPeekEnd < itemEnd
+  ) {
     throw new Error("Tab reveal geometry is invalid");
   }
 
@@ -49,11 +65,18 @@ export function getTabRevealDelta(
   const visibleEnd = viewportEnd - padding;
   const visibleWidth = Math.max(0, visibleEnd - visibleStart);
   const itemWidth = itemEnd - itemStart;
-  if (itemWidth > visibleWidth || itemStart < visibleStart) {
+  if (itemWidth > visibleWidth) {
     return itemStart - visibleStart;
   }
+  if (itemStart < visibleStart) {
+    const contextDelta = leadingPeekStart - visibleStart;
+    const minimumDeltaForItemEnd = itemEnd - visibleEnd;
+    return Math.max(contextDelta, minimumDeltaForItemEnd);
+  }
   if (itemEnd > visibleEnd) {
-    return itemEnd - visibleEnd;
+    const contextDelta = trailingPeekEnd - visibleEnd;
+    const maximumDeltaForItemStart = itemStart - visibleStart;
+    return Math.min(contextDelta, maximumDeltaForItemStart);
   }
   return 0;
 }
