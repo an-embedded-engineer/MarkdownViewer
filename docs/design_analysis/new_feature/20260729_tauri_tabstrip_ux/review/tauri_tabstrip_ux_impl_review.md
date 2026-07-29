@@ -664,3 +664,82 @@ Round 3 の実 WebView 確認で 10.6 の 5 項目が期待どおりであれば
 2. 実装記録 §5 / §9 の test 件数を実測値へ整合させる（11.3-4）。
 3. `View > Debug Information` の受理を TODO-2026-026 または完了記録へ明示する（11.3-6）。
 4. 11.3-1 / 11.3-2 / 11.3-3 は任意対応とし、対応しない場合は既知の改善余地として完了記録へ残す。
+
+---
+
+## 12. Phase 3 follow-up / Round 5（レビュー担当、2026-07-30、対象 `aa40142..41d2da8`）
+
+**修正コミット**: `41d2da8` Phase 3 address Round 4 TabStrip review findings（8 files、+107 / −35。`App.tsx` +109、docs 7 ファイル）
+**判定**: **Phase 3 承認 (Approved)。Phase 4-b 進行可。** Round 4 の 6 件は**すべて解決済み**。再確認で **新規 1 件（Low / non-blocking）** を検出したため、**未解決 1 件**であり「未解決 0」には至っていない。当該 1 件は既存残リスク R5（HTML iframe 境界）の部分集合で自己修復する性質のため、Phase 4-b の進行は妨げない。
+
+### 12.1 Round 4 指摘の解決状況
+
+| 指摘 | 対応内容と確認根拠 | 判定 |
+| --- | --- | --- |
+| 11.3-1 pointermove ごとの shell 矩形 read | `trackPointerPosition` は最新座標を `pendingPointerRef` へ保存し、`pointerSyncFrameRef` が空の時だけ rAF を 1 本予約する（`App.tsx` の listener effect）。矩形 read と `isPointInsideTabStrip` は rAF 内の 1 回だけになり、**split でも 1 frame あたり pane ごと 1 read** が上限。touch は `cancelPointerSync()` + clear、window `blur` の `clearVisibility` も `cancelPointerSync()` を先に呼び、effect cleanup でも frame と座標を破棄する。双方向 enter / leave 回復は rAF 内で `pointerInsideRef` と比較して両方向に更新するため維持され、drag capture 中も window capture の move が同じ経路を通る。Debug ON 時は rAF 内から座標付きで `queueScrollbarDebug` を呼ぶため `pointer` 表示も更新される（変化なしの場合も `window-move-inside/outside` として最新座標を送る） | **解決済み** |
+| 11.3-2 provider 固有 filter と stale entry | event detail を `DebugPanelEntry \| { id; remove: true }` の union にし、`"remove" in detail` で narrowing（TS 型検査は build で通過）。provider は effect cleanup で `debugEnabled` の時だけ remove を発行するため、split off による secondary unmount と Debug ON→OFF の両方で entry が残らない。App 側は `tab-strip-secondary` の特別扱いを削除し `Object.values(debugPanelEntries)` をそのまま渡す。remove 対象が存在しない場合は `current` を返して余分な render も避けている。Debug OFF 遷移時は cleanup の dispatch と App の一括 clear のどちらが先でも entries は空になる | **解決済み** |
+| 11.3-3 Debug OFF 時の余分な render | `setDebugPanelEntries((current) => (Object.keys(current).length === 0 ? current : {}))` により、空なら同一参照を返して bail out する | **解決済み** |
+| 11.3-4 test 件数の記録 | 実装記録 §5 の表を「6 files / 113 tests（最終 Phase 3 follow-up 時点）」へ更新し、§9 の peek 追加前件数を 109 へ訂正。レビュー担当の再実行値（113）と一致 | **解決済み** |
+| 11.3-5 Phase 4-a 結果の記録 | `verification/phase4a_user_verification.md` へ「Round 5 最終確認結果」を新設し、起動直後からの scrollbar 表示（Debug OFF / ON）、隣接 tab 50% peek、先頭 / 末尾と幅不足時の優先、40px / 6px / indicator / drag / item reveal の非退行を合格として記録。残る Low リスク（HTML iframe 境界、pointer 静止中の layout 変化、focus ring と thumb modality の理論差）を完了記録へ引き継ぐ旨も明記。`meta.md` は `verification_status: done`、Phase 4-a 行を Done へ更新 | **解決済み** |
+| 11.3-6 DebugPanel の traceability | `docs/todo/todo.md` の TODO-2026-026 へ scope（原因調査から派生した恒久機能としての受理、通常時は採取停止）と completion（OFF で採取なし / ON で provider 単位の複数行情報を表示・破棄）の 2 行を追加 | **解決済み** |
+
+恒久 docs 側も同期済みである。`interface_spec.md` の Debug Information 節へ provider の更新 / 削除契約を追記し、`detail_design.md` へ「native event ごとに layout を読まず、最新座標を ref に保持して animation frame ごとに最大 1 回 shell 矩形を読む」「split でも pane ごと 1 frame 1 回」を明記した。設計側にも Round 4 指摘対応の記述が入っている。
+
+### 12.2 新規指摘
+
+#### 12.2-1 `onPointerLeave` 経路が pending pointer-sync frame を破棄しないため、iframe 越えの直後に古い座標で inside が再設定され得る
+
+**severity**: Low / **blocking**: 非 blocking / **status**: 未解決
+
+**根拠**: `cancelPointerSync` は listener effect のクロージャ内に閉じており、呼び出しているのは touch 分岐、`clearVisibility`（window blur）、effect cleanup の 3 箇所だけである。shell の React `onPointerLeave` は `updatePointerInside(false, ...)` を呼ぶだけで pending frame を破棄しない。このため次の順序が同一 frame 内で成立すると、明示 clear の後に古い座標判定が上書きする。
+
+1. 親 document で strip 内座標の `pointermove` を受信 → `pendingPointerRef` に inside 座標、rAF を 1 本予約。
+2. 同 frame 内に pointer が trusted HTML preview の iframe へ入る → 親では `pointerleave`（shell 外座標）だけが発生し、以後の `pointermove` は iframe 側へ配送されるため親の pending は更新されない。
+3. React handler が `updatePointerInside(false)` で class を外す。
+4. 予約済み rAF が発火し、手順 1 の inside 座標で再判定して `updatePointerInside(true)` に戻す。
+
+結果として HTML preview 上に pointer がある間だけ thumb が残り得る。入力 event は通常 frame 単位に合わせて配送されるため 1 と 2 が同一 frame に入る確率は高くなく、親側で次の `pointermove` を 1 回受け取るか window blur が起きれば自己修復する。Markdown preview では手順 2 で親に move が届くため発生しない。実 WebView の Round 5 確認でも再現していない。既存残リスク R5（iframe が親の `pointermove` を吸収する）の部分集合であり、rAF 集約によって「解除できない」から「解除後に再設定され得る」へ性質が変わった点が新規である。
+
+**推奨対応**: `cancelPointerSync` 相当を component scope（ref だけを触る helper）へ引き上げ、`onPointerLeave` の clear と `updatePointerInside(false, …)` 経路でも pending frame と座標を破棄する。あるいは clear 世代カウンタを ref に持ち、rAF 内で世代が進んでいれば適用をスキップする。いずれも数行で、既存の coalesce 効果は失われない。対応しない場合は R5 の一部として完了記録へ明記し、Phase 4-b の確認で trusted HTML 文書を表示した状態の TabStrip ↔ preview 往復を 1 度確認すること。
+
+### 12.3 残リスク
+
+| # | 内容 | severity | 状態 |
+| --- | --- | --- | --- |
+| R2 | WebKit native scrollbar の初回 style / paint invalidation 不足に対する明示 flush（engine 依存 workaround） | Low | 継続。将来 WebView 更新で不要になった際の削除条件を完了記録へ残すことを推奨 |
+| R4 | mouse 起点 programmatic focus では thumb を出さない（意図どおり） | Low | 継続 |
+| R5 | trusted HTML iframe が親の `pointermove` を吸収するため、解除が `pointerleave` / `blur` 依存（12.2-1 を含む） | Low | 継続。Phase 4-b で HTML 文書表示中の往復を 1 度確認 |
+| R6 | pointer 静止中の layout 変化は次の move まで反映されない | Low（自己修復） | 継続 |
+| R8 | pure policy の invalid geometry throw（実 rect では到達しない） | Low | 継続 |
+| R9 | UA の focus ring と自前 keyboard modality の理論上の差 | Low（cosmetic） | 継続 |
+
+### 12.4 自動検証（レビュー担当による再実行）
+
+| 検証 | 実装側の記録 | レビュー担当の再実行 |
+| --- | --- | --- |
+| `npm test -- --run` | 6 files / 113 tests passed | 成功。6 files / 113 tests |
+| `npm run build` | success（既存 chunk size warning のみ） | 成功（同 warning のみ） |
+| `cargo fmt -- --check` | success | 成功 |
+| `cargo check` | success | 成功 |
+| `cargo test` | 22 passed | 成功。22 passed |
+| `git diff --check` | success | 成功 |
+
+今回の差分は `App.tsx` の debug event 契約と pointer 同期の集約が中心で、pure policy（`tabStrip.ts`）と CSS には変更が無い。したがって 40px 固定高、6px track、indicator、reveal delta、drag lifecycle への影響は構造的に生じず、113 tests の内訳も Round 4 から不変である。
+
+### 12.5 集計と結論（Round 5）
+
+| 分類 | 件数 |
+| --- | --- |
+| Round 4 指摘（11.3-1〜11.3-6） | 6 件すべて **解決済み** |
+| Round 5 新規指摘 | **1**（blocking 0 / non-blocking Low 1: 12.2-1） |
+| 未解決指摘 | **1**（Low、12.2-1） |
+| 残リスク | 6 件（R2 / R4 / R5 / R6 / R8 / R9、いずれも Low） |
+
+**Phase 3 判定**: **承認 (Approved)**。Round 4 の 6 件は推奨した形どおりに閉じており、rAF 集約は「1 frame・pane あたり 1 read」という上限を満たしつつ双方向同期、drag capture、Debug ON の座標更新を退行させていない。debug event は provider 非依存の update / remove 契約になり、表示器から provider 固有の判定が消えた。記録類（test 件数、Phase 4-a 結果、TODO scope / completion）も実測・実機結果と一致する。
+
+**Phase 4-b 進行可否**: **進行可**。Phase 4-a は Round 5 で合格が記録され、`meta.md` の `verification_status` も `done` になっている。ただし本レビューは**未解決 1 件（Low）を残すため「未解決 0 での完了」には該当しない**。Phase 4-b では次のいずれかを実施すること。
+
+1. 12.2-1 を数行で修正し（`cancelPointerSync` の component scope 化、または clear 世代カウンタ）、trusted HTML 文書表示中の TabStrip ↔ preview 往復を 1 度確認する。修正した場合は完了記録へ反映する。
+2. 修正しない場合は、12.2-1 を R5 の一部として完了記録へ明示的に受理記録し、既知の Low 制約として残す。
+
+いずれの選択でも Phase 4-b の完了処理と merge を妨げるものではない。R2 の workaround 削除条件、R5 / R6 / R9 の Low 制約も完了記録へ引き継ぐこと。
