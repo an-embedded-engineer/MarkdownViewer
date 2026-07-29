@@ -96,3 +96,5 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 2026-07-29のユーザ確認では、40px固定高、状態indicator、pane間drag move、右端tabのitem全体revealは期待どおりだった。一方、tabをpointer clickした後にpointerをpreviewへ移してもhorizontal scrollbar thumbが残ることが報告され、Phase 4-aをNGとしてPhase 3へ差し戻した。
 
 原因は`.tab-strip:focus-within`がpointer click後に残るbutton focusにも一致することだった。thumb表示条件を`.tab-strip:hover`または`.tab-strip:has(:focus-visible)`へ限定し、pointerが領域外へ出た時は隠し、keyboard focus中は表示を維持する。6px trackと40px外寸は変更しない。再確認ではpointer click後のmouse leave、keyboard focus中のmouse leave、TabStrip外へのkeyboard focus移動を確認する。
+
+修正コミット`76daecf`はRound 2レビュー`d9ebeaa`で新規指摘0件、未解決0件として承認され、Phase 4-a再実施可となった。`:has()`は既存CSS機能より対応下限が低く互換性上のblocking riskはないが、focus-visibleのUA heuristicとscrollbar pseudo-elementの再描画は実WebViewで再確認する。
