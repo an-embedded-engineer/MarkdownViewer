@@ -15,7 +15,7 @@ components:
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "not_started"
+design_status: "draft"
 impl_status: "not_started"
 completion_status: "not_started"
 verification_status: "not_started"
@@ -50,7 +50,7 @@ depends_on:
 | --- | --- |
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
-| Phase 2 Design review | Not started |
+| Phase 2 Design review | Draft prepared; review not started |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4-a User verification | Not started |
 | Phase 4-b Completion | Not started |
