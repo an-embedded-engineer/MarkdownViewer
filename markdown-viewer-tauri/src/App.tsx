@@ -179,6 +179,13 @@ type DebugPanelEntry = {
   lines: string[];
 };
 
+type DebugPanelEventDetail =
+  | DebugPanelEntry
+  | {
+      id: string;
+      remove: true;
+    };
+
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 const defaultWindowSize: WindowSize = { width: 800, height: 600 };
@@ -291,12 +298,22 @@ function App() {
 
   useEffect(() => {
     if (!isDebugPanelVisible) {
-      setDebugPanelEntries({});
+      setDebugPanelEntries((current) => (Object.keys(current).length === 0 ? current : {}));
       return;
     }
     const handleDebugPanelUpdate = (event: Event) => {
-      const entry = (event as CustomEvent<DebugPanelEntry>).detail;
-      setDebugPanelEntries((current) => ({ ...current, [entry.id]: entry }));
+      const detail = (event as CustomEvent<DebugPanelEventDetail>).detail;
+      setDebugPanelEntries((current) => {
+        if ("remove" in detail) {
+          if (!(detail.id in current)) {
+            return current;
+          }
+          const next = { ...current };
+          delete next[detail.id];
+          return next;
+        }
+        return { ...current, [detail.id]: detail };
+      });
     };
     window.addEventListener(debugPanelEventName, handleDebugPanelUpdate);
     return () => window.removeEventListener(debugPanelEventName, handleDebugPanelUpdate);
@@ -1671,11 +1688,7 @@ function App() {
         {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
 
         {isDebugPanelVisible ? (
-          <DebugPanel
-            entries={Object.values(debugPanelEntries).filter(
-              (entry) => splitViewState.mode === "split" || entry.id !== "tab-strip-secondary",
-            )}
-          />
+          <DebugPanel entries={Object.values(debugPanelEntries)} />
         ) : null}
 
         <StatusBar
@@ -2847,6 +2860,8 @@ function TabStrip({
   const lastScrollbarEventRef = useRef("mount");
   const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
   const scrollbarDebugFrameRef = useRef<number | null>(null);
+  const pointerSyncFrameRef = useRef<number | null>(null);
+  const pendingPointerRef = useRef<{ x: number; y: number } | null>(null);
   const [isPointerInside, setIsPointerInside] = useState(false);
   const [isKeyboardFocusInside, setIsKeyboardFocusInside] = useState(false);
 
@@ -2912,7 +2927,7 @@ function TabStrip({
           : "-",
       };
       window.dispatchEvent(
-        new CustomEvent<DebugPanelEntry>(debugPanelEventName, {
+        new CustomEvent<DebugPanelEventDetail>(debugPanelEventName, {
           detail: {
             id: `tab-strip-${paneId}`,
             title: `${paneId === "primary" ? "Primary" : "Secondary"} TabStrip`,
@@ -2993,30 +3008,60 @@ function TabStrip({
     const clearPointerInside = (eventName: string) => {
       updatePointerInside(false, eventName);
     };
+    const cancelPointerSync = () => {
+      if (pointerSyncFrameRef.current !== null) {
+        window.cancelAnimationFrame(pointerSyncFrameRef.current);
+        pointerSyncFrameRef.current = null;
+      }
+      pendingPointerRef.current = null;
+    };
     // Two-way geometry sync: boundary events (pointerenter/pointerleave) are
     // unreliable here because the native scrollbar swallows hit-tests and tab
-    // drag holds pointer capture, so every window pointermove re-derives the
-    // inside state from the shell rect instead of trusting event ordering.
+    // Drag holds pointer capture, so window pointermove re-derives the inside
+    // state from the shell rect instead of trusting event ordering. Coalesce
+    // geometry reads to one per animation frame so split view performs at most
+    // two shell reads per rendered frame rather than per native pointer event.
     const trackPointerPosition = (event: PointerEvent) => {
-      const shell = shellRef.current;
-      if (!shell || event.pointerType === "touch") {
-        clearPointerInside(event.pointerType === "touch" ? "move-touch-clear" : "move-no-shell");
+      if (event.pointerType === "touch") {
+        cancelPointerSync();
+        clearPointerInside("move-touch-clear");
         return;
       }
-      const rect = shell.getBoundingClientRect();
-      const inside = isPointInsideTabStrip(
-        rect.left,
-        rect.right,
-        rect.top,
-        rect.bottom,
-        event.clientX,
-        event.clientY,
-      );
-      if (pointerInsideRef.current !== inside) {
-        updatePointerInside(inside, inside ? "window-move-enter" : "window-move-leave", event);
-      } else {
-        queueScrollbarDebug(inside ? "window-move-inside" : "window-move-outside", event);
+      pendingPointerRef.current = { x: event.clientX, y: event.clientY };
+      if (pointerSyncFrameRef.current !== null) {
+        return;
       }
+      pointerSyncFrameRef.current = window.requestAnimationFrame(() => {
+        pointerSyncFrameRef.current = null;
+        const shell = shellRef.current;
+        const pointer = pendingPointerRef.current;
+        pendingPointerRef.current = null;
+        if (!shell || !pointer) {
+          clearPointerInside("move-no-shell");
+          return;
+        }
+        const rect = shell.getBoundingClientRect();
+        const inside = isPointInsideTabStrip(
+          rect.left,
+          rect.right,
+          rect.top,
+          rect.bottom,
+          pointer.x,
+          pointer.y,
+        );
+        if (pointerInsideRef.current !== inside) {
+          updatePointerInside(
+            inside,
+            inside ? "window-move-enter" : "window-move-leave",
+            { clientX: pointer.x, clientY: pointer.y },
+          );
+        } else {
+          queueScrollbarDebug(
+            inside ? "window-move-inside" : "window-move-outside",
+            { clientX: pointer.x, clientY: pointer.y },
+          );
+        }
+      });
     };
     const trackKeyboardInput = () => {
       lastInputWasKeyboardRef.current = true;
@@ -3027,6 +3072,7 @@ function TabStrip({
       updateKeyboardFocusInside(false, "window-pointerdown");
     };
     const clearVisibility = () => {
+      cancelPointerSync();
       updatePointerInside(false, "window-blur");
       updateKeyboardFocusInside(false, "window-blur");
     };
@@ -3041,8 +3087,17 @@ function TabStrip({
       window.removeEventListener("pointerdown", trackPointerInput, true);
       window.removeEventListener("keydown", trackKeyboardInput, true);
       window.removeEventListener("blur", clearVisibility);
+      cancelPointerSync();
       if (scrollbarDebugFrameRef.current !== null) {
         window.cancelAnimationFrame(scrollbarDebugFrameRef.current);
+        scrollbarDebugFrameRef.current = null;
+      }
+      if (debugEnabled) {
+        window.dispatchEvent(
+          new CustomEvent<DebugPanelEventDetail>(debugPanelEventName, {
+            detail: { id: `tab-strip-${paneId}`, remove: true },
+          }),
+        );
       }
     };
   }, [debugEnabled]);

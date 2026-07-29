@@ -101,7 +101,7 @@ StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術�
 
 ## Debug Information表示
 
-`View > Debug Information`がONの場合、ErrorBannerとStatusBarの間に最大180pxの複数行デバッグ領域を表示する。OFFの場合は領域と診断採取処理を無効にする。現在はprimary / secondary TabStripのpointer / keyboard表示state、DOM class、geometry、focus、scrollbar computed style、直近eventを表示する。
+`View > Debug Information`がONの場合、ErrorBannerとStatusBarの間に最大180pxの複数行デバッグ領域を表示する。OFFの場合は領域と診断採取処理を無効にする。現在はprimary / secondary TabStripのpointer / keyboard表示state、DOM class、geometry、focus、scrollbar computed style、直近eventを表示する。providerは更新eventと削除eventを同じ汎用契約で通知し、unmountまたは停止したproviderのentryを表示器へ残さない。
 
 ## StatusBar 表示
 

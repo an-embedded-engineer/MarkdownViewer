@@ -109,6 +109,8 @@ DOM ref、pointer capture、focus、`elementFromPoint`、React stateは`TabStrip
 
 `overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparentにする。scroll elementを同寸のouter shellで包み、native scrollbarを含むshell矩形をpointer境界にする。pointer enter / leaveとwindow capture `pointermove`からpointer stateを管理し、window keydown / pointerdownとshell内focusからkeyboard modality stateを管理する。`pointerInside || keyboardFocusInside`をpure policyで求め、単一の表示classだけをthumb着色条件に使う。`:focus-within`、`:hover`、`:has(:focus-visible)`はいずれもUAのfocus / native scrollbar hit-test / repaintに依存した残留が確認されたため表示条件に使わない。Tauriの対象WebViewで共通利用できるWebKit scrollbar pseudo-elementへ実装を一本化し、`scrollbar-width` / `scrollbar-color`は併記しない。
 
+window `pointermove`の双方向同期はnative eventごとにlayoutを読まず、最新座標をrefへ保持してanimation frameごとに最大1回だけouter shell矩形を読む。split時もpaneごとに1 frame 1回へ上限を設け、pointer event頻度によるforced layout増加を避ける。
+
 scrollbar自体の追加・除去や`overflow-x: auto | hidden`切替は行わない。classic scrollbarではtransparentなtrackを含め常に同じ6px内部寸法を確保し、overlay scrollbar環境でもTabStrip外寸40pxを維持する。overflowがない場合も透明trackの領域は保持するがthumbは生成されず、不要なbarは視認できない。これによりtab追加・closeがoverflow境界を跨いでもtab itemの内寸を34pxから変えない。
 
 ### 4.6 不採用案一覧

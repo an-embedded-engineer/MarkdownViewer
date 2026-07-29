@@ -70,3 +70,14 @@ OFF / ON比較では、起動直後のOFFで残留し、ONでは非表示が正�
 style flush buildは起動直後のDebug OFF、Debug ON、再度OFFのすべてで期待どおり表示・非表示が動作し、horizontal scrollbar問題は解決と確認された。
 
 追加確認では、見切れたtabをclickすると選択tab全体は表示されるが、さらに同方向の隣接tabが見えず、連続移動にはmanual scrollが必要だった。次回は、左見切れなら前tabの右半分、右見切れなら次tabの左半分を選択tabと同時に表示する。先頭 / 末尾では従来どおり選択tabを端へ揃え、幅不足時は選択tab全体を優先する。
+
+## Round 5 最終確認結果（2026-07-30）
+
+ユーザは最終publish版を実Tauri WebViewで確認し、次を期待どおりと判定した。
+
+1. app起動直後からhorizontal scrollbar thumbの表示・非表示が正しく、Debug InformationのOFF / ONどちらでも同じ結果になる。
+2. 見切れ方向に隣接tabがある場合、選択tab全体と隣接tabのおよそ半分が表示され、連続してtabを選択できる。
+3. 先頭 / 末尾では選択tab全体を従来どおり端へ揃え、選択tab全体を表示できないほど狭い場合は選択tabを優先する。
+4. 40px固定高、6px scrollbar track、上端indicator、左右pane間drag move、item全体revealに退行は確認されなかった。
+
+以上によりPhase 4-aを合格とする。HTML iframe境界、pointer静止中のlayout変化、keyboard focus ringとthumb modalityの理論上の差はLowの残リスクとして完了記録へ引き継ぐ。

@@ -59,7 +59,7 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 
 | 検証 | 結果 |
 | --- | --- |
-| `npm test -- --run` | 成功。6 files / 97 tests |
+| `npm test -- --run` | 成功。6 files / 113 tests（最終Phase 3 follow-up時点） |
 | `npm run build` | 成功。TypeScript compile + Vite production build。既存chunk size warningのみ |
 | `cargo fmt -- --check` | 成功 |
 | `cargo check` | 成功 |
@@ -113,4 +113,6 @@ Round 4実WebView確認でも症状は変わらなかった。window `pointermov
 
 実WebViewではDebug ONで正常化し、その後OFFへ戻しても正常状態が継続した。通常のscrollbar表示class transitionとtab数変更後にも、overflow時だけ次frameでlayoutとthumb computed backgroundを1回読むstyle flush effectを追加した。診断providerはOFF時に停止したままであり、workaroundは連続pointermove採取やApp再renderに依存しない。
 
-scrollbar修正確認後の追加feedbackとして、見切れたtabをactivateしてもその隣が表示されず連続clickしにくい点へ対応した。`revealTab`は対象itemの前後refから隣接itemの中点を求め、見切れ方向の隣接tabを50%だけpeek目標へ含める。pure `getTabRevealDelta`は選択item全体を必ず優先し、先頭 / 末尾、狭幅、oversized、invalid geometryを決定的に扱う。unit testを108件から113件へ拡張した。
+scrollbar修正確認後の追加feedbackとして、見切れたtabをactivateしてもその隣が表示されず連続clickしにくい点へ対応した。`revealTab`は対象itemの前後refから隣接itemの中点を求め、見切れ方向の隣接tabを50%だけpeek目標へ含める。pure `getTabRevealDelta`は選択item全体を必ず優先し、先頭 / 末尾、狭幅、oversized、invalid geometryを決定的に扱う。unit testを109件から113件へ拡張した。
+
+Round 4レビュー指摘への対応として、window `pointermove`の双方向geometry同期は最新座標だけを保持し、animation frameごとに最大1回のshell矩形readへ集約した。DebugPanel eventはprovider追加だけでなくprovider削除も表現し、表示器から`tab-strip-secondary`固有判定を除去した。Debug OFF時の空entry初期化は既に空なら同一state参照を返す。

@@ -29,6 +29,7 @@
   - overflow中のtabをactivateまたはfocusした時、titleだけでなくmove / close buttonを含むtab item全体が表示範囲へ入るようscroll位置を調整する。
   - split表示中、tabを反対paneへdrag and dropして既存`move-tab` transitionを実行する。drop target / drag feedback / cancelを明示する。
   - 既存の矢印move buttonをkeyboard / assistive technology向けの代替導線として維持する。
+  - 原因調査から派生した`View > Debug Information`を恒久機能として受理し、通常時は採取を停止、表示時だけ複数行のTabStrip診断情報を提供する。
 - non_scope:
   - 同一pane内reorder、pin、複数選択、一括move / close。
   - 実数のrender progress表示。現行runtimeに進捗率が無いためindeterminate表現までとする。
@@ -47,6 +48,7 @@
   - overflow中に右端を含む任意tabをactivate / focusすると、title、move、close controlを含むtab item全体が自動的に表示範囲へ入る。
   - pointer dragでprimary / secondary間を移動でき、source fallback、destination selection、focus、runtime guardが矢印moveと一致する。cancel時はstateを変更しない。
   - keyboardだけでも既存move buttonから同じ移動を実行でき、drag state / drop targetが支援技術を妨げない。
+  - `View > Debug Information`をOFFにした通常経路では診断採取を行わず、ON時はprovider単位の複数行情報を表示・破棄できる。
   - Light / Dark、single / split、narrow window、horizontal overflow、HTML / Mermaid / PlantUML表示で回帰がない。
   - `npm test`、`npm run build`、`cargo check`が成功する。
 - success_metrics:
