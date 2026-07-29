@@ -11,6 +11,15 @@
 - target_users:
   - 多数のtabを左右paneで扱い、状態を判別しつつpreview領域を広く保ちたい利用者。
   - pointerでtabを直接反対paneへ移動したい一方、keyboardや支援技術でも同じ操作へ到達したい利用者。
+- use_cases:
+  - 通常・active・error・renderingのtabを、本文領域を圧迫しないcompactなTabStrip上で識別し、状態の詳細は支援技術からも確認する。
+  - 多数のtabでoverflowしたpaneにおいて、pointerまたはkeyboardで任意tabを選択し、move / closeを含むtab全体が見える状態で操作を続ける。
+  - split表示中にtabを反対paneへdrag and dropし、矢印move buttonと同じ移動結果・focus復旧を得る。
+  - dragを開始後にdrop target外へ移動する、または操作をcancelし、tabの所属・順序・選択を変更せず元の状態を維持する。
+- prerequisites:
+  - TODO-2026-023で導入したpane-local ordered tab IDs、active tab、pane-local runtime、atomicな`move-tab` transitionを基盤とする。
+  - TabStripは通常 / error / rendering / empty / overflowで58px固定高を維持する現行契約を持つ。本機能ではcompact化後の新しい固定高へ一括更新し、状態別の可変高へ戻さない。
+  - rendering状態は完了率を持たず、trusted HTMLのsandbox / CSP / root boundaryとRust command契約は変更しない。
 - scope:
   - active / error / rendering状態をtab上端のindicatorへ統一し、Error / Renderingのvisible textを廃止する。
   - Errorは赤い上端線、Renderingは別色または左から伸びるindeterminate animationで表現する。実progress値が無いため進捗率とは扱わない。
@@ -29,6 +38,7 @@
   - `markdown-viewer-tauri/src/App.css`のactive / error / rendering indicator、compact height、scrollbar visibility、drag / drop feedback、reduced motion。
   - `markdown-viewer-tauri/src/splitView.ts`の既存atomic `move-tab` action。drag専用の重複state transitionは追加しない。
   - `markdown-viewer-tauri/src/paneRuntime.ts`のpresentation state合成とARIA state導出。
+  - `markdown-viewer-tauri/src/*.test.ts`のpresentation state、move transition、drag / scroll policy testと、`docs/components/tauri_viewer/`、`docs/architecture/`、`docs/rules/development_workflow.md`の恒久仕様・検証手順。
 - completion:
   - Error / Renderingのvisible textが無くても、通常・active・error・renderingを上端indicatorとaccessible stateで識別できる。
   - Error indicatorはtab上端に赤で表示され、Rendering indicatorはError / activeと混同しない。animationを使う場合は`prefers-reduced-motion`へ対応する。
@@ -39,6 +49,12 @@
   - keyboardだけでも既存move buttonから同じ移動を実行でき、drag state / drop targetが支援技術を妨げない。
   - Light / Dark、single / split、narrow window、horizontal overflow、HTML / Mermaid / PlantUML表示で回帰がない。
   - `npm test`、`npm run build`、`cargo check`が成功する。
+- success_metrics:
+  - frontend testでvisual / accessible stateの導出、tab item全体を対象にしたscroll調停、drag完了 / cancelから既存`move-tab`への接続を検証できる。
+  - 手動確認で左右paneのTabStripが全状態・empty・overflowを通じて同じcompact固定高を保ち、scrollbar表示切替でもpreview上端が動かない。
+  - 手動確認でoverflow中の先頭・中間・末尾tabへpointer / keyboardで移動し、title、move、close controlの全体へ到達できる。
+  - 手動確認でprimary / secondary間のdrag moveと矢印move buttonが、source fallback、destination selection、focus、StatusBar / ErrorBanner routingについて同じ結果になる。
+  - Light / Dark、`prefers-reduced-motion`、narrow window、Markdown / HTML / Mermaid / PlantUMLを含む回帰matrixを確認し、`npm test -- --run`、`npm run build`、`cargo check`が成功する。
 
 ## TODO-2026-025 Tauri上下・左右split方向対応
 
