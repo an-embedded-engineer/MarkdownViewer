@@ -5,7 +5,10 @@
 **対象 meta**: `docs/design_analysis/new_feature/20260729_tauri_tabstrip_ux/meta.md`
 **対象 TODO**: `docs/todo/todo.md` TODO-2026-026
 **初回レビュー対象コミット**: `affc977` (Phase 2 prepare Tauri TabStrip UX design)
-**判定**: **条件付き差し戻し (Changes Requested)**。設計の骨格・採用案・非対象境界は妥当だが、**blocking Medium 4 件**を設計へ反映してから Phase 3 へ進むこと。non-blocking Medium 3 件 / Low 10 件を含め **検出 17 件、未解決 17 件**。
+**Round 1 fix コミット**: `1bc136e` (Phase 2 address Tauri TabStrip UX design review)
+**Round 1 再確認日**: 2026-07-29
+**初回判定**: 条件付き差し戻し (Changes Requested)。blocking Medium 4 件 / non-blocking Medium 3 件 / Low 10 件 = 検出 17 件。
+**最終判定**: **承認 (Approved)**。Phase 3 進行可。初回 17 件は Round 1 fix (`1bc136e`) ですべて設計上解決済みと再確認した。Round 1 再確認で新規検出した **non-blocking Medium 1 件 / Low 2 件 = 3 件**は、いずれも Phase 3 の実装差分と同じ改訂で閉じられるため進行を妨げない。**未解決 3 件（すべて non-blocking、Phase 3 実装レビューで確認）。**
 
 ---
 
@@ -287,3 +290,121 @@ blocking 4 件の反映後に再確認レビューを行い、新たな穴が無
 | 3.8 module登録先 | meta componentsと§15へ`tabStrip.ts` / test、basic design、READMEを追加 | 対応済み・再確認待ち |
 | 3.9 destination暗黙導出 | §2.3 / §8.4 / §9.1で`moveTab(source,destination,tabId)`へ明示化。reducerは不変 | 対応済み・再確認待ち |
 | 3.10 roving前提 | §7.2 / §14で矢印activate後にTabでcontrolsへ進む手順を明記 | 対応済み・再確認待ち |
+
+---
+
+## 7. Round 1 再確認（レビュー担当、2026-07-29、対象 `1bc136e`）
+
+`git show 1bc136e`（design 82 行、meta 9 行、review 26 行）、改訂後の設計書全文、`meta.md`、および現行実ソース（`App.tsx`、`App.css`、`main.tsx`、`splitView.ts`）を突き合わせて再確認した。**初回 17 件はすべて設計上解決済み**である。以下、依頼された 8 観点を軸に検算結果を示す。
+
+### 7.1 初回指摘の解決状況
+
+| 指摘 | severity（初回） | 再確認結果 | 判定 |
+| --- | --- | --- | --- |
+| 1.1 focus による ancestor scroll | Medium（blocking） | §7.2 へ「TabStrip / App が実行する roving navigation、close 後、move 後、pane fallback の programmatic focus はすべて `focus({ preventScroll: true })`」「水平位置は `getTabRevealDelta` + `strip.scrollBy` だけが変更する」を追加。§9.2 の TabStrip 責務、§12 の境界条件行、§14-5 / §14-8 の「focus 時に preview / Explorer / shell が動かない」確認まで一貫。現行の 4 経路（`App.tsx:2455-2461` `focusTab`、`2490-2497` close、`789-801` `moveTab`、`2495` pane fallback）が漏れなく列挙されている | **解決済み** |
+| 1.2 click 抑止 flag lifecycle | Medium（blocking） | flag が `{ pointerId, sourcePaneId, tabId }` の scoped identity へ格上げされ（§8.1 / §8.2）、消費経路が source activate button の `onClickCapture`、clear 経路が「pointerup 後の次 frame」「新しい pointerdown による stale clear」「unexpected lost capture の同期 clear」へ確定した（§8.4）。成功 drop の source unmount で click が来ない経路、pointerup 後の implicit `lostpointercapture` を no-op とする順序、§12 の 1 行、§14-13 の手動確認まで揃っている。詳細は 7.2 参照 | **解決済み**（残る改善提案は 7.4 の 8.2） |
+| 1.3 scrollbar 内部寸法 | Medium（blocking） | §4.5 / §7.1 が `overflow-x: scroll` + 常時 transparent track へ確定し、「overflow 境界を跨いでも tab item の内寸を 34px から変えない」と明記。§14-4 に overflow 境界前後の増減確認が入った。`auto` 由来の 6px 変動は消えている | **解決済み**（engine 依存の残課題は 7.4 の 8.1） |
+| 1.4 恒久 docs 置換対象 | Medium（blocking） | §15 が「file / 現行記述 / 置換後の要旨」の 11 行表へ改稿。指摘した 4 行（`detail_design.md:474`、`interface_spec.md:12` / `:59` / `:62`、`development_workflow.md:177`）がすべて含まれ、`basic_design.md`、`README.md`、`code_patterns.md`、`common_pitfalls.md`、`docs/tests/README.md`、`docs/history/` も追加された。行番号を目安とし記述内容で照合する旨の但し書きもあり、TODO-2026-023 で確立した形式に戻っている | **解決済み** |
+| 2.1 indicator theme token | Medium | §7.1 が `--tab-indicator-loading` / `--tab-indicator-rendering` / `--tab-indicator-error` を `.app-shell` と dark 側へ追加すると確定し、「Light / Dark の `--chrome-bg` と active 時 `--panel-bg` の双方で視認できる値」という受け入れ条件を明示。§9.6 が component rule への固定 RGB 追加を禁止したまま token 定義先を規定し、§14-2 が手動確認へ落ちている | **解決済み**（drag layer 側の token 供給範囲は 7.4 の 8.3） |
+| 2.2 非 finite geometry | Medium | §7.2-5 が「`getTabRevealDelta` が throw する。呼び出し側は catch して 0 へ fallback しない」へ一意化。`splitView.ts:369-379` の assert pattern と整合。§12 に行、§13.1 に `NaN` / `Infinity` の test が追加された | **解決済み** |
+| 2.3 touch / pen 競合 | Medium | §8.2 が `pointerType === "mouse"` を受理条件へ追加し、touch / pen は horizontal pan、tap activate、move button へ委ねると明記。§7.1 が `.tab-activate` へ `touch-action: none` を付けないことを裏返しで確定し、§14-14 が手動確認になった。scroll container と drag の競合が設計上発生しない | **解決済み** |
+| 3.1 candidate 型 | Low | §4.3 の signature が `resolveTabDropPane(sourcePaneId: PaneId, candidatePaneId: string | null, mode: ViewMode): PaneId | null` へ変更され、§8.3 が dataset からの `string | null` 取得と `elementFromPoint` の `null`（viewport 外 / 対象なし）を invalid target へ含め、§13.1 の test も `string | null` 前提へ更新された | **解決済み** |
+| 3.2 pointerup 再判定 | Low | §8.4 が「pointerup の `clientX` / `clientY` で `elementFromPoint` と `resolveTabDropPane` を再実行し、その結果が valid な時だけ move」「session の `dropPaneId` は feedback 表示専用」と確定。coalesce による stale target が drop 判定に入らない | **解決済み** |
+| 3.3 session 所有者 | Low | §8.1 が「`App` の React `useRef`」へ一本化し、「`TabStrip` component は `App.tsx` 内に維持し、pure policy だけを `tabStrip.ts` へ分ける」と明記。§9.1 と矛盾しない | **解決済み** |
+| 3.4 Escape listener | Low | §8.4 が「dragging 中だけ `document` へ capture phase の `keydown` を effect 登録」「`preventDefault` / `stopPropagation` で drag cancel を優先」「cleanup で必ず解除」へ確定。既存の document bubble listener（menu `App.tsx:1138`、image viewer `1557`、settings `1978`）は同一 event では起動しない。DOM の伝播アルゴリズム上、document の capture 段で伝播を止めれば同じ node の bubble listener も呼ばれないため、記述どおりに成立する | **解決済み** |
+| 3.5 preview mount | Low | §8.1 / §9.1 / §9.6 が「`.app-shell` の sibling として React root 直下に 1 つだけ mount、`position: fixed` + `transform: translate()`」へ確定。既存の `.settings-backdrop` / `.image-viewer-backdrop`（`App.tsx:1400-1409`、`App.css:238`, `271`）と同じ配置 pattern であり、pane / shell の `overflow: hidden` に clip されない | **解決済み**（token 供給は 7.4 の 8.3） |
+| 3.6 body class 不整合 | Low | §8.2 / §8.4 / §9.1 が `.app-shell.tab-dragging` を React state 由来で付ける形へ統一し、「`document.body.classList` は変更しない」と明記。`App.tsx:1203` の `explorer-resizing` / `split-resizing` と同じ pattern | **解決済み** |
+| 3.7 accessible name 実装 | Low | §6.3 が `aria-label` 方式へ確定し、「visible `.tab-name` が accessible name の先頭と完全一致する順序を維持」して name-in-name 要件を満たす旨を追加。隠し要素を入れないため 40px layout と干渉しない | **解決済み** |
+| 3.8 module 登録先 | Low | `meta.md` の `components` へ `markdown-viewer-tauri/src/tabStrip.ts` / `tabStrip.test.ts` が追加され、§15 表へ `basic_design.md` の policy 一覧と `README.md` の file map / module 表が入った。`related_commits` と Phase Status も更新されている | **解決済み** |
+| 3.9 destination 暗黙導出 | Low | §2.3-4 / §8.4 / §9.1 が `moveTab(sourcePaneId, destinationPaneId, tabId)` へ明示化。move button は反対 pane を明示して渡し、drag は drop 再判定結果を渡す。`splitView.ts` の `move-tab` reducer 契約は不変（§9.5 のまま）で、判定と適用がずれる経路が無くなった | **解決済み** |
+| 3.10 roving 前提 | Low | §7.2 に「非 active tab を矢印キーで activate した後、active item 内の activate → move → close へ Tab 移動した時に `onFocusCapture` reveal が働く」、§14-5 に同じ手順が入り、`interface_spec.md:59` の確定契約と一致した | **解決済み** |
+
+**初回 17 件: 解決済み 17 / 未解決 0。**
+
+### 7.2 click 抑止 identity の clear 順（重点確認）
+
+§8.4 の記述順を、React 19 の同期 flush と DOM の event 順序へ当てて検算した。
+
+- **成功 drop**: pointerup → session finalize → `moveTab` → source `.tab-item` unmount → click 未発火。identity は次 frame の scheduled clear、または次 pointerdown の stale clear で確実に落ちる。初回 1.2 で指摘した「次の tab click を 1 回飲む」経路は塞がっている。
+- **invalid drop（同 pane 上 / drop target 外での release）**: source item は残るため click が source activate button で発火し、matching identity（同一 `pointerId` / `sourcePaneId` / `tabId`）で `onClickCapture` が消費する。cancel なのに source tab が activate される経路は塞がっている。
+- **pointerup 後の implicit `lostpointercapture`**: 「session が既に finalize 済みなので no-op とし、scheduled clear を早めない」と明記されており、explicit release と implicit release の二重発火で identity が前倒しに消えない。
+- **Escape / `pointercancel` / unexpected lost capture**: click が生成されない経路として同期 clear。ここで scheduled clear を待たない判断も正しい。
+
+順序自体は閉じている。残る論点は「scheduled clear の trigger を `requestAnimationFrame` に置くこと」の頑健性だけであり、7.4 の 8.2 として非ブロッキングで記録する。
+
+### 7.3 その他の重点観点
+
+| 観点 | 確認内容 | 結果 |
+| --- | --- | --- |
+| preventScroll と manual reveal の単一路線 | §4.4（`scrollBy` だけ）、§7.2（全 programmatic focus に `preventScroll`）、§9.2（TabStrip 責務）、§12、§14-5 / 8 が同じ contract を指す。`scrollIntoView` を残す記述は設計書に無い | 一貫 |
+| `overflow-x: scroll` + transparent track | §4.5 / §7.1 / §14-4 が同じ値で一致。overflow 有無で内寸が変わらないという主張が、選んだ値と整合する（`auto` 時の自己矛盾は解消） | 一貫（engine 差は 8.1） |
+| semantic indicator token と fixed drag layer | §7.1（token 追加先）、§9.6（`.app-shell, .tab-drag-layer` / dark 側の共通 selector、sibling 継承に依存しない）、§14-2（2 背景での視認確認）。既存 `.settings-backdrop` / `.image-viewer-backdrop` が token を局所再宣言している pattern（`App.css:238-250`, `271-283`）とも整合 | 一貫（供給範囲は 8.3） |
+| pointerup 再判定と explicit destination | §2.3-4 / §8.4 / §9.1 が `moveTab(source, destination, tabId)` で統一。`splitView.ts:145-180` の reducer は引数が明示化されるだけで invariant も guard も不変。§9.5「`splitView.ts` を変更しない」と矛盾しない（変更は App 側の関数 signature） | 一貫 |
+| mouse 限定 drag | §8.2（受理条件）、§7.1（`touch-action` を付けない）、§14-14（手動確認）、§15 の `interface_spec.md` 置換行（mouse drag と明記）が一致。§2.3-1 だけ「primary pointer を押す」の旧表現が残るが、§8.2 が受理条件の正本であり実装判断は割れない（編集上の微差） | 一貫 |
+| §15 置換対象表 / meta 登録 | 7.1 の 1.4 / 3.8 のとおり。Phase 3 で新旧仕様が並存する箇所は表から特定できる | 一貫 |
+| pure policy 自動 test と手動 matrix の境界 | §13.1 が reveal delta / 非 finite throw / threshold / drop narrowing、§13.2 が accessibility mapping、§13.3 が既存 `move-tab` 回帰。DOM lifecycle（capture、click identity、focus、CSS）は §14（14 項目）へ寄せ、§16 のリスク表へ「DOM lifecycle を unit test できない → pure policy 自動 test + §14 手動 matrix 必須」が明記された。jsdom / RTL を持たない現行構成（`package.json`、既存 test 5 本）で取りうる最善の切り分けであり、境界が文書化されている | 一貫 |
+| 要求 traceability | §18 の対応表は初回から不変で、追加した contract（preventScroll、click identity、mouse 限定、token）はいずれも既存行（§6 / §7 / §8 / §11–12 / §13）の内側に収まる。TODO-2026-026 の受け入れ条件に新たな欠落は無い | 問題なし |
+
+### 7.4 Round 1 で新規に検出した指摘
+
+#### 8.1 `scrollbar-width` と `::-webkit-scrollbar` を併記すると、対象 WebView で pseudo-element 側が無効化され 6px / 33px の見積もりが崩れうる
+
+**severity**: Medium（non-blocking）
+**工程**: Phase 3（設計 1 行の確定 + CSS 実装 + 実機確認）
+**status**: 未解決
+
+**ドキュメント記載**: §4.5「`overflow-x: scroll`と6pxのscrollbar寸法を使い…Firefox系の`scrollbar-color`とWebKit系pseudo-elementの両方を定義する。」§7.1「`.tab-strip`は`overflow-x: scroll`と6pxのtransparent trackを常時持つ。content control領域は最低33pxを確保し」。
+
+**根拠 / 差異**: 「両方を定義する」は、現行 CSS が `.tab-strip` に持つ `scrollbar-width: thin`（`App.css:866`）を残したまま `::-webkit-scrollbar { height: 6px }` を足す実装へ誘導する。しかし Chromium 121 以降および近年の WebKit は標準の `scrollbar-width` / `scrollbar-color` を実装しており、これらが `auto` 以外に設定されている場合 `::-webkit-scrollbar` 系の pseudo-element 規則を無視する。本 application の対象 WebView は WebView2（Chromium）、WKWebView / WebKitGTK（WebKit）であり Gecko は含まれないため、**併記した場合に効くのは標準プロパティ側**になる可能性が高い。そのとき track 幅は UA 定義の「thin」であって 6px ではなく、`--tab-strip-height: 40px` から差し引く量が設計の想定より大きくなる。§7.1 の「content control 領域 33px 以上」は 40px − 6px = 34px を前提にしているため、UA thin が 10px 前後であればこの budget を満たさない。
+
+なお、visibility 切替（通常 transparent、hover / focus-within で muted）自体は `scrollbar-color` でも表現できるため、機能要件は標準プロパティだけでも満たせる。崩れるのは**寸法の確定値**と、それに紐づく §7.1 の control 高さ見積もりである。
+
+**推奨対応**: §4.5 / §7.1 で機構を 1 つに決める。
+
+- 案 A（推奨）: 対象 WebView がすべて WebKit / Chromium 系であることを根拠に pseudo-element 側で寸法を確定する。この場合 `.tab-strip` の既存 `scrollbar-width: thin`（`App.css:866`）を**削除**し、`scrollbar-color` も設定しない旨を §7.1 の置換対象として明記する。6px / 34px / 33px の見積もりがそのまま成立する。
+- 案 B: 標準プロパティを正本にし、`::-webkit-scrollbar` は legacy fallback と位置づける。この場合 §7.1 の「6px」「最低 33px」を「UA thin 幅を差し引いた残り」に書き換え、実測値を Phase 4-a で確認する項目へ格上げする。
+
+いずれの案でも §14-4 へ「WebView 上で track の実寸と thumb 可視切替が設計どおりか」を含めること。Phase 3 の CSS 実装時に実機で確認し、結果を Phase 3 実装レビューで報告することを条件に、本指摘は Phase 3 進行のブロッキングとはしない。
+
+#### 8.2 click 抑止 identity の scheduled clear を `requestAnimationFrame` に置く必然性が無く、早すぎる clear の risk だけが残る
+
+**severity**: Low（non-blocking）
+**工程**: Phase 3（設計 1 文の簡素化 + 実装）
+**status**: 未解決
+
+**ドキュメント記載**: §8.4「pointerup handlerはsessionをfinalizeしてからcaptureをreleaseし、source click dispatchより後になる次の`requestAnimationFrame`でidentityを必ずclearする。…新しいpointerdownもstale identityを先にclearする。」
+
+**根拠 / 差異**: 「rAF は click dispatch より後」という前提は、pointerup → mouseup → click が同一 task で連続 dispatch される通常経路では成立するが、rendering opportunity が click の前に挟まる経路では成立しない。前倒しに clear された場合、**invalid drop cancel の直後に source activate button の click が素通りする**。非 active tab を drag して cancel した場合はその tab が activate され、§2.3-5「cancel 時は state を変更しない」に反する（`move-tab` は呼ばれないので tab 所属は変わらないが、selection は変わる）。
+
+一方、初回 1.2 で問題にした「identity が残り続けて次の click を飲む」経路は、同じ §8.4 が既に持つ「新しい pointerdown で stale identity を先に clear する」だけで塞がる。identity は `{ pointerId, sourcePaneId, tabId }` scoped であり、残存しても抑止できるのは同一 source tab の activate click に限られ、その click は必ず pointerdown を伴うためである。したがって rAF clear は 1.2 の解決に不要で、早すぎる clear の risk だけを追加している。
+
+**推奨対応**: identity の解除経路を「matching click の消費」「次の pointerdown」「click を生成しない unexpected lost capture の同期 clear」の 3 つに限定し、`requestAnimationFrame` による時間依存の clear を落とす。§14-13 の確認項目（成功 drop 後 / cancel 後に別 tab を 1 回で activate）はそのまま有効である。
+
+#### 8.3 fixed drag layer へ供給する token が「TabStrip 用 semantic token」だけに読め、preview の描画に必要な既存 token が欠ける
+
+**severity**: Low（non-blocking）
+**工程**: Phase 3（設計 1 行の具体化 + CSS 実装）
+**status**: 未解決
+
+**ドキュメント記載**: §9.6「fixed drag previewのsibling layerにもtheme tokenを供給するため、Lightは`.app-shell, .tab-drag-layer`、Darkは`:root[data-theme="dark"] .app-shell, :root[data-theme="dark"] .tab-drag-layer`の共通selectorで同じsemantic tokenを定義する。sibling間のCSS variable継承には依存しない。」§7.1 は追加 token として `--tab-indicator-loading` / `--tab-indicator-rendering` / `--tab-indicator-error` の 3 つを挙げる。
+
+**根拠 / 差異**: theme token は `.app-shell` に定義されており（`App.css:45-58` / dark は `61-75`）、sibling の `.tab-drag-layer` はこれを継承しない。`:root` 側に存在するのは `color` / `background` だけ（`App.css:1-16`）である。drag preview は tab 相当の chip を描くため、少なくとも `--panel-bg`（または `--chrome-bg`）、`--text`、`--border`、状態表示を行うなら indicator token と `--muted` を参照する。§9.6 の「同じ semantic token」が §7.1 の 3 つだけを指すと読まれると、背景・枠線が未定義（`var()` 解決不能）となり、Dark で透明な preview が出る。
+
+既存の sibling overlay は必要 token を局所再宣言している（`.settings-backdrop` は `--accent-bg` / `--error-bg` / `--error-text` と `color`、`.image-viewer-backdrop` は `--panel-bg` / `--border` / `--muted` 等、`App.css:238-250`, `271-283`）。同じ運用に揃えるのが自然である。
+
+**推奨対応**: §9.6 へ「`.tab-drag-layer` には preview が参照する token（`--panel-bg` / `--chrome-bg` / `--text` / `--muted` / `--border` / `--accent` と TabStrip indicator token）を Light / Dark 双方で定義する」と対象を列挙する。あるいは preview が参照する token を indicator token だけに絞る設計（背景・文字色は `:root` の `color` / `background` と固定 border なしで表現）へ寄せるかを、§8.1 の preview 仕様とあわせて 1 行で確定する。
+
+### 7.5 集計と結論（Round 1 再確認）
+
+| 分類 | 初回 | Round 1 で解決 | Round 1 新規 | 未解決 |
+| --- | --- | --- | --- | --- |
+| blocking Medium | 4 | 4 | 0 | 0 |
+| non-blocking Medium | 3 | 3 | 1（8.1） | 1 |
+| Low | 10 | 10 | 2（8.2 / 8.3） | 2 |
+| **合計** | **17** | **17** | **3** | **3** |
+
+**結論**: **承認 (Approved)。Phase 3 へ進行可。**
+
+初回の blocking Medium 4 件は、いずれも「設計が自ら掲げた不変条件が実装時に破れる」という構造的な穴だったが、Round 1 fix でそれぞれ contract 化された。特に 1.1（全 programmatic focus の `preventScroll` と manual reveal 単一路線）、1.2（identity 化した click 抑止と clear 順）、1.3（`overflow-x: scroll` + 常時 transparent track）は、設計書内の複数節（§4 / §7 / §8 / §9 / §12 / §13 / §14）で相互に矛盾なく閉じている。1.4 の §15 置換対象表と meta の module 登録により、Phase 3 で恒久 docs と実装差分を同時に整合させる準備も整った。
+
+新規 3 件はいずれも Phase 3 の CSS / 実装差分と同じ改訂で閉じられる粒度であり、設計の骨格・責務分割・transition 契約には影響しない。ただし 8.1 は 40px 固定高という受け入れ条件に数値で効くため、**Phase 3 の CSS 実装時に機構を 1 つへ確定し、対象 WebView での track 実寸を確認したうえで Phase 3 実装レビューへ報告すること**を進行条件とする。8.2 / 8.3 も同じ Phase 3 差分で反映し、実装レビュー時に解決を確認する。
