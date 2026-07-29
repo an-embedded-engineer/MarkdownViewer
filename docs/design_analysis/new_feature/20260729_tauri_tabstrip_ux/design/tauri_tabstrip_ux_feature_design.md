@@ -107,7 +107,7 @@ DOM ref、pointer capture、focus、`elementFromPoint`、React stateは`TabStrip
 
 ### 4.5 採用: scrollbar geometry固定 + thumb visibility切替
 
-`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparent、`:hover`または`:has(:focus-visible)`時だけthumbをmuted colorへ切り替える。`:focus-within`はpointer click後もbutton focusを保持してthumbが残るため使わない。Tauriの対象WebViewで共通利用できるWebKit scrollbar pseudo-elementへ実装を一本化し、`scrollbar-width` / `scrollbar-color`は併記しない。
+`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparentにする。pointer表示はTabStripのenter / leaveとwindow capture `pointermove`のclient座標をstrip矩形と比較して明示classへ反映する。enter時にrefを同期更新するため高速移動でもlistener有効化待ちを作らず、refが無効な通常時はgeometryを読まない。領域外の最初のmove、pointer leave、window blurでclassを外す。keyboard表示は`:has(:focus-visible)`でthumbをmuted colorへ切り替える。`:focus-within`はpointer click後もbutton focusを保持してthumbが残り、`:hover`はnative scrollbar pseudo-elementの再描画タイミングで残留したため表示状態のsource of truthに使わない。Tauriの対象WebViewで共通利用できるWebKit scrollbar pseudo-elementへ実装を一本化し、`scrollbar-width` / `scrollbar-color`は併記しない。
 
 scrollbar自体の追加・除去や`overflow-x: auto | hidden`切替は行わない。classic scrollbarではtransparentなtrackを含め常に同じ6px内部寸法を確保し、overlay scrollbar環境でもTabStrip外寸40pxを維持する。overflowがない場合も透明trackの領域は保持するがthumbは生成されず、不要なbarは視認できない。これによりtab追加・closeがoverflow境界を跨いでもtab itemの内寸を34pxから変えない。
 
@@ -440,7 +440,7 @@ ADRは追加しない。Pointer EventsとTabStrip policyは現時点ではTauri 
 | visible textなしで状態識別 | §6 |
 | error / rendering / reduced motion | §6.1–6.2 |
 | compact固定高、段差なし | §7.1 |
-| pointer hover / keyboard focus-visible時だけscrollbar可視 | §4.5、§7.1、§19 |
+| pointer滞在 / keyboard focus-visible時だけscrollbar可視 | §4.5、§7.1、§19–20 |
 | tab item全体を自動表示 | §4.4、§7.2 |
 | pointer dragとmove整合、cancel no-op | §8、§11–12 |
 | keyboard / assistive technology導線 | §2.3、§6.3 |
@@ -452,3 +452,9 @@ ADRは追加しない。Pointer EventsとTabStrip policyは現時点ではTauri 
 2026-07-29のユーザ動作確認では、固定高、状態indicator、pane間drag move、右端tabのitem全体revealは期待どおりと確認された。一方、overflowしたTabStripでtabをpointer clickした後、pointerをpreviewへ移動してもhorizontal scrollbar thumbが残ることが報告されたため、Phase 4-aをNGとしてPhase 3へ差し戻す。
 
 原因はthumb表示条件に`:focus-within`を使っていたことにある。pointer clickしたbuttonはpointerが領域外へ移動してもfocusを保持するため、`:focus-within`が継続する。表示条件を`:hover`または`:has(:focus-visible)`へ変更し、pointer操作では領域を離れた時に隠しつつ、keyboard操作ではTabStrip内focus中の視認性を維持する。scrollbar geometry、reveal、drag、tab focus自体は変更しない。
+
+## 20. Phase 4-a feedback Round 2: native scrollbar hover残留
+
+Round 1修正後の再確認でも、TabStripとpreviewの間をpointerで上下に往復するとthumbが残る場合と消える場合があり、素早い移動ほど残りやすいと報告された。scrollbar付近で一旦停止してからpreviewへ移動すると消えやすい傾向は、native scrollbar pseudo-elementと`:hover`のstate / repaintがpointer移動と同期しないことを示す。Phase 4-aを引き続きNGとしてPhase 3へ再差し戻しする。
+
+pointer表示のsource of truthをCSS `:hover`からReact stateへ移す。pointer enterでrefとstateを同期して有効化し、window captureの`pointermove`はref有効中だけclient座標をstrip矩形と比較する。領域外の最初のmove、pointer leave、window blurでrefとstateを無効化し、CSSはそのclassだけを参照する。listenerは常設して高速enter / leave間の登録raceを避けるが、ref無効時は即returnして通常時のlayout readを避ける。keyboard表示の`:has(:focus-visible)`、6px track、40px外寸、reveal、drag lifecycleは変更しない。

@@ -66,6 +66,7 @@ import {
 import {
   getTabRevealDelta,
   hasExceededTabDragThreshold,
+  isPointInsideTabStrip,
   resolveTabDropPane,
 } from "./tabStrip";
 
@@ -2760,6 +2761,16 @@ function TabStrip({
   const stripRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
+  const pointerInsideRef = useRef(false);
+  const [isPointerInside, setIsPointerInside] = useState(false);
+
+  function updatePointerInside(nextValue: boolean) {
+    if (pointerInsideRef.current === nextValue) {
+      return;
+    }
+    pointerInsideRef.current = nextValue;
+    setIsPointerInside(nextValue);
+  }
 
   function revealTab(tabId: string) {
     const strip = stripRef.current;
@@ -2791,6 +2802,43 @@ function TabStrip({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeTabId, tabs.length]);
+
+  useEffect(() => {
+    const clearPointerInside = () => {
+      pointerInsideRef.current = false;
+      setIsPointerInside(false);
+    };
+    const trackPointerPosition = (event: PointerEvent) => {
+      if (!pointerInsideRef.current) {
+        return;
+      }
+      const strip = stripRef.current;
+      if (!strip || event.pointerType === "touch") {
+        clearPointerInside();
+        return;
+      }
+      const rect = strip.getBoundingClientRect();
+      if (
+        !isPointInsideTabStrip(
+          rect.left,
+          rect.right,
+          rect.top,
+          rect.bottom,
+          event.clientX,
+          event.clientY,
+        )
+      ) {
+        clearPointerInside();
+      }
+    };
+
+    window.addEventListener("pointermove", trackPointerPosition, true);
+    window.addEventListener("blur", clearPointerInside);
+    return () => {
+      window.removeEventListener("pointermove", trackPointerPosition, true);
+      window.removeEventListener("blur", clearPointerInside);
+    };
+  }, []);
 
   function focusTab(tabId: string) {
     window.requestAnimationFrame(() => {
@@ -2843,10 +2891,16 @@ function TabStrip({
   return (
     <div
       ref={stripRef}
-      className={`tab-strip ${isDropTarget ? "tab-drop-target" : ""}`}
+      className={`tab-strip ${isPointerInside ? "tab-scrollbar-pointer-active" : ""} ${isDropTarget ? "tab-drop-target" : ""}`}
       role="tablist"
       aria-label={`${paneId === "primary" ? "Primary" : "Secondary"} pane open documents`}
       data-tab-drop-pane={paneId}
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "touch") {
+          updatePointerInside(true);
+        }
+      }}
+      onPointerLeave={() => updatePointerInside(false)}
     >
       {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId;

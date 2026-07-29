@@ -18,3 +18,15 @@
 - overflowしたTabStripへpointerを置くとthumbが表示され、pointer clickでtabを選択した後にpointerをpreviewへ移動すると非表示になる。
 - keyboardでTabStrip内controlへfocusした場合はpointerが領域外でもthumbが表示され、keyboard focusをTabStrip外へ移すと非表示になる。
 - 6px track、40px固定高、indicator、item全体reveal、drag moveに退行がない。
+
+## Round 2 再確認（2026-07-29）
+
+Round 1修正後は若干消えやすくなったが、TabStripとpreviewをpointerで上下に往復するとthumbが残る場合と消える場合があり、問題は解消しなかった。素早く移動すると残りやすく、scrollbar位置で一旦停止してからpreviewへ移すと消えやすい傾向が報告された。
+
+Phase 4-aは引き続きNGとし、Phase 3へ再差し戻した。Round 3ではpointer表示をCSS `:hover`から明示的なpointer境界stateへ変更する。
+
+### Round 3 再確認条件
+
+- TabStripとpreviewを低速・高速で繰り返し往復しても、pointerがTabStrip外にある間はthumbが残らない。
+- scrollbar上で停止する場合、停止せず通過する場合、tabをclickしてfocusが残る場合のすべてで同じ結果になる。
+- keyboard focus中の表示、6px track、40px固定高、indicator、item全体reveal、drag moveに退行がない。

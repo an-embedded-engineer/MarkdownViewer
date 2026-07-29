@@ -889,7 +889,7 @@ button {
   border-radius: 3px;
 }
 
-.tab-strip:hover::-webkit-scrollbar-thumb,
+.tab-strip.tab-scrollbar-pointer-active::-webkit-scrollbar-thumb,
 .tab-strip:has(:focus-visible)::-webkit-scrollbar-thumb {
   background: var(--muted);
 }

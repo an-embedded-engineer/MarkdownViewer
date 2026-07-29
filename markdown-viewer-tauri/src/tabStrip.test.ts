@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getTabRevealDelta,
   hasExceededTabDragThreshold,
+  isPointInsideTabStrip,
   resolveTabDropPane,
 } from "./tabStrip";
 
@@ -34,6 +35,26 @@ describe("tab drag threshold", () => {
     expect(hasExceededTabDragThreshold(0, 0, 6, 0)).toBe(true);
     expect(hasExceededTabDragThreshold(0, 0, 4, 4)).toBe(false);
     expect(hasExceededTabDragThreshold(0, 0, 5, 4)).toBe(true);
+  });
+});
+
+describe("tab strip pointer boundary", () => {
+  it.each([
+    [10, 110, 20, 60, 10, 20, true],
+    [10, 110, 20, 60, 109.99, 59.99, true],
+    [10, 110, 20, 60, 110, 40, false],
+    [10, 110, 20, 60, 40, 60, false],
+    [10, 110, 20, 60, 9.99, 40, false],
+    [10, 110, 20, 60, 40, 19.99, false],
+  ])(
+    "classifies viewport coordinates against the strip bounds",
+    (left, right, top, bottom, clientX, clientY, expected) => {
+      expect(isPointInsideTabStrip(left, right, top, bottom, clientX, clientY)).toBe(expected);
+    },
+  );
+
+  it("rejects invalid geometry", () => {
+    expect(() => isPointInsideTabStrip(10, 0, 0, 10, 5, 5)).toThrow("invalid");
   });
 });
 

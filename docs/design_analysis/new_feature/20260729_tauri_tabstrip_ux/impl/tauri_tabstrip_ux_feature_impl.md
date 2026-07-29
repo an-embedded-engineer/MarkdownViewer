@@ -98,3 +98,5 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 原因は`.tab-strip:focus-within`がpointer click後に残るbutton focusにも一致することだった。thumb表示条件を`.tab-strip:hover`または`.tab-strip:has(:focus-visible)`へ限定し、pointerが領域外へ出た時は隠し、keyboard focus中は表示を維持する。6px trackと40px外寸は変更しない。再確認ではpointer click後のmouse leave、keyboard focus中のmouse leave、TabStrip外へのkeyboard focus移動を確認する。
 
 修正コミット`76daecf`はRound 2レビュー`d9ebeaa`で新規指摘0件、未解決0件として承認され、Phase 4-a再実施可となった。`:has()`は既存CSS機能より対応下限が低く互換性上のblocking riskはないが、focus-visibleのUA heuristicとscrollbar pseudo-elementの再描画は実WebViewで再確認する。
+
+再確認では、TabStripとpreviewをpointerで上下に往復した際にthumbが残る場合と消える場合があり、素早い移動で残りやすいと報告された。`:hover`とnative scrollbar pseudo-elementのstate / repaintへpointer表示を委ねる方式を廃止し、TabStrip enter / leaveとwindow capture pointermoveの矩形判定から`tab-scrollbar-pointer-active` classを管理する。enter時にrefを同期更新してlistener登録raceを避け、ref無効時のpointermoveはgeometryを読まず即returnする。keyboard表示の`:has(:focus-visible)`は維持する。`tabStrip.ts`へ矩形境界policyとunit testを追加した。

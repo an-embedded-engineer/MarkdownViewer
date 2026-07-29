@@ -45,6 +45,21 @@ export function hasExceededTabDragThreshold(
   return deltaX * deltaX + deltaY * deltaY >= tabDragThreshold * tabDragThreshold;
 }
 
+export function isPointInsideTabStrip(
+  left: number,
+  right: number,
+  top: number,
+  bottom: number,
+  clientX: number,
+  clientY: number,
+): boolean {
+  assertFiniteGeometry([left, right, top, bottom, clientX, clientY]);
+  if (right < left || bottom < top) {
+    throw new Error("Tab strip geometry is invalid");
+  }
+  return clientX >= left && clientX < right && clientY >= top && clientY < bottom;
+}
+
 export function resolveTabDropPane(
   sourcePaneId: PaneId,
   candidatePaneId: string | null,

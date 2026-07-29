@@ -13,7 +13,7 @@ OS 連携とファイルシステム境界は Rust command / `DocumentStore` へ
 - TypeScript policy (`explorerPane.ts`): Explorer幅の最小値、workspace実寸に応じたdynamic最大値、clamp、keyboard操作をpure functionで管理する。幅はsession-onlyで永続化しない。
 - TypeScript policy (`splitView.ts`): single / split、active pane、paneごとのordered tab ID / selection / pending navigation、open / local close / atomic move / root reset、参照集合、generic group resolver、requested ratioとdynamic幅をpure functionで管理する。
 - TypeScript policy (`paneRuntime.ts`): pane / tab / revisionのasync結果guardと、共有tab stateとpane-local preview stateからTabStrip表示stateを合成する。
-- TypeScript policy (`tabStrip.ts`): tab item全体のhorizontal reveal delta、mouse drag開始threshold、candidate pane IDのdrop target narrowingをDOM非依存のpure functionで管理する。
+- TypeScript policy (`tabStrip.ts`): tab item全体のhorizontal reveal delta、mouse drag開始threshold、candidate pane IDのdrop target narrowing、pointer座標とTabStrip矩形の境界判定をDOM非依存のpure functionで管理する。
 - TypeScript policy / DOM adapter (`imageViewer.ts`): image viewerのfit / zoom / pan / wheel / intrinsic size / activation判定をpure functionへ集約し、Markdown preview内で描画が完了した通常画像、Mermaid SVG、PlantUML SVGだけをtyped requestへ解決する。
 - Rust: canonical current root、Markdown / HTML open、`mvhtml` resource配信、PlantUML レンダリング、Recent Folders / Viewer settings の app config JSON 永続化。
 - Tauri config: dialog / opener / asset protocol の権限管理とshell CSP。HTML protocol originをcapability remote URLへ追加しない。

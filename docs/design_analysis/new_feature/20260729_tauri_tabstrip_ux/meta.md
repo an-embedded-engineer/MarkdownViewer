@@ -16,9 +16,9 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "in_progress"
 design_status: "done"
-impl_status: "done"
+impl_status: "in_review"
 completion_status: "not_started"
 verification_status: "in_progress"
 related_commits:
@@ -64,7 +64,7 @@ depends_on:
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`0c0dd98`); initial 17 findings resolved, 3 non-blocking implementation follow-ups carried into Phase 3 |
-| Phase 3 Implementation and docs review | Done after Phase 4-a feedback (`d9ebeaa`); scrollbar focus-modality fix approved, 0 unresolved |
-| Phase 4-a User verification | NG; fixed height, indicators, drag move, and item reveal accepted, but pointer click focus kept scrollbar thumb visible after mouse leave; re-verification pending |
+| Phase 3 Implementation and docs review | Reopened again after Phase 4-a Round 2; explicit pointer-boundary state fix complete and review pending |
+| Phase 4-a User verification | NG after Round 2; accepted features remain good, but native scrollbar thumb visibility is still timing-dependent during fast TabStrip / preview pointer movement; Round 3 re-verification pending |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |
