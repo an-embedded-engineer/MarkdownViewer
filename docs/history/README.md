@@ -26,4 +26,5 @@
 - Tauri Split view 導入: `docs/history/tauri_split_view_2026-07-26.md`
 - Tauri先行UX評価・Avalonia反映仕様化: `docs/history/tauri_ux_evaluation_avalonia_spec_2026-07-27.md`
 - Tauri pane-local tab group / pane間移動: `docs/history/tauri_pane_local_tab_groups_2026-07-29.md`
+- Tauri TabStrip 状態表現・scroll・drag move UX改善: `docs/history/tauri_tabstrip_ux_2026-07-30.md`
 - 大きな仕様変更、採用判断、publish方式の変更が発生した場合に履歴文書を追加する。

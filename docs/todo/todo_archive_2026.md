@@ -1,5 +1,39 @@
 # TODO Archive 2026
 
+## TODO-2026-026 Tauri TabStrip 状態表現・scroll・drag move UX改善
+
+- Status: `done`
+- Category: `new-feature`
+- Created: `2026-07-29`
+- Completed: `2026-07-30`
+- Branch: `new-feature/tauri-tabstrip-ux`
+- Depends on: `TODO-2026-023`
+- Source feedback: `TODO-2026-023 Phase 4-a`
+- Design analysis: `docs/design_analysis/new_feature/20260729_tauri_tabstrip_ux/`
+- Change report: `docs/design_analysis/new_feature/20260729_tauri_tabstrip_ux/change_report.md`
+- Verification: `docs/design_analysis/new_feature/20260729_tauri_tabstrip_ux/verification/phase4a_user_verification.md`
+- Summary:
+  - TabStripを40px固定高へcompact化し、ready / active / loading / rendering / errorを上端indicatorとaccessible stateで表現した。
+  - pointerまたはkeyboard利用時だけ視認可能な6px horizontal scrollbarを追加し、WebKitの初回paintを明示flushで安定させた。
+  - overflowしたtab item全体と進行方向の隣接tab 50%をrevealし、連続clickで端まで移動できるようにした。
+  - pointer dragを既存のtyped atomic `move-tab` transitionへ接続し、cancel / invalid dropではstateを維持した。
+  - `View > Debug Information`を追加し、OFF時は採取を停止、ON時だけprovider単位の複数行診断を表示した。
+- Verification:
+  - ユーザーが固定高、正常 / 読み込み中 / error indicator、左右pane間drag move、scrollbarの起動直後を含む表示・非表示、隣接tab context revealを2026-07-30に確認した。
+  - `npm test -- --run`: 6 files / 113 tests、0 failures。`npm run build`: 成功（既知のchunk size warningのみ）。
+  - `cargo fmt -- --check` / `cargo check`: 成功。`cargo test`: 22 tests、0 failures。
+  - design review 17件と全implementation review roundの指摘を解決し、最終reviewは新規0件、未解決0件でApprovedとなった。
+  - `diff.zip`はbase `c8edd30`から最終review commit `ee6d95a`までのbinary full-index patchを収録し、`unzip -t`で整合確認済み。
+- Known constraints:
+  - WebKit native scrollbarの初回paintへengine依存の明示flushを適用しており、将来WebView更新時に削除可否を再評価する。
+  - trusted HTML iframe内では親documentが`pointermove`を受けないため、領域外clearはshell `pointerleave` / window `blur`に依存する。
+  - pointer静止中のgeometry変化は次のmoveで自己修復し、UA focus ringと自前keyboard modalityはprogrammatic focusで理論上ずれる可能性がある。
+- Follow-up:
+  - `TODO-2026-025`: Tauri上下・左右split方向。
+  - `TODO-2026-011` / `TODO-2026-012`: Avalonia版のpane / multi-tab UX水平展開。
+- Completion:
+  - Phase 4-b成果物を作成済み。Phase 4-cの`main` mergeはユーザー承認待ち。
+
 ## TODO-2026-023 Tauri pane-local tab group / pane 間移動
 
 - Status: `done`

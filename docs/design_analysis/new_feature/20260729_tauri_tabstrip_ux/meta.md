@@ -16,10 +16,10 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "in_progress"
+status: "implemented"
 design_status: "done"
-impl_status: "in_review"
-completion_status: "not_started"
+impl_status: "done"
+completion_status: "done"
 verification_status: "done"
 related_commits:
   - "c8edd30 : Phase 0 define TODO-2026-026 TabStrip UX scope"
@@ -36,7 +36,14 @@ related_commits:
   - "d9ebeaa : Phase 3 review follow-up approves Phase 4-a re-verification with 0 unresolved findings"
   - "db2f066 : Phase 3 replace scrollbar hover dependency with explicit pointer boundary state"
   - "55bd8b9 : Phase 3 Round 3 review approves Phase 4-a re-verification with 0 unresolved findings"
-source_todo_path: "docs/todo/todo.md#todo-2026-026-tauri-tabstrip-状態表現scroll・drag-move-ux改善"
+  - "19ca878 : Phase 3 flush WebKit scrollbar style transitions after diagnostic isolation"
+  - "d0d45bf : Phase 3 reveal adjacent tab context during activation"
+  - "aa40142 : Phase 3 Round 4 review approves Phase 4-b with Low follow-ups"
+  - "41d2da8 : Phase 3 address all 6 Round 4 review findings"
+  - "e6612b6 : Phase 3 Round 5 review resolves Round 4 findings and identifies one Low race"
+  - "3e8a1c3 : Phase 3 cancel pending pointer synchronization on shell leave"
+  - "ee6d95a : Phase 3 final review approves implementation with 0 unresolved findings"
+source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-026-tauri-tabstrip-状態表現scroll・drag-move-ux改善"
 source_feedback: "TODO-2026-023 Phase 4-a"
 depends_on:
   - "TODO-2026-023 Tauri pane-local tab groups and tab movement between panes"
@@ -66,7 +73,7 @@ depends_on:
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`0c0dd98`); initial 17 findings resolved, 3 non-blocking implementation follow-ups carried into Phase 3 |
-| Phase 3 Implementation and docs review | Round 4 approved (`aa40142`); Low follow-up findings addressed, final follow-up review pending |
+| Phase 3 Implementation and docs review | Done and approved (`ee6d95a`); all review findings resolved, 0 unresolved |
 | Phase 4-a User verification | Done; scrollbar accepted from startup in Debug OFF / ON and adjacent-tab 50% peek reveal accepted |
-| Phase 4-b Completion | Not started |
-| Phase 4-c Merge | Not started |
+| Phase 4-b Completion | Done; change report, binary diff artifact, TODO archive, history, and known constraints recorded |
+| Phase 4-c Merge | Awaiting user approval |
