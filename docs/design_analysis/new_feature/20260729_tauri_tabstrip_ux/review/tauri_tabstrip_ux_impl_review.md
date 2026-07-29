@@ -8,7 +8,11 @@
 **対象恒久docs**: `docs/components/tauri_viewer/`（README / basic_design / detail_design / interface_spec）、`docs/architecture/code_patterns.md`、`docs/architecture/common_pitfalls.md`、`docs/rules/development_workflow.md`、`docs/tests/README.md`
 **Phase 2 設計レビュー**: `./tauri_tabstrip_ux_design_review.md`（初回 17 件解決済み、持越し 3 件）
 
-**判定**: **条件付き差し戻し (Changes Requested)**。実装・test・恒久docsは設計とほぼ完全に一致し、Phase 2 持越し 8.1〜8.3 も閉じている。ただし **blocking Medium 1 件**（Escape cancel 後に source tab が activate されうる）が受け入れ条件「cancel 時は state を変更しない」に反するため、修正後に Phase 4-a へ進むこと。**検出 4 件（blocking Medium 1 / non-blocking Low 3）、未解決 4 件。**
+**Round 1 fix コミット**: `ddc7e86` (Phase 3 address Tauri TabStrip UX implementation review)
+**Round 1 再確認日**: 2026-07-29
+
+**初回判定**: 条件付き差し戻し (Changes Requested)。blocking Medium 1 件 / non-blocking Low 3 件 = 検出 4 件。
+**最終判定**: **承認 (Approved)**。**Phase 4-a 進行可**。初回 4 件は Round 1 fix (`ddc7e86`) ですべて解決済みと再確認した。再確認で新規指摘は無く、**未解決 0 件**。自動検証 5 種と `git diff --check` もレビュー担当で再実行し記録と一致した。
 
 ---
 
@@ -189,3 +193,57 @@ DOM lifecycle（pointer capture、click 順、focus scroll）と CSS 実寸は j
 | 2.3 cancel handler重複 | pointercancel / lostpointercaptureを共通`handleTabPointerAbort`へ統合 | 対応済み・再確認待ち |
 
 未解決はレビュー担当のfollow-up判定待ち4件。新規の別issue化は不要。
+
+---
+
+## 8. Round 1 再確認（レビュー担当、2026-07-29、対象 `ddc7e86`）
+
+`git show ddc7e86`（9 files、実装 2 / 設計 1 / 実装記録 1 / meta 1 / 恒久docs 2 / review 1 / 開発workflow 1）、改訂後の `App.tsx` / `App.css` 全文、設計 §8.4 / §14、実装記録、`meta.md`、恒久docs を突き合わせて再確認した。**初回 4 件はすべて解決済み**である。
+
+### 8.1 初回指摘の解決状況
+
+| 指摘 | severity（初回） | 再確認した実装・文書 | 判定 |
+| --- | --- | --- | --- |
+| 1.1 Escape cancel 後の release で source tab が activate される | Medium（blocking） | `cancelTabDrag` が options 引数（`preserveClickSuppression` / `status`）を取り、`preserveClickSuppression` が false の時だけ identity を clear する（`App.tsx:859-878`）。Escape handler だけが `cancelTabDrag({ preserveClickSuppression: true })` を呼ぶ（同 `1414`）。event 順を再検算した結果、Escape → session null（identity は保持）→ capture release → 物理 release → `handleTabPointerUp` は session null で早期 return → source activate button の click → `suppressTabClick` が pane / tab 一致で `preventDefault` + `stopPropagation` して identity を消費 → `onClick` の `!event.defaultPrevented` で activate しない、と閉じている。click が発生しない位置で release した場合は identity が残るが、session 不在のため次の pointerdown が clear する（同 `885-887`）。`cancelTabDrag` は identity 判定より前に `tabDragSessionRef.current = null` を置いてから capture を release するため、明示 release で発火する implicit `lostpointercapture` は `handleTabPointerAbort` の pointerId 判定に掛からず、保持した identity を消さない。設計 §8.4、§14-7 / §14-13、`common_pitfalls.md` §12、`development_workflow.md` の手動確認、実装記録 §3.3 / §6 も同じ規則へ更新済み | **解決済み** |
+| 2.1 drag 中の追加 pointerdown で identity が消える | Low | `handleTabPointerDown` 冒頭の clear が `if (!tabDragSessionRef.current)` で守られ、pending / dragging の進行中 session がある間は clear されない（`App.tsx:885-887`）。副ボタン press は従来どおり `button !== 0` guard で session を作らない。single view へ切り替えた後などの stale identity は、session 不在時の pointerdown で従来どおり clear される（推奨した guard 位置と一致）。`SuppressedTabClick` は `Pick<TabDragSession, "sourcePaneId" \| "tabId">` へ縮小され、未使用の `pointerId` は型・生成箇所（同 `930-933`）とも削除済み | **解決済み** |
+| 2.2 focus outline が上端 indicator を覆う | Low | `.tab-item::before` が `z-index: 2` へ変更され（`App.css`）、`z-index: 1` の `.tab-activate:focus-visible` より前面になった。`pointer-events: none` は維持されているため hit test / drop 判定への影響は無い。`development_workflow.md` と設計 §14 経由の手動確認（error / loading tab に focus した状態で outline と indicator を同時に判別）も追加済み | **解決済み** |
+| 2.3 cancel handler の重複 | Low | `handleTabPointerCancel` / `handleTabLostPointerCapture` が `handleTabPointerAbort` 1 関数へ統合され（`App.tsx:998-1002`）、両 pane の `onTabPointerCancel` / `onTabLostPointerCapture` が同じ関数を受け取る（同 `1546-1547`, `1609-1610`）。中身は `pointerId` 一致時の `cancelTabDrag()`（identity を clear する側）のままで、cancel semantics は変わっていない。`pointercancel` 後は click が生成されないため、Escape と扱いを分けた現在の設計と整合する | **解決済み** |
+
+**初回 4 件: 解決済み 4 / 未解決 0。新規指摘なし。**
+
+### 8.2 設計・恒久docs・手動確認境界の再確認
+
+| 観点 | 確認内容 | 結果 |
+| --- | --- | --- |
+| 設計との整合 | 設計 §8.4 が「Escape は identity を維持し matching click か session 終了後の次 primary pointerdown で clear、pointercancel / source unmount を伴う unexpected lost capture だけ同期 clear、drag 中の追加 pointerdown では clear しない」へ改訂され、実装の分岐と 1 対 1 で対応する。§12 の該当行、§14-7 / §14-13 の確認手順も同じ規則を指す | 一致 |
+| 実装と設計の乖離 | Phase 2 で確定した他の契約（`preventScroll` + manual reveal、mouse 限定 drag、6px threshold、`elementFromPoint` + pointerup 再判定、explicit destination、単一 `move-tab`、pure policy 分離、fixed sibling layer、scrollbar 一本化、token 供給、pointermove で state 更新しない）は今回の差分で変更されておらず、初回レビュー §4 の確認結果がそのまま有効 | 維持 |
+| 恒久docs | `common_pitfalls.md` §12 の click 抑止 bullet が Escape / pointercancel / 追加 pointerdown の区別まで含む形へ更新。`development_workflow.md` に「Escape 後 release で selection が変わらない」「drag 中の追加 pointerdown でも抑止が失われない」「error / loading tab focus 時に outline と indicator を同時に判別できる」の 3 観点が追加された。40px / indicator / scrollbar / reveal / drag の既存記述と矛盾は無く、`58px` や state 2 行目の旧記述も残っていない | 整合 |
+| 実装記録 | §3.3 が Escape と他 cancel 経路の identity 扱いの差、追加 pointerdown で clear しない旨へ更新。§6 の Phase 4-a 手動確認境界へ「非 active source の Escape 後 release」「drag 中の追加 pointerdown」「error / loading tab focus 時の indicator / outline 併存」が追加され、今回の修正で新たに実 WebView 確認が要る点を過不足なく列挙している | 妥当 |
+| meta | `impl_status: in_review`、`related_commits` へ `031c06a` / `ca88c4b` を追加、Phase Status を「Claude findings 1 blocking Medium + 3 Low addressed, follow-up pending」へ更新。本 follow-up の承認後に Phase 4-a へ進む状態として整合する | 妥当 |
+| Phase 4-a 境界 | DOM pointer lifecycle、click 順、CSS 実寸、WebKit scrollbar track、theme / reduced motion の視認性は jsdom 非採用のため自動化せず、設計 §14（14 項目）、`development_workflow.md`、`docs/tests/README.md`、実装記録 §6 の 4 箇所で同じ範囲を手動確認へ委譲している。今回追加された 3 観点もこの 4 箇所のうち該当箇所へ反映済みで、境界の記述は正確 | 妥当 |
+| 残存 edge（指摘化しない観察） | split 解除 / source eviction を検知する effect と `handleTabPointerAbort` は非保持 cancel を使う。理論上は「button を押したまま split 解除」で Escape と同種の click が起こりうるが、mouse 1 本では drag 中に menu を操作できず、source item も unmount するため到達しない。現在の分岐で妥当と判断する | 指摘なし |
+
+### 8.3 自動検証の再実行
+
+| 検証 | 実装側の記録 | レビュー担当の再実行 |
+| --- | --- | --- |
+| `npm test -- --run` | 成功。97 tests | 成功。6 files / 97 tests |
+| `npm run build` | 成功 | 成功（既存 chunk size warning のみ） |
+| `cargo fmt -- --check` | 成功 | 成功 |
+| `cargo check` | 成功 | 成功 |
+| `cargo test` | 成功。22 tests | 成功。22 passed |
+| `git diff --check` | 成功 | 成功（whitespace error なし） |
+
+### 8.4 集計と結論（Round 1 再確認）
+
+| 分類 | 初回 | Round 1 で解決 | Round 1 新規 | 未解決 |
+| --- | --- | --- | --- | --- |
+| blocking Medium | 1 | 1 | 0 | 0 |
+| non-blocking Low | 3 | 3 | 0 | 0 |
+| **合計** | **4** | **4** | **0** | **0** |
+
+**結論**: **Phase 3 を承認 (Approved)。Phase 4-a へ進行可。**
+
+blocking だった 1.1 は、`cancelTabDrag` の identity clear を経路ごとに分けるという最小限の修正で閉じており、Escape・pointercancel・unexpected lost capture・成功 drop・invalid drop・追加 pointerdown の 6 経路すべてで「cancel 時は state を変更しない」と「無関係な click を飲まない」が同時に成立することを event 順で確認した。2.1〜2.3 も推奨どおりの形で反映され、cancel semantics の変更や新たな重複経路は生じていない。設計・実装記録・meta・恒久docs・手動確認手順の同期も取れている。
+
+Phase 4-a では、実装記録 §6 と `development_workflow.md` に列挙された実 WebView 依存項目（WebKit scrollbar track 実寸 6px と 40px 外寸、Light / Dark / reduced motion の indicator 視認性、item 全体 reveal と ancestor 非 scroll、drag 各経路と Escape 後 release、drag 中の追加 pointerdown、error / loading tab focus 時の indicator 併存、touch / pen の非 drag 契約、keyboard 導線）を確認すること。
