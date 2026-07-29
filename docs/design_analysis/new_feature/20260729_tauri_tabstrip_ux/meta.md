@@ -17,7 +17,7 @@ components:
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
 status: "in_progress"
-design_status: "in_review"
+design_status: "done"
 impl_status: "not_started"
 completion_status: "not_started"
 verification_status: "not_started"
@@ -26,6 +26,8 @@ related_commits:
   - "a1ba28b : Phase 1 initialize Tauri TabStrip UX workflow"
   - "affc977 : Phase 2 prepare Tauri TabStrip UX design"
   - "6fdb8ed : Phase 2 initial design review requests 17 changes"
+  - "1bc136e : Phase 2 address all 17 initial design review findings"
+  - "0c0dd98 : Phase 2 follow-up review approves Phase 3 with 3 non-blocking implementation follow-ups"
 source_todo_path: "docs/todo/todo.md#todo-2026-026-tauri-tabstrip-状態表現scroll・drag-move-ux改善"
 source_feedback: "TODO-2026-023 Phase 4-a"
 depends_on:
@@ -55,7 +57,7 @@ depends_on:
 | --- | --- |
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
-| Phase 2 Design review | In review; initial 17 findings addressed, Claude follow-up pending |
+| Phase 2 Design review | Done and approved (`0c0dd98`); initial 17 findings resolved, 3 non-blocking implementation follow-ups carried into Phase 3 |
 | Phase 3 Implementation and docs review | Not started |
 | Phase 4-a User verification | Not started |
 | Phase 4-b Completion | Not started |
