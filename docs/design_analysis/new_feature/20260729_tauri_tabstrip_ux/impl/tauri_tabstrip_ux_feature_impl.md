@@ -106,3 +106,5 @@ Round 3修正`db2f066`はレビュー`55bd8b9`で新規指摘0件、未解決0�
 Round 3再確認ではthumbが常時表示され、native scrollbar位置で一瞬消える場合があると報告された。境界判定の向きではなく、pointer classをclearしても`:has(:focus-visible)`がtrueなら表示されるOR経路と、native scrollbar上でscroll elementのleaveが発生し得るDOM境界が原因だった。scroll elementをouter shellで包み、pointer / explicit keyboard modality stateを`shouldShowTabScrollbar`で単一classへ集約した。scrollbar表示条件から`:hover` / `:focus-within` / `:has(:focus-visible)`をすべて除去し、visibility policy 4ケースをunit testへ追加した。
 
 Round 4実WebView確認でも症状は変わらなかった。window `pointermove`ごとにouter shell矩形からpointer stateを双方向同期し、native scrollbar上で発生する矩形内`pointerleave`を無視する補強も同じ結果だったため、StatusBarへ一時的な`TabDebug`項目を追加した。pointer / keyboard state、表示policy、実DOM class、座標の生判定、hover / focus、thumb computed background、overflow、active element、最終eventを同時採取し、event state残留とnative scrollbar描画問題を切り分ける。原因確定後に診断UIを除去して最終修正・再レビューを行う。
+
+診断buildではthumbが正しく非表示となった。診断処理によるevent timing / repaintへの影響を切り分けるため、`TabDebug`の採取、custom event、App state、StatusBar列だけを除去した。双方向geometry同期、scrollbar内`pointerleave`無視、keyboard modality補強、transparent scrollbar backgroundは維持する。この状態をpublishして挙動を確認してから、汎用デバッグ領域の実装へ進む。

@@ -58,3 +58,5 @@ outer shellと明示的なpointer / keyboard stateへ一本化した後も、poi
 - `show=0 class=1`の場合はReact renderとDOM class同期を疑う。
 - `ptr`と`raw`が異なる場合はpointer eventとshell geometry同期を疑う。
 - `focus=0 kbd=1`の場合はkeyboard focus stateのcleanupを疑う。
+
+診断buildの実WebView確認では、それまで再現していたthumb残留が発生せず、TabStrip外で正しく非表示になった。診断コードがevent timingまたはrepaintへ影響した可能性を分離するため、まず`TabDebug`のstate収集・event発行・StatusBar表示だけを除去し、Round 4の双方向geometry同期とtransparent scrollbar backgroundは維持したbuildをpublishして再確認する。

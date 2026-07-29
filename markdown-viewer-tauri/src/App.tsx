@@ -171,47 +171,10 @@ type TabDragPresentation = Pick<
 
 type SuppressedTabClick = Pick<TabDragSession, "sourcePaneId" | "tabId">;
 
-type TabStripDebugSnapshot = {
-  paneId: PaneId;
-  pointerInside: boolean;
-  keyboardFocusInside: boolean;
-  shouldShow: boolean;
-  classVisible: boolean;
-  rawPointInside: boolean | null;
-  cssHover: boolean;
-  focusWithin: boolean;
-  thumbBackground: string;
-  overflow: boolean;
-  activeElement: string;
-  lastEvent: string;
-  pointer: string;
-};
-
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 const defaultWindowSize: WindowSize = { width: 800, height: 600 };
 const windowResizeSaveDelay = 500;
-const tabStripDebugEventName = "markdown-viewer:tab-strip-debug";
-
-function formatTabStripDebug(snapshot: TabStripDebugSnapshot | null): string {
-  if (!snapshot) {
-    return "waiting";
-  }
-  return [
-    `ptr=${Number(snapshot.pointerInside)}`,
-    `kbd=${Number(snapshot.keyboardFocusInside)}`,
-    `show=${Number(snapshot.shouldShow)}`,
-    `class=${Number(snapshot.classVisible)}`,
-    `raw=${snapshot.rawPointInside === null ? "-" : Number(snapshot.rawPointInside)}`,
-    `hover=${Number(snapshot.cssHover)}`,
-    `focus=${Number(snapshot.focusWithin)}`,
-    `thumb=${snapshot.thumbBackground || "-"}`,
-    `overflow=${Number(snapshot.overflow)}`,
-    `active=${snapshot.activeElement}`,
-    `event=${snapshot.lastEvent}`,
-    `xy=${snapshot.pointer}`,
-  ].join(" ");
-}
 
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
@@ -242,9 +205,6 @@ function App() {
   const [tabDragPresentation, setTabDragPresentation] =
     useState<TabDragPresentation | null>(null);
   const [tabDragStatus, setTabDragStatus] = useState("");
-  const [tabStripDebug, setTabStripDebug] = useState<
-    Record<PaneId, TabStripDebugSnapshot | null>
-  >({ primary: null, secondary: null });
   const workspaceRef = useRef<HTMLElement>(null);
   const previewWorkspaceRef = useRef<HTMLElement>(null);
   const explorerResizeRef = useRef<ExplorerResizeState | null>(null);
@@ -279,7 +239,6 @@ function App() {
   const activePaneTabs =
     splitViewState.activePaneId === "primary" ? primaryTabs : secondaryTabs;
   const activeTab = activePaneTabs.find((tab) => tab.id === activePane.activeTabId) ?? null;
-  const tabStripDebugText = `P[${formatTabStripDebug(tabStripDebug.primary)}] S[${formatTabStripDebug(tabStripDebug.secondary)}]`;
   const activePaneStatus = panePreviewStatuses[splitViewState.activePaneId];
   const currentActivePaneStatus =
     activePaneStatus &&
@@ -318,15 +277,6 @@ function App() {
             : currentActivePaneStatus?.phase === "rendering-mermaid"
               ? "Rendering Mermaid diagrams..."
               : null;
-
-  useEffect(() => {
-    const handleTabStripDebug = (event: Event) => {
-      const snapshot = (event as CustomEvent<TabStripDebugSnapshot>).detail;
-      setTabStripDebug((current) => ({ ...current, [snapshot.paneId]: snapshot }));
-    };
-    window.addEventListener(tabStripDebugEventName, handleTabStripDebug);
-    return () => window.removeEventListener(tabStripDebugEventName, handleTabStripDebug);
-  }, []);
 
   function handleExplorerPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || !event.isPrimary || explorerResizeRef.current) {
@@ -1695,7 +1645,6 @@ function App() {
         <StatusBar
           selectedFileName={activeTab?.displayName ?? ""}
           loadingMessage={loadingMessage}
-          tabStripDebug={tabStripDebugText}
         />
       </main>
 
@@ -2440,10 +2389,9 @@ function ErrorBanner({ message }: ErrorBannerProps) {
 type StatusBarProps = {
   selectedFileName: string;
   loadingMessage: string | null;
-  tabStripDebug: string;
 };
 
-function StatusBar({ selectedFileName, loadingMessage, tabStripDebug }: StatusBarProps) {
+function StatusBar({ selectedFileName, loadingMessage }: StatusBarProps) {
   const fileText = selectedFileName || "No file selected";
   const stateText = loadingMessage ?? "Ready";
 
@@ -2451,7 +2399,6 @@ function StatusBar({ selectedFileName, loadingMessage, tabStripDebug }: StatusBa
     <footer className="status-bar" aria-label="Application status">
       <StatusBarItem label="State" value={stateText} priority="state" live />
       <StatusBarItem label="File" value={fileText} priority="file" />
-      <StatusBarItem label="TabDebug" value={tabStripDebug} priority="debug" />
     </footer>
   );
 }
@@ -2459,7 +2406,7 @@ function StatusBar({ selectedFileName, loadingMessage, tabStripDebug }: StatusBa
 type StatusBarItemProps = {
   label: string;
   value: string;
-  priority: "state" | "file" | "debug";
+  priority: "state" | "file";
   live?: boolean;
 };
 
@@ -2818,97 +2765,15 @@ function TabStrip({
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
   const pointerInsideRef = useRef(false);
   const lastInputWasKeyboardRef = useRef(false);
-  const keyboardFocusInsideRef = useRef(false);
-  const lastScrollbarEventRef = useRef("mount");
-  const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
-  const scrollbarDebugFrameRef = useRef<number | null>(null);
   const [isPointerInside, setIsPointerInside] = useState(false);
   const [isKeyboardFocusInside, setIsKeyboardFocusInside] = useState(false);
 
-  function queueScrollbarDebug(
-    eventName: string,
-    pointerEvent?: { clientX: number; clientY: number },
-  ) {
-    lastScrollbarEventRef.current = eventName;
-    if (pointerEvent) {
-      lastPointerPositionRef.current = {
-        x: pointerEvent.clientX,
-        y: pointerEvent.clientY,
-      };
+  function updatePointerInside(nextValue: boolean) {
+    if (pointerInsideRef.current === nextValue) {
+      return;
     }
-    if (scrollbarDebugFrameRef.current !== null) {
-      window.cancelAnimationFrame(scrollbarDebugFrameRef.current);
-    }
-    scrollbarDebugFrameRef.current = window.requestAnimationFrame(() => {
-      scrollbarDebugFrameRef.current = null;
-      const shell = shellRef.current;
-      const strip = stripRef.current;
-      if (!shell || !strip) {
-        return;
-      }
-      const lastPointer = lastPointerPositionRef.current;
-      const shellRect = shell.getBoundingClientRect();
-      const activeElement = document.activeElement;
-      const snapshot: TabStripDebugSnapshot = {
-        paneId,
-        pointerInside: pointerInsideRef.current,
-        keyboardFocusInside: keyboardFocusInsideRef.current,
-        shouldShow: shouldShowTabScrollbar(
-          pointerInsideRef.current,
-          keyboardFocusInsideRef.current,
-        ),
-        classVisible: shell.classList.contains("tab-scrollbar-visible"),
-        rawPointInside: lastPointer
-          ? isPointInsideTabStrip(
-              shellRect.left,
-              shellRect.right,
-              shellRect.top,
-              shellRect.bottom,
-              lastPointer.x,
-              lastPointer.y,
-            )
-          : null,
-        cssHover: shell.matches(":hover"),
-        focusWithin: activeElement instanceof Node && shell.contains(activeElement),
-        thumbBackground: window
-          .getComputedStyle(strip, "::-webkit-scrollbar-thumb")
-          .getPropertyValue("background-color"),
-        overflow: strip.scrollWidth > strip.clientWidth,
-        activeElement:
-          activeElement instanceof HTMLElement
-            ? activeElement.id || activeElement.className || activeElement.tagName
-            : "none",
-        lastEvent: lastScrollbarEventRef.current,
-        pointer: lastPointer
-          ? `${Math.round(lastPointer.x)},${Math.round(lastPointer.y)}`
-          : "-",
-      };
-      window.dispatchEvent(
-        new CustomEvent<TabStripDebugSnapshot>(tabStripDebugEventName, {
-          detail: snapshot,
-        }),
-      );
-    });
-  }
-
-  function updatePointerInside(
-    nextValue: boolean,
-    eventName: string,
-    pointerEvent?: { clientX: number; clientY: number },
-  ) {
-    if (pointerInsideRef.current !== nextValue) {
-      pointerInsideRef.current = nextValue;
-      setIsPointerInside(nextValue);
-    }
-    queueScrollbarDebug(eventName, pointerEvent);
-  }
-
-  function updateKeyboardFocusInside(nextValue: boolean, eventName: string) {
-    if (keyboardFocusInsideRef.current !== nextValue) {
-      keyboardFocusInsideRef.current = nextValue;
-      setIsKeyboardFocusInside(nextValue);
-    }
-    queueScrollbarDebug(eventName);
+    pointerInsideRef.current = nextValue;
+    setIsPointerInside(nextValue);
   }
 
   function revealTab(tabId: string) {
@@ -2943,8 +2808,8 @@ function TabStrip({
   }, [activeTabId, tabs.length]);
 
   useEffect(() => {
-    const clearPointerInside = (eventName: string) => {
-      updatePointerInside(false, eventName);
+    const clearPointerInside = () => {
+      updatePointerInside(false);
     };
     // Two-way geometry sync: boundary events (pointerenter/pointerleave) are
     // unreliable here because the native scrollbar swallows hit-tests and tab
@@ -2953,7 +2818,7 @@ function TabStrip({
     const trackPointerPosition = (event: PointerEvent) => {
       const shell = shellRef.current;
       if (!shell || event.pointerType === "touch") {
-        clearPointerInside(event.pointerType === "touch" ? "move-touch-clear" : "move-no-shell");
+        clearPointerInside();
         return;
       }
       const rect = shell.getBoundingClientRect();
@@ -2966,35 +2831,30 @@ function TabStrip({
         event.clientY,
       );
       if (pointerInsideRef.current !== inside) {
-        updatePointerInside(inside, inside ? "window-move-enter" : "window-move-leave", event);
+        updatePointerInside(inside);
       }
     };
     const trackKeyboardInput = () => {
       lastInputWasKeyboardRef.current = true;
-      queueScrollbarDebug("window-keydown");
     };
     const trackPointerInput = () => {
       lastInputWasKeyboardRef.current = false;
-      updateKeyboardFocusInside(false, "window-pointerdown");
+      setIsKeyboardFocusInside(false);
     };
     const clearVisibility = () => {
-      updatePointerInside(false, "window-blur");
-      updateKeyboardFocusInside(false, "window-blur");
+      clearPointerInside();
+      setIsKeyboardFocusInside(false);
     };
 
     window.addEventListener("pointermove", trackPointerPosition, true);
     window.addEventListener("pointerdown", trackPointerInput, true);
     window.addEventListener("keydown", trackKeyboardInput, true);
     window.addEventListener("blur", clearVisibility);
-    queueScrollbarDebug("listener-mounted");
     return () => {
       window.removeEventListener("pointermove", trackPointerPosition, true);
       window.removeEventListener("pointerdown", trackPointerInput, true);
       window.removeEventListener("keydown", trackKeyboardInput, true);
       window.removeEventListener("blur", clearVisibility);
-      if (scrollbarDebugFrameRef.current !== null) {
-        window.cancelAnimationFrame(scrollbarDebugFrameRef.current);
-      }
     };
   }, []);
 
@@ -3031,7 +2891,7 @@ function TabStrip({
       event.preventDefault();
       // Refocusing an already-focused tab fires no focus event, so the
       // focus-capture path alone cannot mark keyboard navigation here.
-      updateKeyboardFocusInside(true, `key-${event.key}`);
+      setIsKeyboardFocusInside(true);
       activateAndFocus(tabs[nextIndex].id);
     }
   }
@@ -3059,7 +2919,7 @@ function TabStrip({
       className={`tab-strip-shell ${isScrollbarVisible ? "tab-scrollbar-visible" : ""}`}
       onPointerEnter={(event) => {
         if (event.pointerType !== "touch") {
-          updatePointerInside(true, "shell-pointerenter", event);
+          updatePointerInside(true);
         }
       }}
       onPointerLeave={(event) => {
@@ -3078,20 +2938,16 @@ function TabStrip({
             event.clientY,
           )
         ) {
-          queueScrollbarDebug("shell-pointerleave-ignored", event);
           return;
         }
-        updatePointerInside(false, "shell-pointerleave", event);
+        updatePointerInside(false);
       }}
       onFocusCapture={() => {
-        updateKeyboardFocusInside(
-          lastInputWasKeyboardRef.current,
-          lastInputWasKeyboardRef.current ? "focus-keyboard" : "focus-pointer",
-        );
+        setIsKeyboardFocusInside(lastInputWasKeyboardRef.current);
       }}
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          updateKeyboardFocusInside(false, "focus-left-shell");
+          setIsKeyboardFocusInside(false);
         }
       }}
     >

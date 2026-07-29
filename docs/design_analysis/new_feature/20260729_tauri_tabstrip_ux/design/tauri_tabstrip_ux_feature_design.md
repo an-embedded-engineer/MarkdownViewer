@@ -470,3 +470,5 @@ scroll elementを40px固定高のouter shellで包み、native scrollbarを含�
 outer shellと単一表示classへ集約した後も実WebViewの症状が変わらず、window `pointermove`ごとの矩形再判定とnative scrollbar上の擬似leave無視を追加しても改善しなかった。このため、次の修正を推測で重ねず、React state、実DOM class、pointer座標の矩形判定、focus、CSS pseudo-elementのcomputed styleを同時に観測する一時診断をStatusBarへ追加する。
 
 診断結果から、state / classが表示を指示している場合はevent lifecycleを、state / classが非表示なのにthumbが見える場合はnative scrollbarのstyle適用またはrepaintを次の修正対象とする。診断UIは原因確定と再確認後に除去する。
+
+診断buildでは症状が再現しなかったため、診断処理の有無を変数として分離する。最初にStatusBarの診断表示と採取処理を除去したbuildを再確認し、その後の別段階で`View`メニューから切り替える汎用の複数行デバッグ領域を設計・実装する。汎用領域はErrorBannerとStatusBarの間に配置し、通常時は非表示、明示切り替え時だけlayoutへ参加させる。TabStrip診断はその最初の情報providerとして接続する。
