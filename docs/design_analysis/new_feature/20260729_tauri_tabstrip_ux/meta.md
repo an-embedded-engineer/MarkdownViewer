@@ -66,7 +66,7 @@ depends_on:
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`0c0dd98`); initial 17 findings resolved, 3 non-blocking implementation follow-ups carried into Phase 3 |
-| Phase 3 Implementation and docs review | Reopened after Phase 4-a Round 4; reusable opt-in debug panel and TabStrip provider implemented, review pending after diagnosis |
-| Phase 4-a User verification | No-diagnostics build reproduced the issue; OFF / ON debug-panel comparison pending |
+| Phase 3 Implementation and docs review | Reopened after Phase 4-a Round 4; WebKit scrollbar style flush and reusable opt-in diagnostics implemented, review pending |
+| Phase 4-a User verification | Debug OFF reproduced, ON fixed, and ON→OFF stayed fixed; normal-path style-flush build pending verification |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |

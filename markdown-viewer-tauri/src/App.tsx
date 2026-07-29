@@ -3087,6 +3087,26 @@ function TabStrip({
     isKeyboardFocusInside,
   );
 
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (strip.scrollWidth <= strip.clientWidth) {
+        return;
+      }
+      // WKWebView can retain the previous native scrollbar thumb paint even
+      // after the visibility class changes. Reading the pseudo-element style
+      // after layout makes that transition observable and flushes its paint.
+      void strip.getBoundingClientRect();
+      void window
+        .getComputedStyle(strip, "::-webkit-scrollbar-thumb")
+        .getPropertyValue("background-color");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isScrollbarVisible, tabs.length]);
+
   return (
     <div
       ref={shellRef}

@@ -478,3 +478,5 @@ outer shellと単一表示classへ集約した後も実WebViewの症状が変わ
 診断除去buildで症状が再発したため、`View > Debug Information`のcheckable itemから診断の採取と表示を同時に切り替える。OFF時はパネルを描画せず、TabStrip providerもanimation frame、layout read、computed style read、debug eventを実行しない。ON時だけErrorBannerとStatusBarの間へ最大180pxのscroll可能な複数行領域を確保し、provider IDごとのtitleとline配列を表示する。
 
 TabStrip providerはprimary / secondary別にstate、DOM class、生の矩形判定、hover / focus、thumb computed background、overflow、active element、最終event / pointer座標を4行で発行する。表示器はprovider固有の形式を解釈せず、今後ほかの診断情報を追加できる汎用entryとして保持する。この段階では診断ONによる症状消失を修正完了とは扱わず、OFFで再現後にONへ切り替えた瞬間の値と描画変化を原因特定へ使う。
+
+OFF / ON比較で、一度診断をONにするとOFFへ戻しても正常描画が継続した。診断が行うlayout / computed style readまたはパネル挿入によるresizeがnative scrollbarの初回paintを確定させたと判断する。通常経路では`isScrollbarVisible`またはtab数が変わった次のanimation frameに、overflow時だけstrip layoutと`::-webkit-scrollbar-thumb`のcomputed backgroundを1回読む。この明示flushをWebKit native scrollbar repaint workaroundとし、表示stateやgeometryは変更しない。

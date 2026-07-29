@@ -64,3 +64,5 @@ outer shellと明示的なpointer / keyboard stateへ一本化した後も、poi
 診断処理を除去したpublish版ではthumb残留が再発した。表示classへ使うReact stateはDOM出力として観測可能でありRelease buildのdead-code elimination対象ではない。一方、診断処理に含まれた`requestAnimationFrame`、layout / computed style read、custom event、App再renderはnative scrollbarのstyle再評価・repaint timingを変える。このため最適化によるstate消失ではなく、診断副作用で隠れるWebKit native scrollbarの描画依存として扱う。
 
 次のbuildでは`View > Debug Information`をOFFにすると診断処理を停止し、ONにするとErrorBannerとStatusBarの間へ複数行パネルを表示して診断を開始する。起動後OFFのまま残留を再現し、その場でONへ切り替えて、パネル値とthumbの変化を同時に確認する。
+
+OFF / ON比較では、起動直後のOFFで残留し、ONでは非表示が正常化した。さらに一度ONにした後はOFFへ戻しても正常な描画が継続した。これはReact stateの消失ではなく、native scrollbar pseudo-elementの初回style / paint invalidation不足と整合する。通常経路でも表示policyまたはtab数が変わった次frameにoverflowを確認し、layoutとthumb computed styleを1回読むWebKit向けflushを追加して、Debug OFFの起動直後から再確認する。
