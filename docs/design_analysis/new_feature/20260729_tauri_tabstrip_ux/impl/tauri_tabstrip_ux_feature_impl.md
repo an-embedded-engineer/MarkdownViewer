@@ -83,3 +83,10 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 - 同一pane reorder、preview paneへのdrop、touch / pen dragは非対象。
 - drag / scrollbar / focusのDOM lifecycleはjsdomを導入せず、pure policy自動testとPhase 4-aの実WebView matrixで分担する。
 - Rust command、settings schema、custom protocol、CSP / capabilityは変更していない。
+
+## 8. Phase 3 実装レビュー
+
+- 初回レビュー `ca88c4b` では blocking Medium 1件とLow 3件が検出された。
+- 修正コミット `ddc7e86` でEscape後releaseのclick抑止、追加pointerdown時のidentity保持、indicatorのstacking order、cancel handler重複を是正した。
+- Round 1再レビュー `ca48356` で4件すべて解決、新規指摘なし、未解決0件を確認し、Phase 3は承認された。
+- reviewerもfrontend 97 tests、production build、Rust format / check / 22 tests、`git diff --check`を再実行し、実装側の記録と一致した。

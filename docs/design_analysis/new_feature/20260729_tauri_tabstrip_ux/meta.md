@@ -16,9 +16,9 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "in_progress"
+status: "implemented"
 design_status: "done"
-impl_status: "in_review"
+impl_status: "done"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -30,6 +30,8 @@ related_commits:
   - "0c0dd98 : Phase 2 follow-up review approves Phase 3 with 3 non-blocking implementation follow-ups"
   - "031c06a : Phase 3 implement Tauri TabStrip UX improvements and permanent docs"
   - "ca88c4b : Phase 3 implementation review requests 4 changes"
+  - "ddc7e86 : Phase 3 address all 4 implementation review findings"
+  - "ca48356 : Phase 3 implementation review follow-up approves Phase 4-a with 0 unresolved findings"
 source_todo_path: "docs/todo/todo.md#todo-2026-026-tauri-tabstrip-状態表現scroll・drag-move-ux改善"
 source_feedback: "TODO-2026-023 Phase 4-a"
 depends_on:
@@ -60,7 +62,7 @@ depends_on:
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`0c0dd98`); initial 17 findings resolved, 3 non-blocking implementation follow-ups carried into Phase 3 |
-| Phase 3 Implementation and docs review | In review; Claude findings 1 blocking Medium + 3 Low addressed, follow-up pending |
+| Phase 3 Implementation and docs review | Done and approved (`ca48356`); initial 4 findings resolved, 0 unresolved |
 | Phase 4-a User verification | Not started |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |
