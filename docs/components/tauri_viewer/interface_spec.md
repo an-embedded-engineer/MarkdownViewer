@@ -9,7 +9,7 @@
 - Explorer resize: ExplorerとPreview間のseparatorをpointerでdragする。separatorへfocus後、ArrowLeft / ArrowRightは16px単位、Home / Endは現在の最小 / dynamic最大幅へ移動する。
 - Tab activate: TabStripから表示するdocumentを切り替える。ArrowLeft / ArrowRight / Home / Endでもfocusとselectionを移動できる。
 - Tab close: 操作元pane groupだけからtabを削除する。active tabならsource local順の右隣、なければ左隣、なければ未選択へ移る。反対groupに同じIDが残る場合はglobal document dataと表示を維持し、どのgroupからも参照されなくなった時だけdataを破棄する。
-- Tab move: split時だけactive tabの`→` / `←` buttonで反対paneへ移動する。source removal / fallbackとdestination add / selectをatomicに行い、destinationに同じIDがある場合は既存位置を維持してsourceだけから外す。完了後はdestination tabへfocusする。
+- Tab move: split時はactive tabの`→` / `←` button、またはtab name上から開始するmouse dragで反対paneへ移動する。pointer dragはnon-active tabも直接扱い、反対paneのTabStripだけをdrop targetにする。source removal / fallbackとdestination add / selectをatomicに行い、destinationに同じIDがある場合は既存位置を維持してsourceだけから外す。完了後はdestination tabへfocusし、Escape / invalid release / pointer cancelでは所属・選択を変更しない。
 - Reload: MenuBar の File dropdown から root treeとactive paneのselected tabだけを再読み込みする。同じtabを両paneで表示している場合は共有revision更新により両方を再描画する。
 - Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
 - Split View: MenuBarの`View > Split View`でsingle / 左右2 paneを切り替える。pane内をpointer操作またはfocusするとそのpaneがactiveになる。
@@ -57,9 +57,10 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - 多数tabは横scrollで到達可能にする。`role="tablist"` / `role="tab"` とroving tabindexを使う。
 - 各TabStripは自paneの`orderedTabIds`に属するtabだけをlocal挿入順で表示する。ArrowLeft / ArrowRight / Home / Endもlocal順へ適用する。
 - single時はactivate / closeの2領域、split時はactivate / move / closeの3領域を持つ。activate buttonとactive tabのmove / close buttonだけをTabキーのfocus順に含める。非active tabを操作する場合は、先に矢印キーでactivateする。
+- keyboardのfocus契約は維持し、programmatic focusはancestorをscrollしない。pointer dragだけが非active tabを直接移動でき、touch / penではdragを開始しない。
 - move buttonはprimaryで`→`、secondaryで`←`を表示し、accessible nameへdocument名とdestination paneを含める。close buttonもdocument名とsource paneを含める。
 - 同じtab IDを両groupで参照できるが、document dataだけを共有し、選択とLoading / Rendering / Error表示、Markdown DOM、HTML iframeはpaneごとに分離する。
-- TabStripはname 1行、Loading / Rendering / Errorのstate 2行目、empty、水平scrollbar有無にかかわらず58px固定高とし、split時の左右preview上端を一致させる。
+- TabStripはname 1行と上端indicatorでactive / Loading / Rendering / Errorを表し、accessible nameへ状態suffix、Loading / Renderingへ`aria-busy`を公開する。empty、状態遷移、水平overflowにかかわらず40px固定高とし、split時の左右preview上端を一致させる。horizontal scrollbarはoverflow時のhover / focusだけthumbを見せるが6px track寸法を維持する。activateまたはitem内controlへfocusした場合はmove / closeを含むitem外枠全体をTabStrip内へ表示する。
 - DOM IDは`tab-${paneId}-${tabId}`、`document-preview-${paneId}`、`document-pane-${paneId}`とし、single時もprimary prefixを使う。
 - tab永続化、reorder、pinは対象外。
 

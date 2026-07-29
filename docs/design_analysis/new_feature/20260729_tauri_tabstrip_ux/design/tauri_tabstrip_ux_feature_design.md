@@ -107,7 +107,7 @@ DOM ref、pointer capture、focus、`elementFromPoint`、React stateは`TabStrip
 
 ### 4.5 採用: scrollbar geometry固定 + thumb visibility切替
 
-`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparent、`:hover` / `:focus-within`時だけthumbをmuted colorへ切り替える。Firefox系の`scrollbar-color`とWebKit系pseudo-elementの両方を定義する。
+`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparent、`:hover` / `:focus-within`時だけthumbをmuted colorへ切り替える。Tauriの対象WebViewで共通利用できるWebKit scrollbar pseudo-elementへ実装を一本化し、`scrollbar-width` / `scrollbar-color`は併記しない。
 
 scrollbar自体の追加・除去や`overflow-x: auto | hidden`切替は行わない。classic scrollbarではtransparentなtrackを含め常に同じ6px内部寸法を確保し、overlay scrollbar環境でもTabStrip外寸40pxを維持する。overflowがない場合も透明trackの領域は保持するがthumbは生成されず、不要なbarは視認できない。これによりtab追加・closeがoverflow境界を跨いでもtab itemの内寸を34pxから変えない。
 
@@ -178,7 +178,7 @@ error / loading / rendering indicatorがactive上端線より優先されるた�
 - `.tab-item`はstretchし、indicator用pseudo-elementを持つ`position: relative`とする。
 - `.tab-activate`は1行中央揃え、`.tab-state`要素と2行gridを削除する。
 - move / close各30px、single itemのmin width 130px、split itemのmin width 160pxは維持する。
-- `.tab-strip`は`overflow-x: scroll`と6pxのtransparent trackを常時持つ。content control領域は最低33pxを確保し、indicator 2〜3pxをoverlayしてbutton layoutを押し下げない。
+- `.tab-strip`は`overflow-x: scroll`とWebKit pseudo-elementによる6pxのtransparent trackを常時持つ。`scrollbar-width`は併用しない。content control領域は外寸40pxからborderと実測scrollbar寸法を差し引いた領域を使い、indicator 2〜3pxをoverlayしてbutton layoutを押し下げない。
 - `.app-shell`とdark theme側へ`--tab-indicator-loading` / `--tab-indicator-rendering` / `--tab-indicator-error`のsemantic tokenを追加する。component ruleへ固定RGBを書かず、Light / Darkの`--chrome-bg`とactive時`--panel-bg`の双方で視認できる値を各theme定義へ置く。error tokenは`--error-text`を参照してよい。
 - drag開始は`pointerType === "mouse"`だけを対象とし、`.tab-activate`へ`touch-action: none`を付けない。touch / penでは従来のhorizontal pan、tap activate、move buttonを維持する。
 
@@ -248,7 +248,7 @@ type TabDragSession = {
 - invalid target上のpointerupはcancelでno-op。
 - dragging中だけ`document`へcapture phaseの`keydown` listenerをeffectで登録する。Escapeでは`preventDefault`と`stopPropagation`を行ってdrag cancelを優先し、captureを安全にreleaseする。cleanupでlistenerを必ず解除し、menu等の別document-level Escape handlerを同じeventでは実行させない。
 - `pointercancel` / `lostpointercapture` / unmount / split解除はno-op cleanupする。
-- drag成立後のsource activate buttonには`onClickCapture`を置き、click抑止identityが同じsource tabかつpointerup直後の有効期間内なら`preventDefault` / `stopPropagation`してidentityを消費する。pointerup handlerはsessionをfinalizeしてからcaptureをreleaseし、source click dispatchより後になる次の`requestAnimationFrame`でidentityを必ずclearする。成功dropでsource itemがunmountしてclickが来なくても次のtab clickへ持ち越さない。新しいpointerdownもstale identityを先にclearする。Escape / pointercancel / pointerupを経ないunexpected lost captureではclickが生成されないため同期clearする。pointerup後のimplicit `lostpointercapture`はsessionが既にfinalize済みなのでno-opとし、scheduled clearを早めない。
+- drag成立後のsource activate buttonには`onClickCapture`を置き、click抑止identityが同じsource tabなら`preventDefault` / `stopPropagation`してidentityを消費する。時間依存のscheduled clearは行わず、解除経路をmatching clickの消費、次のpointerdown、clickを生成しないEscape / pointercancel / unexpected lost captureの同期clearへ限定する。成功dropでsource itemがunmountしてclickが来ない場合も、次のpointerdownがstale identityを操作前にclearする。pointerup後のimplicit `lostpointercapture`はsessionが既にfinalize済みなのでno-opとし、identityを早めにclearしない。
 - cleanupはsession ref、presentation state、`.app-shell.tab-dragging` classに対応するReact state、preview transform、live status、keydown listenerを一つの経路で解除する。click抑止identityだけは前項のevent順序に従ってclearする。lost capture後の二重cleanupはcurrent pointer ID不一致なら何もしない。
 - move後のsource item unmountは正常であり、destination focusは既存`moveTab`の`requestAnimationFrame`経路を使う。
 
@@ -294,7 +294,7 @@ type TabDragSession = {
 - compact fixed height、indicator、scrollbar、drag source / target / preview、reduced motionを定義する。
 - state / hover / focus切替でgrid rowやouter heightを変更しない。
 - Light / Dark双方の`.app-shell`へTabStrip用semantic tokenを定義し、component ruleには固定RGBを追加しない。
-- fixed drag previewのsibling layerにもtheme tokenを供給するため、Lightは`.app-shell, .tab-drag-layer`、Darkは`:root[data-theme="dark"] .app-shell, :root[data-theme="dark"] .tab-drag-layer`の共通selectorで同じsemantic tokenを定義する。sibling間のCSS variable継承には依存しない。
+- fixed drag previewのsibling layerにもtheme tokenを供給するため、Lightは`.app-shell, .tab-drag-layer`、Darkは`:root[data-theme="dark"] .app-shell, :root[data-theme="dark"] .tab-drag-layer`の共通selectorを使う。previewが参照する`--panel-bg` / `--chrome-bg` / `--text` / `--muted` / `--border` / `--accent`とTabStrip indicator tokenをLight / Dark双方で明示定義し、sibling間のCSS variable継承には依存しない。
 
 ## 10. データ・サービス・永続化・migration
 
@@ -330,7 +330,7 @@ type TabDragSession = {
 | item幅がviewport超過 | left edge優先、無限revealループを避ける |
 | reveal geometryが非finite | pure policyがthrowし、silent 0 / nullへfallbackしない |
 | programmatic focus | `preventScroll:true`でancestorを動かさず、TabStripだけmanual reveal |
-| drag成立後のsource click | matching `onClickCapture`で抑止。成功dropでunmountしclickが無くても次frameでidentity clear |
+| drag成立後のsource click | matching `onClickCapture`で抑止。成功dropでunmountしclickが無い場合は次のpointerdownでstale identityをclear |
 | focus target欠落 | existing destination pane focus + console error。silent no-opにしない |
 
 ## 13. テスト設計
@@ -376,7 +376,7 @@ Rust差分は予定しないが、Tauri application全体の回帰確認とし�
 1. ready / active / loading / rendering / errorの上端indicatorとaccessible state。
 2. Light / Darkと`prefers-reduced-motion`で色・pattern・active背景が識別可能。loading / rendering / error tokenがinactiveの`--chrome-bg`とactiveの`--panel-bg`の双方で視認できる。
 3. primary / secondary、empty、overflow、状態遷移で40px固定高とpreview上端が一致。
-4. overflowなしではbarが見えず、overflow時はhover / focusでthumbが現れる。tabをoverflow境界前後で増減してもtransparent trackの6px内部寸法、itemの見た目高さ、preview上端が変わらない。
+4. overflowなしではbarが見えず、overflow時はhover / focusでthumbが現れる。対象WebViewでWebKit pseudo-elementのtrack実寸が6pxであることを確認し、tabをoverflow境界前後で増減してもitemの見た目高さとpreview上端が変わらない。
 5. 矢印キーで先頭・中間・末尾tabをactivateし、Tabでactive item内のactivate → move → closeへ移動してitem全体が見える。focus時にpreview / Explorer / shellが縦横に動かない。
 6. primary→secondary、secondary→primaryのactive / non-active tab drag。
 7. destination same ID、source最後のtab、invalid target release、Escape cancel。
@@ -416,7 +416,7 @@ ADRは追加しない。Pointer EventsとTabStrip policyは現時点ではTauri 
 | clickとdragの競合 | drag後にsource activate | 6px thresholdとdrag成立時のone-shot click抑止 |
 | pointermoveでApp全体rerender | preview DOM性能 / 再描画 | 座標はref / preview style、target変更時だけstate更新 |
 | source unmountでcapture喪失 | stale drag / double move | lost capture、identity effect、pointer ID付きcleanup |
-| scrollbar実装差 | thumb常時表示 / layout差 | Firefox / WebKit両CSS、fixed outer height、実機確認 |
+| scrollbar実装差 | thumb常時表示 / layout差 | WebKit pseudo-elementへ一本化、fixed outer height、対象WebViewでtrack実寸確認 |
 | indicatorが色だけに依存 | 状態識別困難 | 太さ、motion / pattern、active背景、accessible name |
 | reduced motionでrendering不明 | loadingとの混同 | static repeating patternを使用 |
 | scrollがouter paneを動かす | preview / shell位置変化 | manual strip-only delta、item外枠ref |

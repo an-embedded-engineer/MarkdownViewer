@@ -49,6 +49,8 @@ markdown-viewer-tauri/
 │   ├── splitView.test.ts         — open / local close / move / split / root / resize policy unit test
 │   ├── paneRuntime.ts            — pane async guard / TabStrip表示state合成
 │   ├── paneRuntime.test.ts       — stale result / pane-local runtime unit test
+│   ├── tabStrip.ts               — item reveal / drag threshold / drop pane policy
+│   ├── tabStrip.test.ts          — TabStrip geometry / pointer policy unit test
 │   ├── imageViewer.ts            — image viewer transform policy / DOM decoration / source resolver
 │   ├── imageViewer.test.ts       — zoom / pan / wheel / intrinsic size policy unit test
 │   ├── App.css                   — Light / Dark テーマ + MenuBar / resizable Explorer / TabStrip / StatusBar レイアウト
@@ -72,6 +74,7 @@ markdown-viewer-tauri/
 | `App` / `DocumentPane` / `MenuBar` / `SettingsDialog` / `RootPathBar` / `FileTree` / `TabStrip` / `MarkdownPreview` / `HtmlPreview` / `ErrorBanner` / `StatusBar` | UI + 状態管理。`tabs`をglobal document data、`SplitViewState`をpane-local groupの正本とし、App境界でordered viewを解決してpaneごとのMarkdown DOM / sandboxed HTML iframeを表示する | [markdown-viewer-tauri/src/App.tsx](../../../markdown-viewer-tauri/src/App.tsx) |
 | `splitView.ts` | pane-local ordered ID、open / select / local close / atomic move、split保持、root reset、参照集合、generic group resolver、requested ratioとdynamic幅をpure functionで管理する | [markdown-viewer-tauri/src/splitView.ts](../../../markdown-viewer-tauri/src/splitView.ts) |
 | `paneRuntime.ts` | pane / tab / revisionのasync guardと、shared tab state + pane runtimeによるTabStrip表示stateをpure functionで合成する | [markdown-viewer-tauri/src/paneRuntime.ts](../../../markdown-viewer-tauri/src/paneRuntime.ts) |
+| `tabStrip.ts` | TabStrip内だけを動かすitem全体reveal delta、6px drag threshold、pane IDをnarrowingするdrop policyをpure functionで管理する | [markdown-viewer-tauri/src/tabStrip.ts](../../../markdown-viewer-tauri/src/tabStrip.ts) |
 | `documentPolicy.ts` | Markdown / HTML response shape、preview revision URL、opaque-origin bridge messageをpure functionで検証する | [markdown-viewer-tauri/src/documentPolicy.ts](../../../markdown-viewer-tauri/src/documentPolicy.ts) |
 | `explorerPane.ts` | Explorerの初期/最小/dynamic最大幅、clamp、ArrowLeft / ArrowRight / Home / End操作をDOM非依存のpure functionで管理する | [markdown-viewer-tauri/src/explorerPane.ts](../../../markdown-viewer-tauri/src/explorerPane.ts) |
 | `imageViewer.ts` | image viewerのfit / zoom / pan / wheel / intrinsic size / activation policyと、Markdown DOM内の3種visualだけを扱うdecoration / resolverを提供する | [markdown-viewer-tauri/src/imageViewer.ts](../../../markdown-viewer-tauri/src/imageViewer.ts) |
@@ -87,6 +90,8 @@ markdown-viewer-tauri/
 | Capability | `core:default` / `dialog:default` / `opener:default` | [markdown-viewer-tauri/src-tauri/capabilities/default.json](../../../markdown-viewer-tauri/src-tauri/capabilities/default.json) |
 | Cargo manifest | `tauri-plugin-dialog` / `tauri-plugin-opener` / `serde` 依存 | [markdown-viewer-tauri/src-tauri/Cargo.toml](../../../markdown-viewer-tauri/src-tauri/Cargo.toml) |
 | Package | `markdown-it` / `mermaid` / Tauri JS API / plugin SDK | [markdown-viewer-tauri/package.json](../../../markdown-viewer-tauri/package.json) |
+
+TabStripは40px固定高の1行表示と上端state indicatorを使う。split時は矢印move buttonに加えてmouseのtab name dragで反対paneのTabStripへ移動できる。touch / pen drag、同一pane reorder、preview paneへのdropは提供せず、keyboard / 支援技術では既存move buttonを使う。
 
 ## 依存関係
 

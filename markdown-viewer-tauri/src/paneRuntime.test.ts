@@ -5,6 +5,7 @@ import {
   isPaneSelectionCurrent,
   isTabRevisionCurrent,
   resolvePaneTabPresentationState,
+  resolveTabAccessibilityState,
   type PanePreviewStatus,
 } from "./paneRuntime";
 import { reduceSplitView, type SplitViewState } from "./splitView";
@@ -148,6 +149,15 @@ describe("pane runtime guard", () => {
 });
 
 describe("pane tab presentation", () => {
+  it.each([
+    ["ready", { labelSuffix: null, busy: false }],
+    ["loading", { labelSuffix: "Loading", busy: true }],
+    ["rendering", { labelSuffix: "Rendering", busy: true }],
+    ["error", { labelSuffix: "Error", busy: false }],
+  ] as const)("maps %s to one accessible state", (presentation, expected) => {
+    expect(resolveTabAccessibilityState(presentation)).toEqual(expected);
+  });
+
   it.each(["loading", "rendering", "error"] as const)(
     "keeps shared %s ahead of pane runtime",
     (loadState) => {

@@ -18,7 +18,7 @@ components:
   - "docs/rules/development_workflow.md"
 status: "in_progress"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "draft"
 completion_status: "not_started"
 verification_status: "not_started"
 related_commits:
@@ -58,7 +58,7 @@ depends_on:
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`0c0dd98`); initial 17 findings resolved, 3 non-blocking implementation follow-ups carried into Phase 3 |
-| Phase 3 Implementation and docs review | Not started |
+| Phase 3 Implementation and docs review | Implementation and permanent docs prepared; automated verification passed, Claude review pending |
 | Phase 4-a User verification | Not started |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |

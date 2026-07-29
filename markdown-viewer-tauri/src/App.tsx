@@ -45,6 +45,7 @@ import {
   isPaneSelectionCurrent,
   isTabRevisionCurrent,
   resolvePaneTabPresentationState,
+  resolveTabAccessibilityState,
   type PanePreviewPhase,
   type PanePreviewStatus,
 } from "./paneRuntime";
@@ -62,6 +63,11 @@ import {
   type SplitViewAction,
   type SplitViewState,
 } from "./splitView";
+import {
+  getTabRevealDelta,
+  hasExceededTabDragThreshold,
+  resolveTabDropPane,
+} from "./tabStrip";
 
 type FileTreeNode = {
   name: string;
@@ -144,6 +150,25 @@ type PaneImageViewerRequest = ImageViewerRequest & { paneId: PaneId };
 
 type PanePreviewElements = Record<PaneId, HTMLElement | null>;
 
+type TabDragSession = {
+  pointerId: number;
+  sourcePaneId: PaneId;
+  tabId: string;
+  displayName: string;
+  startClientX: number;
+  startClientY: number;
+  phase: "pending" | "dragging";
+  dropPaneId: PaneId | null;
+  captureElement: HTMLButtonElement;
+};
+
+type TabDragPresentation = Pick<
+  TabDragSession,
+  "sourcePaneId" | "tabId" | "displayName" | "dropPaneId"
+>;
+
+type SuppressedTabClick = Pick<TabDragSession, "pointerId" | "sourcePaneId" | "tabId">;
+
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 const defaultWindowSize: WindowSize = { width: 800, height: 600 };
@@ -175,6 +200,9 @@ function App() {
   const [splitWorkspaceWidth, setSplitWorkspaceWidth] = useState<number | null>(null);
   const [isSplitResizing, setIsSplitResizing] = useState(false);
   const [imageViewerRequest, setImageViewerRequest] = useState<PaneImageViewerRequest | null>(null);
+  const [tabDragPresentation, setTabDragPresentation] =
+    useState<TabDragPresentation | null>(null);
+  const [tabDragStatus, setTabDragStatus] = useState("");
   const workspaceRef = useRef<HTMLElement>(null);
   const previewWorkspaceRef = useRef<HTMLElement>(null);
   const explorerResizeRef = useRef<ExplorerResizeState | null>(null);
@@ -191,6 +219,9 @@ function App() {
   const mermaidQueueRef = useRef<Promise<void>>(Promise.resolve());
   const nextTabIdRef = useRef(1);
   const imageViewerFocusReturnRef = useRef<HTMLElement | null>(null);
+  const tabDragSessionRef = useRef<TabDragSession | null>(null);
+  const suppressedTabClickRef = useRef<SuppressedTabClick | null>(null);
+  const tabDragPreviewRef = useRef<HTMLDivElement>(null);
 
   splitViewRef.current = splitViewState;
   panePreviewStatusesRef.current = panePreviewStatuses;
@@ -777,9 +808,7 @@ function App() {
     return getPaneState(state, paneId).activeTabId;
   }
 
-  function moveTab(sourcePaneId: PaneId, tabId: string) {
-    const destinationPaneId: PaneId =
-      sourcePaneId === "primary" ? "secondary" : "primary";
+  function moveTab(sourcePaneId: PaneId, destinationPaneId: PaneId, tabId: string) {
     applySplitView({
       type: "move-tab",
       sourcePaneId,
@@ -789,16 +818,198 @@ function App() {
     window.requestAnimationFrame(() => {
       const destinationTab = document.getElementById(`tab-${destinationPaneId}-${tabId}`);
       if (destinationTab instanceof HTMLButtonElement) {
-        destinationTab.focus();
-        destinationTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+        destinationTab.focus({ preventScroll: true });
         return;
       }
       const destinationPane = document.getElementById(`document-pane-${destinationPaneId}`);
-      destinationPane?.focus();
+      destinationPane?.focus({ preventScroll: true });
       console.error(
         `Moved tab focus target is missing: tab-${destinationPaneId}-${tabId}`,
       );
     });
+  }
+
+  function getTabDropPaneAtPoint(
+    sourcePaneId: PaneId,
+    clientX: number,
+    clientY: number,
+  ): PaneId | null {
+    const target = document.elementFromPoint(clientX, clientY);
+    const candidate = target
+      ?.closest<HTMLElement>("[data-tab-drop-pane]")
+      ?.dataset.tabDropPane ?? null;
+    return resolveTabDropPane(sourcePaneId, candidate, splitViewRef.current.mode);
+  }
+
+  function updateTabDragPreview(clientX: number, clientY: number) {
+    if (tabDragPreviewRef.current) {
+      tabDragPreviewRef.current.style.transform =
+        `translate3d(${clientX + 12}px, ${clientY + 12}px, 0)`;
+    }
+  }
+
+  function resetTabDragPresentation(status: string) {
+    setTabDragPresentation(null);
+    setTabDragStatus(status);
+    if (tabDragPreviewRef.current) {
+      tabDragPreviewRef.current.style.transform = "";
+    }
+  }
+
+  function cancelTabDrag(status = "Tab move cancelled.") {
+    const session = tabDragSessionRef.current;
+    if (!session) {
+      return;
+    }
+    tabDragSessionRef.current = null;
+    suppressedTabClickRef.current = null;
+    resetTabDragPresentation(session.phase === "dragging" ? status : "");
+    if (session.captureElement.hasPointerCapture(session.pointerId)) {
+      session.captureElement.releasePointerCapture(session.pointerId);
+    }
+  }
+
+  function handleTabPointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tab: OpenDocumentTab,
+  ) {
+    suppressedTabClickRef.current = null;
+    if (
+      splitViewRef.current.mode !== "split" ||
+      event.pointerType !== "mouse" ||
+      !event.isPrimary ||
+      event.button !== 0 ||
+      tabDragSessionRef.current
+    ) {
+      return;
+    }
+    tabDragSessionRef.current = {
+      pointerId: event.pointerId,
+      sourcePaneId: paneId,
+      tabId: tab.id,
+      displayName: tab.displayName,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      phase: "pending",
+      dropPaneId: null,
+      captureElement: event.currentTarget,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleTabPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const session = tabDragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) {
+      return;
+    }
+    if (
+      session.phase === "pending" &&
+      !hasExceededTabDragThreshold(
+        session.startClientX,
+        session.startClientY,
+        event.clientX,
+        event.clientY,
+      )
+    ) {
+      return;
+    }
+    const startedDragging = session.phase === "pending";
+    if (startedDragging) {
+      session.phase = "dragging";
+      suppressedTabClickRef.current = {
+        pointerId: session.pointerId,
+        sourcePaneId: session.sourcePaneId,
+        tabId: session.tabId,
+      };
+      activatePane(session.sourcePaneId);
+      setTabDragStatus(
+        `Dragging ${session.displayName}. Drop on the other pane tab strip or press Escape to cancel.`,
+      );
+      const { clientX, clientY } = event;
+      window.requestAnimationFrame(() => updateTabDragPreview(clientX, clientY));
+    }
+    event.preventDefault();
+    updateTabDragPreview(event.clientX, event.clientY);
+    const dropPaneId = getTabDropPaneAtPoint(
+      session.sourcePaneId,
+      event.clientX,
+      event.clientY,
+    );
+    if (startedDragging || dropPaneId !== session.dropPaneId) {
+      session.dropPaneId = dropPaneId;
+      setTabDragPresentation({
+        sourcePaneId: session.sourcePaneId,
+        tabId: session.tabId,
+        displayName: session.displayName,
+        dropPaneId,
+      });
+      if (dropPaneId) {
+        setTabDragStatus(
+          `Move ${session.displayName} to the ${dropPaneId} pane. Release to drop.`,
+        );
+      } else if (!startedDragging) {
+        setTabDragStatus(
+          `Dragging ${session.displayName}. Drop on the other pane tab strip or press Escape to cancel.`,
+        );
+      }
+    }
+  }
+
+  function handleTabPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
+    const session = tabDragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) {
+      return;
+    }
+    const wasDragging = session.phase === "dragging";
+    const destinationPaneId = wasDragging
+      ? getTabDropPaneAtPoint(session.sourcePaneId, event.clientX, event.clientY)
+      : null;
+    const currentState = splitViewRef.current;
+    const sourceIsCurrent =
+      currentState.mode === "split" &&
+      getPaneState(currentState, session.sourcePaneId).orderedTabIds.includes(session.tabId);
+
+    tabDragSessionRef.current = null;
+    resetTabDragPresentation(
+      wasDragging && destinationPaneId && sourceIsCurrent
+        ? `Moved ${session.displayName} to the ${destinationPaneId} pane.`
+        : wasDragging
+          ? "Tab move cancelled."
+          : "",
+    );
+    if (session.captureElement.hasPointerCapture(session.pointerId)) {
+      session.captureElement.releasePointerCapture(session.pointerId);
+    }
+    if (wasDragging && destinationPaneId && sourceIsCurrent) {
+      moveTab(session.sourcePaneId, destinationPaneId, session.tabId);
+    }
+  }
+
+  function handleTabPointerCancel(event: React.PointerEvent<HTMLButtonElement>) {
+    if (tabDragSessionRef.current?.pointerId === event.pointerId) {
+      cancelTabDrag();
+    }
+  }
+
+  function handleTabLostPointerCapture(event: React.PointerEvent<HTMLButtonElement>) {
+    if (tabDragSessionRef.current?.pointerId === event.pointerId) {
+      cancelTabDrag();
+    }
+  }
+
+  function suppressTabClick(
+    event: React.MouseEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tabId: string,
+  ) {
+    const suppressed = suppressedTabClickRef.current;
+    if (suppressed?.sourcePaneId !== paneId || suppressed.tabId !== tabId) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    suppressedTabClickRef.current = null;
   }
 
   function closeImageViewer() {
@@ -1187,6 +1398,34 @@ function App() {
     }
   }, [splitViewState, tabs]);
 
+  useEffect(() => {
+    if (!tabDragPresentation) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      cancelTabDrag();
+    }
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [tabDragPresentation]);
+
+  useEffect(() => {
+    const session = tabDragSessionRef.current;
+    if (
+      session &&
+      (splitViewState.mode !== "split" ||
+        !getPaneState(splitViewState, session.sourcePaneId).orderedTabIds.includes(session.tabId) ||
+        !session.captureElement.isConnected)
+    ) {
+      cancelTabDrag();
+    }
+  }, [splitViewState, tabs]);
+
   if (isStartupConfigLoading) {
     return (
       <main className="app-shell startup-shell">
@@ -1200,7 +1439,7 @@ function App() {
   return (
     <>
       <main
-        className={`app-shell ${isExplorerResizing ? "explorer-resizing" : ""} ${isSplitResizing ? "split-resizing" : ""}`}
+        className={`app-shell ${isExplorerResizing ? "explorer-resizing" : ""} ${isSplitResizing ? "split-resizing" : ""} ${tabDragPresentation ? "tab-dragging" : ""}`}
         aria-hidden={settingsDraft || imageViewerRequest ? true : undefined}
         inert={settingsDraft || imageViewerRequest ? true : undefined}
       >
@@ -1297,6 +1536,13 @@ function App() {
                 onActivateTab={activateTab}
                 onCloseTab={closeTab}
                 onMoveTab={moveTab}
+                tabDragPresentation={tabDragPresentation}
+                onTabPointerDown={handleTabPointerDown}
+                onTabPointerMove={handleTabPointerMove}
+                onTabPointerUp={handleTabPointerUp}
+                onTabPointerCancel={handleTabPointerCancel}
+                onTabLostPointerCapture={handleTabLostPointerCapture}
+                onTabClickCapture={suppressTabClick}
                 onPreviewStatus={updatePanePreviewPhase}
                 onPreviewElement={registerPreviewElement}
                 onPreviewClick={handlePreviewClick}
@@ -1353,6 +1599,13 @@ function App() {
                   onActivateTab={activateTab}
                   onCloseTab={closeTab}
                   onMoveTab={moveTab}
+                  tabDragPresentation={tabDragPresentation}
+                  onTabPointerDown={handleTabPointerDown}
+                  onTabPointerMove={handleTabPointerMove}
+                  onTabPointerUp={handleTabPointerUp}
+                  onTabPointerCancel={handleTabPointerCancel}
+                  onTabLostPointerCapture={handleTabLostPointerCapture}
+                  onTabClickCapture={suppressTabClick}
                   onPreviewStatus={updatePanePreviewPhase}
                   onPreviewElement={registerPreviewElement}
                   onPreviewClick={handlePreviewClick}
@@ -1389,6 +1642,17 @@ function App() {
           loadingMessage={loadingMessage}
         />
       </main>
+
+      {tabDragPresentation ? (
+        <div className="tab-drag-layer" aria-hidden="true">
+          <div ref={tabDragPreviewRef} className="tab-drag-preview">
+            {tabDragPresentation.displayName}
+          </div>
+        </div>
+      ) : null}
+      <span className="tab-drag-live" aria-live="polite">
+        {tabDragStatus}
+      </span>
 
       {settingsDraft ? (
         <SettingsDialog
@@ -2163,7 +2427,22 @@ type DocumentPaneProps = {
   onActivatePane: (paneId: PaneId) => void;
   onActivateTab: (paneId: PaneId, tabId: string) => void;
   onCloseTab: (paneId: PaneId, tabId: string) => string | null;
-  onMoveTab: (paneId: PaneId, tabId: string) => void;
+  onMoveTab: (sourcePaneId: PaneId, destinationPaneId: PaneId, tabId: string) => void;
+  tabDragPresentation: TabDragPresentation | null;
+  onTabPointerDown: (
+    event: React.PointerEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tab: OpenDocumentTab,
+  ) => void;
+  onTabPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onTabPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onTabPointerCancel: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onTabLostPointerCapture: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onTabClickCapture: (
+    event: React.MouseEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tabId: string,
+  ) => void;
   onPreviewStatus: (
     paneId: PaneId,
     tabId: string,
@@ -2198,6 +2477,13 @@ function DocumentPane({
   onActivateTab,
   onCloseTab,
   onMoveTab,
+  tabDragPresentation,
+  onTabPointerDown,
+  onTabPointerMove,
+  onTabPointerUp,
+  onTabPointerCancel,
+  onTabLostPointerCapture,
+  onTabClickCapture,
   onPreviewStatus,
   onPreviewElement,
   onPreviewClick,
@@ -2358,6 +2644,13 @@ function DocumentPane({
         onActivate={onActivateTab}
         onClose={onCloseTab}
         onMove={onMoveTab}
+        tabDragPresentation={tabDragPresentation}
+        onPointerDown={onTabPointerDown}
+        onPointerMove={onTabPointerMove}
+        onPointerUp={onTabPointerUp}
+        onPointerCancel={onTabPointerCancel}
+        onLostPointerCapture={onTabLostPointerCapture}
+        onClickCapture={onTabClickCapture}
       />
       <div
         className="preview-pane"
@@ -2426,7 +2719,22 @@ type TabStripProps = {
   previewStatus: PanePreviewStatus | null;
   onActivate: (paneId: PaneId, tabId: string) => void;
   onClose: (paneId: PaneId, tabId: string) => string | null;
-  onMove: (paneId: PaneId, tabId: string) => void;
+  onMove: (sourcePaneId: PaneId, destinationPaneId: PaneId, tabId: string) => void;
+  tabDragPresentation: TabDragPresentation | null;
+  onPointerDown: (
+    event: React.PointerEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tab: OpenDocumentTab,
+  ) => void;
+  onPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerCancel: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onLostPointerCapture: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onClickCapture: (
+    event: React.MouseEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tabId: string,
+  ) => void;
 };
 
 function TabStrip({
@@ -2438,8 +2746,37 @@ function TabStrip({
   onActivate,
   onClose,
   onMove,
+  tabDragPresentation,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onLostPointerCapture,
+  onClickCapture,
 }: TabStripProps) {
+  const stripRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  const itemRefs = useRef(new Map<string, HTMLDivElement>());
+
+  function revealTab(tabId: string) {
+    const strip = stripRef.current;
+    const item = itemRefs.current.get(tabId);
+    if (!strip || !item) {
+      return;
+    }
+    const stripRect = strip.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const delta = getTabRevealDelta(
+      stripRect.left,
+      stripRect.right,
+      itemRect.left,
+      itemRect.right,
+      4,
+    );
+    if (delta !== 0) {
+      strip.scrollBy({ left: delta, behavior: "auto" });
+    }
+  }
 
   useEffect(() => {
     if (!activeTabId) {
@@ -2447,7 +2784,7 @@ function TabStrip({
     }
 
     const frame = window.requestAnimationFrame(() => {
-      tabRefs.current.get(activeTabId)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      revealTab(activeTabId);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeTabId, tabs.length]);
@@ -2455,8 +2792,8 @@ function TabStrip({
   function focusTab(tabId: string) {
     window.requestAnimationFrame(() => {
       const button = tabRefs.current.get(tabId);
-      button?.focus();
-      button?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      button?.focus({ preventScroll: true });
+      revealTab(tabId);
     });
   }
 
@@ -2492,15 +2829,21 @@ function TabStrip({
     if (nextFocusId) {
       focusTab(nextFocusId);
     } else {
-      window.requestAnimationFrame(() => document.getElementById(`document-pane-${paneId}`)?.focus());
+      window.requestAnimationFrame(() =>
+        document.getElementById(`document-pane-${paneId}`)?.focus({ preventScroll: true }),
+      );
     }
   }
 
+  const isDropTarget = tabDragPresentation?.dropPaneId === paneId;
+
   return (
     <div
-      className="tab-strip"
+      ref={stripRef}
+      className={`tab-strip ${isDropTarget ? "tab-drop-target" : ""}`}
       role="tablist"
       aria-label={`${paneId === "primary" ? "Primary" : "Secondary"} pane open documents`}
+      data-tab-drop-pane={paneId}
     >
       {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId;
@@ -2510,18 +2853,25 @@ function TabStrip({
           splitViewState,
           previewStatus,
         );
-        const stateLabel =
-          presentationState === "loading"
-            ? "Loading"
-            : presentationState === "rendering"
-              ? "Rendering"
-              : presentationState === "error"
-                ? "Error"
-                : null;
+        const accessibility = resolveTabAccessibilityState(presentationState);
+        const isDragSource =
+          tabDragPresentation?.sourcePaneId === paneId &&
+          tabDragPresentation.tabId === tab.id;
+        const destinationPaneId: PaneId =
+          paneId === "primary" ? "secondary" : "primary";
         return (
           <div
-            className={`tab-item ${splitViewState.mode === "split" ? "tab-item-split" : ""} ${isActive ? "active" : ""} tab-${presentationState}`}
+            ref={(element) => {
+              if (element) {
+                itemRefs.current.set(tab.id, element);
+              } else {
+                itemRefs.current.delete(tab.id);
+              }
+            }}
+            className={`tab-item ${splitViewState.mode === "split" ? "tab-item-split" : ""} ${isActive ? "active" : ""} ${isDragSource ? "tab-drag-source" : ""} tab-${presentationState}`}
             key={tab.id}
+            data-tab-id={tab.id}
+            onFocusCapture={() => revealTab(tab.id)}
           >
             <button
               ref={(element) => {
@@ -2536,14 +2886,29 @@ function TabStrip({
               className="tab-activate"
               role="tab"
               aria-selected={isActive}
+              aria-label={
+                accessibility.labelSuffix
+                  ? `${tab.displayName}, ${accessibility.labelSuffix}`
+                  : tab.displayName
+              }
+              aria-busy={accessibility.busy || undefined}
               aria-controls={`document-preview-${paneId}`}
               tabIndex={isActive ? 0 : -1}
               title={tab.path}
-              onClick={() => onActivate(paneId, tab.id)}
+              onClickCapture={(event) => onClickCapture(event, paneId, tab.id)}
+              onClick={(event) => {
+                if (!event.defaultPrevented) {
+                  onActivate(paneId, tab.id);
+                }
+              }}
               onKeyDown={(event) => handleKeyDown(event, index)}
+              onPointerDown={(event) => onPointerDown(event, paneId, tab)}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerCancel}
+              onLostPointerCapture={onLostPointerCapture}
             >
               <span className="tab-name">{tab.displayName}</span>
-              {stateLabel ? <span className="tab-state">{stateLabel}</span> : null}
             </button>
             {splitViewState.mode === "split" ? (
               <button
@@ -2552,7 +2917,7 @@ function TabStrip({
                 aria-label={`Move ${tab.displayName} to ${paneId === "primary" ? "secondary" : "primary"} pane`}
                 title={`Move ${tab.displayName} to ${paneId === "primary" ? "secondary" : "primary"} pane`}
                 tabIndex={isActive ? 0 : -1}
-                onClick={() => onMove(paneId, tab.id)}
+                onClick={() => onMove(paneId, destinationPaneId, tab.id)}
               >
                 {paneId === "primary" ? "→" : "←"}
               </button>
