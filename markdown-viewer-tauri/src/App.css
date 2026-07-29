@@ -596,7 +596,8 @@ button {
   display: grid;
   grid-template-columns:
     minmax(160px, 0.8fr)
-    minmax(0, 1.2fr);
+    minmax(0, 0.8fr)
+    minmax(260px, 2.4fr);
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -883,6 +884,7 @@ button {
 
 .tab-strip::-webkit-scrollbar {
   height: 6px;
+  background: transparent;
 }
 
 .tab-strip::-webkit-scrollbar-track,

@@ -44,3 +44,17 @@ Round 3修正後はthumbが消えず常時表示される状態となった。na
 - pointerをpreviewへ移すと移動速度によらずthumbが隠れ、tab click後のfocusだけでは表示が残らない。
 - keyboardでTabStrip内へfocusした場合だけpointerが外でも表示され、pointer clickまたはTabStrip外へのfocus移動で隠れる。
 - Markdown / trusted HTML、左右pane、drag、6px track、40px固定高、indicator、item revealに退行がない。
+
+## Round 4 再確認結果と診断（2026-07-30）
+
+outer shellと明示的なpointer / keyboard stateへ一本化した後も、pointerがTabStrip外にある間にthumbが表示されたままとなり、native scrollbar付近で一瞬だけ消える場合がある症状は変わらなかった。window `pointermove`ごとにshell矩形からinside stateを双方向同期し、native scrollbar上の`pointerleave`を矩形内なら無視する補強後も同じ結果だった。Phase 4-aは引き続きNGとし、Phase 3で実WebViewの状態を観測する。
+
+一時診断としてStatusBarへ`TabDebug`を追加する。primary / secondary paneごとに、React state (`ptr`, `kbd`, `show`)、実DOM class (`class`)、最終pointer座標のshell矩形判定 (`raw`)、CSS `:hover` (`hover`)、DOM focus包含 (`focus`)、thumbのcomputed background (`thumb`)、overflow (`overflow`)、active element、最終event、座標を表示する。値が長い場合はStatusBar項目のtooltipで全文を確認する。
+
+切り分け基準は次のとおり。
+
+- `show=0 class=0`なのにthumbが見える場合は、Reactの表示論理ではなくnative scrollbarの描画・repaintまたはpseudo-element style適用を疑う。
+- TabStrip外で`show=1`の場合は、`ptr` / `kbd` / `raw` / `focus` / `event`から残留したstate経路を特定する。
+- `show=0 class=1`の場合はReact renderとDOM class同期を疑う。
+- `ptr`と`raw`が異なる場合はpointer eventとshell geometry同期を疑う。
+- `focus=0 kbd=1`の場合はkeyboard focus stateのcleanupを疑う。

@@ -464,3 +464,9 @@ pointer表示のsource of truthをCSS `:hover`からReact stateへ移す。point
 Round 3再確認では、thumbが逆に常時表示され、native scrollbar位置へpointerを置いた時だけ一瞬消える場合があると報告された。境界policyのtrue / falseは正しいが、表示条件がpointer classと`:has(:focus-visible)`のORだったため、pointer classをclearしてもUAがfocus-visibleと判定する限り表示が残った。またnative scrollbar自身をscroll elementの境界に含めたことで、scrollbar上への移動がpointer leaveとして観測される場合があり、一瞬だけ消える症状につながった。
 
 scroll elementを40px固定高のouter shellで包み、native scrollbarを含むshell全体をpointer境界にする。keyboard表示はUA selectorを廃止し、window keydown / pointerdownでlast input modalityを管理する。shell内focus時にkeyboard入力由来の場合だけkeyboard stateを有効化し、pointerdownでは同期的に解除する。pointer stateとkeyboard stateは`shouldShowTabScrollbar`のOR policyで単一classへ集約する。これにより表示のsource of truthをすべて明示stateへ移し、UA selectorとnative scrollbarのhit-testを論理判定から除外する。
+
+## 22. Phase 4-a feedback Round 4: 実WebView診断
+
+outer shellと単一表示classへ集約した後も実WebViewの症状が変わらず、window `pointermove`ごとの矩形再判定とnative scrollbar上の擬似leave無視を追加しても改善しなかった。このため、次の修正を推測で重ねず、React state、実DOM class、pointer座標の矩形判定、focus、CSS pseudo-elementのcomputed styleを同時に観測する一時診断をStatusBarへ追加する。
+
+診断結果から、state / classが表示を指示している場合はevent lifecycleを、state / classが非表示なのにthumbが見える場合はnative scrollbarのstyle適用またはrepaintを次の修正対象とする。診断UIは原因確定と再確認後に除去する。
