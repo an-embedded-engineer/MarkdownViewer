@@ -60,6 +60,13 @@ export function isPointInsideTabStrip(
   return clientX >= left && clientX < right && clientY >= top && clientY < bottom;
 }
 
+export function shouldShowTabScrollbar(
+  pointerInside: boolean,
+  keyboardFocusInside: boolean,
+): boolean {
+  return pointerInside || keyboardFocusInside;
+}
+
 export function resolveTabDropPane(
   sourcePaneId: PaneId,
   candidatePaneId: string | null,

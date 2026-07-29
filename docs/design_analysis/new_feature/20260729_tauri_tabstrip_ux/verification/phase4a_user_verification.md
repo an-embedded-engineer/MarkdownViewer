@@ -30,3 +30,17 @@ Phase 4-aは引き続きNGとし、Phase 3へ再差し戻した。Round 3ではp
 - TabStripとpreviewを低速・高速で繰り返し往復しても、pointerがTabStrip外にある間はthumbが残らない。
 - scrollbar上で停止する場合、停止せず通過する場合、tabをclickしてfocusが残る場合のすべてで同じ結果になる。
 - keyboard focus中の表示、6px track、40px固定高、indicator、item全体reveal、drag moveに退行がない。
+
+## Round 3 再確認結果（2026-07-30）
+
+Round 3修正後はthumbが消えず常時表示される状態となった。native scrollbar位置へpointerを置くと一瞬消える場合があるが、毎回ではなかった。Phase 4-aは引き続きNGとしてPhase 3へ差し戻した。
+
+境界policyの向きはunit testどおり正しい。常時表示はpointer stateとは独立した`:has(:focus-visible)`経路がtrueを維持したためで、scrollbar上の一瞬の非表示はnative scrollbarがscroll elementのpointer境界から外れる場合があるためと分析した。
+
+### Round 4 再確認条件
+
+- app起動直後、pointerがTabStrip外にありkeyboard focusもない時はthumbが隠れている。
+- pointerがouter shell内にある間は、tab item上・native scrollbar上のどちらでもthumbが安定して表示される。
+- pointerをpreviewへ移すと移動速度によらずthumbが隠れ、tab click後のfocusだけでは表示が残らない。
+- keyboardでTabStrip内へfocusした場合だけpointerが外でも表示され、pointer clickまたはTabStrip外へのfocus移動で隠れる。
+- Markdown / trusted HTML、左右pane、drag、6px track、40px固定高、indicator、item revealに退行がない。

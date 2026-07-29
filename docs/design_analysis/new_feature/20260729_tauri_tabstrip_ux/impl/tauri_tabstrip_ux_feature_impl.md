@@ -33,7 +33,7 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 - renderingはindeterminate animation、reduced motionではstatic repeating patternを使う。
 - activate buttonへstate込み`aria-label`、loading / renderingへ`aria-busy`を付与した。
 - item refとstrip refからmanual deltaを計算し、`focus({ preventScroll: true })`と`strip.scrollBy`だけでitem全体をrevealする。
-- horizontal scrollbarは6px trackを常時確保し、pointer hoverまたはkeyboard `:focus-visible`時だけthumbを表示する。
+- horizontal scrollbarは6px trackを常時確保し、pointerがouter shell内に滞在する時またはkeyboard入力由来focus時だけ単一classでthumbを表示する。
 
 ### 3.3 pointer drag move
 
@@ -102,3 +102,5 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 再確認では、TabStripとpreviewをpointerで上下に往復した際にthumbが残る場合と消える場合があり、素早い移動で残りやすいと報告された。`:hover`とnative scrollbar pseudo-elementのstate / repaintへpointer表示を委ねる方式を廃止し、TabStrip enter / leaveとwindow capture pointermoveの矩形判定から`tab-scrollbar-pointer-active` classを管理する。enter時にrefを同期更新してlistener登録raceを避け、ref無効時のpointermoveはgeometryを読まず即returnする。keyboard表示の`:has(:focus-visible)`は維持する。`tabStrip.ts`へ矩形境界policyとunit testを追加した。
 
 Round 3修正`db2f066`はレビュー`55bd8b9`で新規指摘0件、未解決0件として承認され、Phase 4-a Round 3再実施可となった。Markdown previewに加えてtrusted HTML iframe境界、primary / secondary間移動、drag中、layout変更後の次pointer moveを実WebViewで確認する。
+
+Round 3再確認ではthumbが常時表示され、native scrollbar位置で一瞬消える場合があると報告された。境界判定の向きではなく、pointer classをclearしても`:has(:focus-visible)`がtrueなら表示されるOR経路と、native scrollbar上でscroll elementのleaveが発生し得るDOM境界が原因だった。scroll elementをouter shellで包み、pointer / explicit keyboard modality stateを`shouldShowTabScrollbar`で単一classへ集約した。scrollbar表示条件から`:hover` / `:focus-within` / `:has(:focus-visible)`をすべて除去し、visibility policy 4ケースをunit testへ追加した。

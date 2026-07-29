@@ -866,9 +866,14 @@ button {
   user-select: none;
 }
 
+.tab-strip-shell {
+  height: var(--tab-strip-height);
+  min-width: 0;
+}
+
 .tab-strip {
   display: flex;
-  height: var(--tab-strip-height);
+  height: 100%;
   min-width: 0;
   overflow-x: scroll;
   overflow-y: hidden;
@@ -889,8 +894,7 @@ button {
   border-radius: 3px;
 }
 
-.tab-strip.tab-scrollbar-pointer-active::-webkit-scrollbar-thumb,
-.tab-strip:has(:focus-visible)::-webkit-scrollbar-thumb {
+.tab-strip-shell.tab-scrollbar-visible .tab-strip::-webkit-scrollbar-thumb {
   background: var(--muted);
 }
 

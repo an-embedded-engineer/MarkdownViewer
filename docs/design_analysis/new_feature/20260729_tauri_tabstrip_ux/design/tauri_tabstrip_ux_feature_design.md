@@ -33,7 +33,7 @@
 1. tab名は1行だけ表示し、状態のvisible textは置かない。
 2. readyなactive tabはaccentの上端線とactive背景、errorは赤い上端線、loading / renderingは別variantの上端indicatorで表す。
 3. activate buttonのaccessible nameへ状態名を加え、loading / renderingでは`aria-busy=true`を公開する。
-4. pointer hoverまたはTabStrip内のkeyboard `:focus-visible`時だけhorizontal scrollbar thumbを視認可能にする。pointer click由来のfocusだけでは表示を維持しない。scrollbarの占有寸法は常に一定とし、preview上端を動かさない。
+4. pointerがTabStrip shell内に滞在する時、または明示的なkeyboard入力後にTabStrip内へfocusがある時だけhorizontal scrollbar thumbを視認可能にする。pointer click由来のfocusだけでは表示を維持しない。scrollbarの占有寸法は常に一定とし、preview上端を動かさない。
 5. active tab変更またはtab item内のactivate / move / close controlへのfocusで、tab item外枠全体をTabStrip内へrevealする。
 
 ### 2.3 drag move導線
@@ -53,7 +53,7 @@
 
 - 40px固定高の1行TabStripと状態indicator。
 - ready / loading / rendering / errorのvisual / accessible mapping。
-- pointer hover / keyboard `:focus-visible`時だけ視認可能なhorizontal scrollbar。
+- pointer滞在 / keyboard入力由来focus時だけ視認可能なhorizontal scrollbar。
 - tab item全体を対象にしたhorizontal reveal policy。
 - Pointer Eventsによるprimary / secondary間drag move、drop feedback、cancel。
 - 既存move buttonと`move-tab` reducerの再利用。
@@ -107,7 +107,7 @@ DOM ref、pointer capture、focus、`elementFromPoint`、React stateは`TabStrip
 
 ### 4.5 採用: scrollbar geometry固定 + thumb visibility切替
 
-`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparentにする。pointer表示はTabStripのenter / leaveとwindow capture `pointermove`のclient座標をstrip矩形と比較して明示classへ反映する。enter時にrefを同期更新するため高速移動でもlistener有効化待ちを作らず、refが無効な通常時はgeometryを読まない。領域外の最初のmove、pointer leave、window blurでclassを外す。keyboard表示は`:has(:focus-visible)`でthumbをmuted colorへ切り替える。`:focus-within`はpointer click後もbutton focusを保持してthumbが残り、`:hover`はnative scrollbar pseudo-elementの再描画タイミングで残留したため表示状態のsource of truthに使わない。Tauriの対象WebViewで共通利用できるWebKit scrollbar pseudo-elementへ実装を一本化し、`scrollbar-width` / `scrollbar-color`は併記しない。
+`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparentにする。scroll elementを同寸のouter shellで包み、native scrollbarを含むshell矩形をpointer境界にする。pointer enter / leaveとwindow capture `pointermove`からpointer stateを管理し、window keydown / pointerdownとshell内focusからkeyboard modality stateを管理する。`pointerInside || keyboardFocusInside`をpure policyで求め、単一の表示classだけをthumb着色条件に使う。`:focus-within`、`:hover`、`:has(:focus-visible)`はいずれもUAのfocus / native scrollbar hit-test / repaintに依存した残留が確認されたため表示条件に使わない。Tauriの対象WebViewで共通利用できるWebKit scrollbar pseudo-elementへ実装を一本化し、`scrollbar-width` / `scrollbar-color`は併記しない。
 
 scrollbar自体の追加・除去や`overflow-x: auto | hidden`切替は行わない。classic scrollbarではtransparentなtrackを含め常に同じ6px内部寸法を確保し、overlay scrollbar環境でもTabStrip外寸40pxを維持する。overflowがない場合も透明trackの領域は保持するがthumbは生成されず、不要なbarは視認できない。これによりtab追加・closeがoverflow境界を跨いでもtab itemの内寸を34pxから変えない。
 
@@ -131,7 +131,7 @@ scrollbar自体の追加・除去や`overflow-x: auto | hidden`切替は行わ�
 | TabStrip高さ | 58px固定、state textを2行目表示 | 40px固定、name 1行 + 上端indicator |
 | active | accent上端線 | ready時accent上端線 + active背景、busy/error時はactive背景を維持 |
 | loading / rendering / error | visible text、error下端線 | 上端variant + accessible name、busyは`aria-busy` |
-| scrollbar | 常時thin style、OS依存で可視 | overflow時にpointer hover / keyboard focus-visibleだけthumb可視、geometry不変 |
+| scrollbar | 常時thin style、OS依存で可視 | overflow時にpointer滞在 / keyboard入力由来focusだけthumb可視、geometry不変 |
 | auto scroll target | activate button | move / closeを含むtab item外枠 |
 | scroll実行範囲 | `scrollIntoView`のancestor chain | TabStripの`scrollLeft`だけ |
 | pane間move | 矢印button | 矢印button + pointer drag、同じ`move-tab` |
@@ -376,7 +376,7 @@ Rust差分は予定しないが、Tauri application全体の回帰確認とし�
 1. ready / active / loading / rendering / errorの上端indicatorとaccessible state。
 2. Light / Darkと`prefers-reduced-motion`で色・pattern・active背景が識別可能。loading / rendering / error tokenがinactiveの`--chrome-bg`とactiveの`--panel-bg`の双方で視認できる。
 3. primary / secondary、empty、overflow、状態遷移で40px固定高とpreview上端が一致。
-4. overflowなしではbarが見えず、overflow時はpointer hoverまたはkeyboard focus-visibleでthumbが現れる。pointer click後にtabへfocusが残ったままpreviewへpointerを移すとthumbが隠れ、keyboard focus中はpointerが領域外でも表示を維持し、TabStrip外へfocusを移すと隠れる。対象WebViewでWebKit pseudo-elementのtrack実寸が6pxであることを確認し、tabをoverflow境界前後で増減してもitemの見た目高さとpreview上端が変わらない。
+4. overflowなしではbarが見えず、overflow時はpointerがshell内にある場合またはkeyboard入力由来focusがある場合にthumbが現れる。pointer click後にtabへfocusが残ったままpreviewへpointerを移すとthumbが隠れ、keyboard focus中はpointerが領域外でも表示を維持し、pointer clickまたはTabStrip外へのfocus移動で隠れる。対象WebViewでWebKit pseudo-elementのtrack実寸が6pxであることを確認し、tabをoverflow境界前後で増減してもitemの見た目高さとpreview上端が変わらない。
 5. 矢印キーで先頭・中間・末尾tabをactivateし、Tabでactive item内のactivate → move → closeへ移動してitem全体が見える。focus時にpreview / Explorer / shellが縦横に動かない。
 6. primary→secondary、secondary→primaryのactive / non-active tab drag。
 7. destination same ID、source最後のtab、invalid target release、Escape cancel。非active sourceをdrag中にEscapeし、source上でmouse buttonをreleaseしてもselectionが変わらない。
@@ -440,7 +440,7 @@ ADRは追加しない。Pointer EventsとTabStrip policyは現時点ではTauri 
 | visible textなしで状態識別 | §6 |
 | error / rendering / reduced motion | §6.1–6.2 |
 | compact固定高、段差なし | §7.1 |
-| pointer滞在 / keyboard focus-visible時だけscrollbar可視 | §4.5、§7.1、§19–20 |
+| pointer滞在 / keyboard入力由来focus時だけscrollbar可視 | §4.5、§7.1、§19–21 |
 | tab item全体を自動表示 | §4.4、§7.2 |
 | pointer dragとmove整合、cancel no-op | §8、§11–12 |
 | keyboard / assistive technology導線 | §2.3、§6.3 |
@@ -458,3 +458,9 @@ ADRは追加しない。Pointer EventsとTabStrip policyは現時点ではTauri 
 Round 1修正後の再確認でも、TabStripとpreviewの間をpointerで上下に往復するとthumbが残る場合と消える場合があり、素早い移動ほど残りやすいと報告された。scrollbar付近で一旦停止してからpreviewへ移動すると消えやすい傾向は、native scrollbar pseudo-elementと`:hover`のstate / repaintがpointer移動と同期しないことを示す。Phase 4-aを引き続きNGとしてPhase 3へ再差し戻しする。
 
 pointer表示のsource of truthをCSS `:hover`からReact stateへ移す。pointer enterでrefとstateを同期して有効化し、window captureの`pointermove`はref有効中だけclient座標をstrip矩形と比較する。領域外の最初のmove、pointer leave、window blurでrefとstateを無効化し、CSSはそのclassだけを参照する。listenerは常設して高速enter / leave間の登録raceを避けるが、ref無効時は即returnして通常時のlayout readを避ける。keyboard表示の`:has(:focus-visible)`、6px track、40px外寸、reveal、drag lifecycleは変更しない。
+
+## 21. Phase 4-a feedback Round 3: native boundaryとfocus ORの分離
+
+Round 3再確認では、thumbが逆に常時表示され、native scrollbar位置へpointerを置いた時だけ一瞬消える場合があると報告された。境界policyのtrue / falseは正しいが、表示条件がpointer classと`:has(:focus-visible)`のORだったため、pointer classをclearしてもUAがfocus-visibleと判定する限り表示が残った。またnative scrollbar自身をscroll elementの境界に含めたことで、scrollbar上への移動がpointer leaveとして観測される場合があり、一瞬だけ消える症状につながった。
+
+scroll elementを40px固定高のouter shellで包み、native scrollbarを含むshell全体をpointer境界にする。keyboard表示はUA selectorを廃止し、window keydown / pointerdownでlast input modalityを管理する。shell内focus時にkeyboard入力由来の場合だけkeyboard stateを有効化し、pointerdownでは同期的に解除する。pointer stateとkeyboard stateは`shouldShowTabScrollbar`のOR policyで単一classへ集約する。これにより表示のsource of truthをすべて明示stateへ移し、UA selectorとnative scrollbarのhit-testを論理判定から除外する。

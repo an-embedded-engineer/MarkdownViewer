@@ -4,6 +4,7 @@ import {
   hasExceededTabDragThreshold,
   isPointInsideTabStrip,
   resolveTabDropPane,
+  shouldShowTabScrollbar,
 } from "./tabStrip";
 
 describe("tab reveal policy", () => {
@@ -56,6 +57,20 @@ describe("tab strip pointer boundary", () => {
   it("rejects invalid geometry", () => {
     expect(() => isPointInsideTabStrip(10, 0, 0, 10, 5, 5)).toThrow("invalid");
   });
+});
+
+describe("tab scrollbar visibility", () => {
+  it.each([
+    [false, false, false],
+    [true, false, true],
+    [false, true, true],
+    [true, true, true],
+  ])(
+    "shows for pointer presence or keyboard focus",
+    (pointerInside, keyboardFocusInside, expected) => {
+      expect(shouldShowTabScrollbar(pointerInside, keyboardFocusInside)).toBe(expected);
+    },
+  );
 });
 
 describe("tab drop pane policy", () => {

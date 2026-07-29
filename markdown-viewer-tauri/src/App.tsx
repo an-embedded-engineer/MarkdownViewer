@@ -68,6 +68,7 @@ import {
   hasExceededTabDragThreshold,
   isPointInsideTabStrip,
   resolveTabDropPane,
+  shouldShowTabScrollbar,
 } from "./tabStrip";
 
 type FileTreeNode = {
@@ -2758,11 +2759,14 @@ function TabStrip({
   onLostPointerCapture,
   onClickCapture,
 }: TabStripProps) {
+  const shellRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
   const pointerInsideRef = useRef(false);
+  const lastInputWasKeyboardRef = useRef(false);
   const [isPointerInside, setIsPointerInside] = useState(false);
+  const [isKeyboardFocusInside, setIsKeyboardFocusInside] = useState(false);
 
   function updatePointerInside(nextValue: boolean) {
     if (pointerInsideRef.current === nextValue) {
@@ -2812,12 +2816,12 @@ function TabStrip({
       if (!pointerInsideRef.current) {
         return;
       }
-      const strip = stripRef.current;
-      if (!strip || event.pointerType === "touch") {
+      const shell = shellRef.current;
+      if (!shell || event.pointerType === "touch") {
         clearPointerInside();
         return;
       }
-      const rect = strip.getBoundingClientRect();
+      const rect = shell.getBoundingClientRect();
       if (
         !isPointInsideTabStrip(
           rect.left,
@@ -2831,12 +2835,31 @@ function TabStrip({
         clearPointerInside();
       }
     };
+    const trackKeyboardInput = () => {
+      lastInputWasKeyboardRef.current = true;
+      const shell = shellRef.current;
+      if (shell?.contains(document.activeElement)) {
+        setIsKeyboardFocusInside(true);
+      }
+    };
+    const trackPointerInput = () => {
+      lastInputWasKeyboardRef.current = false;
+      setIsKeyboardFocusInside(false);
+    };
+    const clearVisibility = () => {
+      clearPointerInside();
+      setIsKeyboardFocusInside(false);
+    };
 
     window.addEventListener("pointermove", trackPointerPosition, true);
-    window.addEventListener("blur", clearPointerInside);
+    window.addEventListener("pointerdown", trackPointerInput, true);
+    window.addEventListener("keydown", trackKeyboardInput, true);
+    window.addEventListener("blur", clearVisibility);
     return () => {
       window.removeEventListener("pointermove", trackPointerPosition, true);
-      window.removeEventListener("blur", clearPointerInside);
+      window.removeEventListener("pointerdown", trackPointerInput, true);
+      window.removeEventListener("keydown", trackKeyboardInput, true);
+      window.removeEventListener("blur", clearVisibility);
     };
   }, []);
 
@@ -2887,22 +2910,38 @@ function TabStrip({
   }
 
   const isDropTarget = tabDragPresentation?.dropPaneId === paneId;
+  const isScrollbarVisible = shouldShowTabScrollbar(
+    isPointerInside,
+    isKeyboardFocusInside,
+  );
 
   return (
     <div
-      ref={stripRef}
-      className={`tab-strip ${isPointerInside ? "tab-scrollbar-pointer-active" : ""} ${isDropTarget ? "tab-drop-target" : ""}`}
-      role="tablist"
-      aria-label={`${paneId === "primary" ? "Primary" : "Secondary"} pane open documents`}
-      data-tab-drop-pane={paneId}
+      ref={shellRef}
+      className={`tab-strip-shell ${isScrollbarVisible ? "tab-scrollbar-visible" : ""}`}
       onPointerEnter={(event) => {
         if (event.pointerType !== "touch") {
           updatePointerInside(true);
         }
       }}
       onPointerLeave={() => updatePointerInside(false)}
+      onFocusCapture={() => {
+        setIsKeyboardFocusInside(lastInputWasKeyboardRef.current);
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsKeyboardFocusInside(false);
+        }
+      }}
     >
-      {tabs.map((tab, index) => {
+      <div
+        ref={stripRef}
+        className={`tab-strip ${isDropTarget ? "tab-drop-target" : ""}`}
+        role="tablist"
+        aria-label={`${paneId === "primary" ? "Primary" : "Secondary"} pane open documents`}
+        data-tab-drop-pane={paneId}
+      >
+        {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId;
         const presentationState = resolvePaneTabPresentationState(
           tab,
@@ -2991,7 +3030,8 @@ function TabStrip({
             </button>
           </div>
         );
-      })}
+        })}
+      </div>
     </div>
   );
 }

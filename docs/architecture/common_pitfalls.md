@@ -74,4 +74,4 @@
 - `scrollIntoView`はTabStrip外のancestorも動かし得る。programmatic focusは`preventScroll`を使い、item外枠とstrip rectから求めたdeltaだけをTabStripへ適用する。
 - app shell配下のfixed previewは`overflow: hidden`でclipされる。React root直下のsibling layerへ1つだけ置き、使用するtheme tokenをLight / Dark双方で明示供給する。
 - scrollbar APIを複数併記するとWebViewの優先規則でtrack寸法が変わり得る。本実装はWebKit pseudo-elementへ一本化し、40px外寸と6px trackを対象WebViewで確認する。
-- `:focus-within`はpointer click後もbutton focusが残り、native scrollbar pseudo-elementと`:hover`の組み合わせもWebViewの再描画タイミングによりthumbが残る場合がある。pointer表示はenter / leaveと領域内だけのwindow-level座標監視から明示classを管理し、keyboard表示だけを`:has(:focus-visible)`へ委ねる。
+- `:focus-within`はpointer click後もbutton focusが残り、`:has(:focus-visible)`もUA heuristicによりpointer focusへ一致し得る。native scrollbar自身をscroll elementのpointer境界にするとenter / leaveも不安定になる。scroll elementを外側shellで包み、pointer滞在と明示keyboard modalityをstateで分離して単一classへ集約し、`:hover` / `:focus-visible`をthumb表示条件に使わない。
