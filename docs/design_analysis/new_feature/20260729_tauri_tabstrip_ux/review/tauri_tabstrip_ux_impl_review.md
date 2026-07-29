@@ -357,3 +357,143 @@ Phase 4-a 再実施では、`verification/phase4a_user_verification.md` の再�
 1. overflow した TabStrip へ pointer を置くと thumb が出る。tab を pointer click し、focus を残したまま preview へ pointer を移すと thumb が隠れる（R1 / R2）。
 2. keyboard で tab control へ focus した状態では pointer が領域外でも thumb が見え、focus を TabStrip 外へ移すと隠れる（R2）。keyboard で move button から移動した直後の destination でも同様に確認する（R4）。
 3. 6px track、40px 固定高、indicator、item 全体 reveal、drag move と cancel 経路に退行が無い。drag 中に source 側 thumb が見えても許容とする（R3）。
+
+---
+
+## 10. Phase 4-a feedback / Round 3 再確認（レビュー担当、2026-07-30、対象 `db2f066`）
+
+**対象**: `db2f066` Phase 3 stabilize TabStrip scrollbar pointer boundary（15 files: `App.tsx` +56 / `App.css` 1 行 / `tabStrip.ts` +15 / `tabStrip.test.ts` +21、設計 2 箇所 + 新設 §20、実装記録、meta、Phase 4-a 検証記録、恒久docs 6 ファイル）
+**契機**: Phase 4-a Round 2 の再確認 NG（`:hover` + `:has(:focus-visible)` 修正後も、TabStrip と preview を pointer で上下往復すると thumb の残留が非決定的に発生）
+**判定**: **Phase 3 承認を維持。Phase 4-a Round 3 再実施へ進行可。新規指摘 0 件、未解決 0 件。**
+
+### 10.1 Phase 4-a feedback（Round 2 NG）の扱い
+
+| # | 内容 | severity | blocking | 状態 |
+| --- | --- | --- | --- | --- |
+| 4a-2 | `:hover` を pointer 表示の source of truth にしていたため、TabStrip ↔ preview の往復で thumb の表示・非表示が非決定的になる（高速移動で残りやすい、scrollbar 上で停止すると消えやすい） | Low（表示条件の安定性の問題。geometry / 操作 / state・data には影響しない） | **Phase 4-a に対して blocking**（受け入れ条件「hover / focus 時だけ視認可能」を安定して満たさない）。Phase 3 の他項目には非 blocking | **実装上は解決済み**（`db2f066`）。確定は Round 3 実 WebView 再確認 |
+
+Phase 4-a で受理済みの 4 項目（40px 固定高、状態 indicator、pane 間 drag and drop、右端 tab の item 全体 reveal）は今回も変更されていない（10.4 参照）。
+
+### 10.2 原因分析の妥当性
+
+**結論: 妥当。報告された症状の傾向と、採った対策が同じ機序を指している。**
+
+- Round 2 の実装は pointer 表示を UA の `:hover` 状態に委ねていた。custom scrollbar（`::-webkit-scrollbar-*`）を持つ scroller では、pointer が **element 自身の scrollbar 領域**にある間は page へ pointer / mouse move が届かない実装が一般的であり、hover 状態と実際の pointer 位置の同期が最後の hit test 結果に依存する。ユーザ報告の「素早い移動ほど残りやすい」「scrollbar 位置で一旦停止してから preview へ移すと消えやすい」という**方向性のある傾向**は、UA 側 hover state と scrollbar 再描画のタイミング依存という説明と整合する。React state は当該表示に一切関与していなかったため、実装差分ではなく表示条件そのものが原因という切り分けも妥当である。
+- Round 1（`:focus-within` → `:has(:focus-visible)`）が解消した「pointer click 由来 focus の残留」とは独立の第 2 の経路であり、Round 2 の症状が「軽減したが解消しない」であったことと一致する。
+- 対策として `:hover` を表示条件から外し、pointer 位置を JS が保持する class へ移すのは、原因（UA state の非同期性）を回避する最短経路である。keyboard 表示だけを `:has(:focus-visible)` に残した切り分けも、Round 2 で確認済みの経路を温存する点で妥当。
+
+### 10.3 修正の妥当性（レビュー観点 1〜5）
+
+#### (1) 高速 enter → leave の race
+
+**問題なし。** window listener は `useEffect(..., [])` で **mount 時に常設**され、enter を契機に登録していない（`App.tsx:2806-2841`）。したがって「enter 直後の move が listener 未登録で取りこぼされる」構造が存在しない。`onPointerEnter` は `updatePointerInside(true)` で **ref を同期更新**してから state を更新するため（同 `2767-2773`）、React の再描画完了を待たずに直後の pointermove が判定対象になる。DOM commit 後 passive effect 実行前という理論上の窓は残るが、その区間でも React の `onPointerLeave` は既に張られており、さらに次の pointermove で backstop が働く。
+
+#### (2) stale class が残らないか
+
+解除経路は 5 つで、いずれも ref と state を同時に落とす。
+
+| 経路 | 実装 | 効果 |
+| --- | --- | --- |
+| `onPointerLeave` | `updatePointerInside(false)` | 通常の離脱 |
+| window capture `pointermove`（領域外） | `isPointInsideTabStrip` false → `clearPointerInside()` | leave を取りこぼしても次の move で確実に解除（今回の主対策） |
+| window `blur` | `clearPointerInside()` | app 非アクティブ化・window 外への離脱 |
+| `stripRef.current` が null / touch pointer | 同上 | DOM 未接続時と touch 混在時の防御 |
+| unmount | effect cleanup で listener 除去、DOM ごと class 消滅 | secondary pane の split off 等 |
+
+`pointermove` を **capture phase** で登録している点も妥当で、下位で `stopPropagation` されても届く。`blur` は capture なしの window 登録であり、element の blur（bubble しない）で誤 clear されない点も正しい。`clearPointerInside` は ref チェック後にしか到達せず、無駄な `setState` も発生しない。
+
+#### (3) pane 間移動 / native scrollbar / pointer capture / iframe 境界
+
+- **primary ↔ secondary**: TabStrip は pane ごとの instance で、ref と state も instance ローカル。移動時は片方が leave、他方が enter となり、leave を取りこぼしても各 instance の tracker が自分の rect で判定するため、両方が同時に active のまま残る状態にならない。
+- **native scrollbar 上の通過・停止**: strip の `getBoundingClientRect()` は scrollbar 領域（下端 6px）を含むため、thumb 操作中や scrollbar 上の滞在では inside 判定が維持され thumb は表示され続ける（操作中に消えないことが正しい）。scrollbar 上で page への move が途切れても ref は true のまま保持され、preview へ抜けた**最初の page 上の move** で解除される。Round 2 の症状に対する直接の修復経路になっている。
+- **pointer capture 中（tab drag）**: capture 中も window capture phase の `pointermove` は届くため、source strip の inside 判定は pointer が rect 外へ出た時点で解除される。Round 2 レビューで残リスク R3 とした「capture により source strip の `:hover` が保持され thumb が残る」挙動は、本修正で解消した。destination strip は capture 中 boundary event を受け取らないため enter せず、drag 中に destination の pointer thumb は出ないが、これは drop feedback（`tab-drop-target`）と役割が分かれており矛盾しない。
+- **preview iframe 境界**: trusted HTML preview は iframe であり、pointer が iframe 内へ入ると親 document へ `pointermove` が届かない。この経路だけは window backstop が効かず、解除は `onPointerLeave`（および blur / 再入）に依存する。boundary event は hit test に基づく DOM event であり、`:hover` の再描画タイミング問題とは別系統のため成立見込みは高いが、**報告された往復ジェスチャを HTML 文書表示中にも実施して確認する**必要がある（残リスク R5）。
+
+#### (4) listener 常設の性能
+
+**妥当。** handler の先頭が `if (!pointerInsideRef.current) return;` であり、pointer が TabStrip 外にある通常時は **layout を一切読まない**（`getBoundingClientRect` に到達しない）。layout read が走るのは「pointer が 40px の strip 内にある間」だけで、その間は 1 move あたり 1 rect 読み取り。TabStrip は最大 2 instance のため常設 listener は 2 個で、いずれも早期 return する。drag 中は App 側の `elementFromPoint` と重なるが、source strip を出た時点で ref が false になり読み取りは止まる。throttle / rAF を挟む必要はない規模である。
+
+#### (5) pure geometry policy
+
+`isPointInsideTabStrip(left, right, top, bottom, clientX, clientY)`（`tabStrip.ts:48-60`）は、finite 検査と `right < left || bottom < top` の throw を先に行い、`x >= left && x < right && y >= top && y < bottom` の **半開区間**で判定する。
+
+- 半開区間は隣接要素との二重判定を避ける矩形判定の標準形であり、strip 下端 = preview 上端という本 UI の隣接関係に対して正しい（下端ちょうどは outside）。
+- fail-fast は `getTabRevealDelta` と同じ方針で、silent fallback を作らない既存 policy と一貫する。
+- 幅・高さ 0（非表示時の全 0 rect 等）は throw ではなく false を返し、安全側（解除）に倒れる。
+- test は inside、右下端手前（109.99 / 59.99）、右端・下端ちょうど、左端・上端手前、invalid geometry の 6 + 1 ケースを網羅（`tabStrip.test.ts`）。境界規則が仕様として固定されている。
+
+### 10.4 非退行（レビュー観点 6）
+
+| 観点 | 確認内容 | 結果 |
+| --- | --- | --- |
+| keyboard `:focus-visible` | `.tab-strip:has(:focus-visible)::-webkit-scrollbar-thumb` は無変更で残存。pointer 側 class と OR 条件 | 非退行 |
+| 6px track / 40px 外寸 | `::-webkit-scrollbar { height: 6px }`、track transparent、`--tab-strip-height: 40px`、`overflow-x: scroll` いずれも無変更。CSS 差分は thumb 着色の selector 1 行のみ | 非退行 |
+| item 全体 reveal | `revealTab` / `getTabRevealDelta` / `focus({ preventScroll: true })` に差分なし | 非退行 |
+| drag lifecycle | App 側の session、click 抑止 identity、`elementFromPoint`、pointerup 再判定、`moveTab`、cancel 経路に差分なし。新規 listener は capture phase の受動監視のみで `preventDefault` / `stopPropagation` を行わず、drag の pointer 経路に干渉しない | 非退行 |
+| indicator / theme | `.tab-item::before`、`--tab-indicator-*`、reduced motion に差分なし | 非退行 |
+| rerender 範囲 | 新 state は TabStrip ローカルで、境界を跨いだ時だけ 1 回再描画する（`updatePointerInside` の等値 guard あり）。App / preview / iframe は再描画されない | 非退行 |
+| touch | enter は `pointerType !== "touch"` のみ受理し、tracker も touch move で即解除。touch の pan / tap 契約は不変 | 非退行 |
+| 自動検証 | レビュー担当でも再実行し実装側記録と一致（下表）。test は 97 → 104（+7 = 境界 6 + invalid 1） | 一致 |
+
+| 検証 | 実装側の記録 | レビュー担当の再実行 |
+| --- | --- | --- |
+| `npm test -- --run` | 6 files / 104 tests passed | 成功。6 files / 104 tests |
+| `npm run build` | success（既存 chunk size warning のみ） | 成功（同 warning のみ） |
+| `cargo fmt -- --check` | success | 成功 |
+| `cargo check` | success | 成功 |
+| `cargo test` | 22 tests passed | 成功。22 passed |
+| `git diff --check` | success | 成功 |
+
+CSS / DOM event の挙動は自動 test の対象外であり、判定は Round 3 の実 WebView 確認に依存する。この境界は `docs/tests/README.md`、`development_workflow.md`、実装記録 §6 に記載済みで、今回「native scrollbar 再描画」「低速・高速の pointer 往復」が明示的に追加されている。
+
+### 10.5 残リスク
+
+| # | 残リスク | severity | 状態 |
+| --- | --- | --- | --- |
+| R1 | `:focus-visible` の成立判定は UA heuristic（macOS Full Keyboard Access 等の影響） | Low | 継続（keyboard 経路のみ） |
+| R2 | scrollbar pseudo-element の再描画が originating element の state 変化へ追従するか。pointer 側は `:hover` から **class 属性変更**へ移り、より確実な invalidation 経路になった。keyboard 側は `:has(:focus-visible)` のまま | Low | 継続（影響縮小） |
+| R3 | drag 中に source strip の `:hover` が保持され thumb が残る | — | **解消**（10.3(3)） |
+| R4 | mouse 起点 move 後の destination programmatic focus は focus-visible にならず thumb が出ない（意図どおり） | Low | 継続 |
+| R5 | HTML preview iframe 内へ pointer が入ると親 document に `pointermove` が届かず、解除が `onPointerLeave` / blur / 再入依存になる | Low | **新規**。Round 3 で HTML 文書表示中の往復を確認 |
+| R6 | pointer 静止中に layout が変わる場合（split separator 操作、Explorer resize、tab 増減による strip 出現・消失）、次の move まで class が実態と一致しない可能性 | Low（cosmetic、次の move で自己修復） | **新規** |
+| R7 | drag（pointer capture）中は destination strip が enter を受け取らず pointer thumb が出ない | Low（仕様として妥当） | **新規・許容** |
+| R8 | `isPointInsideTabStrip` は invalid geometry で throw する。実 rect では到達しないが、window listener 内の例外は React が捕捉しない | Low（fail-fast 方針どおり） | **新規・許容** |
+
+### 10.6 Round 3 再確認観点
+
+`verification/phase4a_user_verification.md` の Round 3 再確認条件（低速・高速の往復、scrollbar 上での停止 / 通過 / click focus 残存、keyboard 表示と各種非退行）に加えて、次を実施すること。
+
+1. **Markdown 文書表示中**と**trusted HTML 文書表示中**の両方で TabStrip ↔ preview の往復を行う（R5）。HTML 表示中だけ残留する場合は、`onPointerLeave` 依存部分の補強（例: `.preview-pane` 側 enter での解除）が追加課題となる。
+2. split 表示で primary ↔ secondary の TabStrip 間を直接往復し、両 strip の thumb が同時に表示され続けないこと（10.3(3)）。
+3. tab drag 中に source strip から pointer を外し、source 側 thumb が消えること。drag 中に destination 側 thumb が出ないことは許容とする（R3 / R7）。
+4. pointer を strip 上で静止させたまま split separator を keyboard 操作するなどで layout を変化させ、次に pointer を動かした時点で表示が実態へ復帰すること（R6）。
+5. keyboard focus 表示、6px track、40px 固定高、indicator、item 全体 reveal、drag move と cancel 経路の非退行（R1 / R2 / R4）。
+
+### 10.7 文書の一貫性（レビュー観点 7）
+
+| 文書 | 記載 | 判定 |
+| --- | --- | --- |
+| 設計 §4.5 / §18 / 新設 §20 | pointer 表示の source of truth を enter / leave + window 座標監視の明示 class へ移した理由、`:hover` と `:focus-within` を使わない理由、ref 同期による race 回避、ref 無効時に geometry を読まない方針、keyboard 経路と geometry / reveal / drag を変えない旨を記載。traceability 行も §19–20 参照へ更新 | 一貫 |
+| 実装記録 §9 追記 | Round 2 NG の内容、原因、方式変更、`tabStrip.ts` への policy / test 追加を記載 | 一貫 |
+| `verification/phase4a_user_verification.md` | Round 2 再確認結果（残る場合と消える場合、速度依存、停止時の傾向）、NG 判断、Round 3 再確認条件 3 項目を追記 | 一貫 |
+| `interface_spec.md` / `detail_design.md` / `basic_design.md` / `README.md` | 恒久仕様として enter / leave + window 座標監視 class、領域外では geometry を読まない、keyboard `:focus-visible` は独立、6px track 維持、`tabStrip.ts` の責務へ境界判定を追加 | 一貫 |
+| `common_pitfalls.md` §12 | `:focus-within` の残留に加え、`:hover` + native scrollbar pseudo-element の再描画タイミング依存と、明示 class 管理という回避策を記載 | 一貫 |
+| `development_workflow.md` / `docs/tests/README.md` | 手動確認へ「低速・高速の往復で領域外では確実に隠れる」「click focus 残存時・scrollbar 通過時も同じ」を追加。`tabStrip.test.ts` の自動 test 対象へ境界判定を追加し、native scrollbar 再描画が手動 matrix 対象であることを明記 | 一貫 |
+| `meta.md` | `status: in_progress` / `impl_status: in_review` / `verification_status: in_progress`、Phase 3 を「Reopened again after Phase 4-a Round 2」、Phase 4-a を「NG after Round 2、Round 3 再確認待ち」へ更新 | 一貫 |
+
+実装側に `:hover` を pointer 表示条件として使う記述は残っていない（CSS の thumb 着色は明示 class と `:has(:focus-visible)` のみ）。
+
+### 10.8 集計と結論（Round 3）
+
+| 分類 | 件数 |
+| --- | --- |
+| Phase 4-a feedback 由来（4a-2） | 1（実装上 解決済み、確定は Round 3 実 WebView 再確認） |
+| Round 3 新規指摘 | **0**（blocking 0 / non-blocking 0） |
+| 未解決指摘 | **0** |
+| 残リスク | 7（R1・R2・R4 継続、R5〜R8 新規、いずれも Low。R3 は解消） |
+
+**結論**: **Phase 3 の承認を維持し、Phase 4-a Round 3 再実施へ進行可。**
+
+原因分析は報告された症状の傾向（速度依存、scrollbar 上での停止で消えやすい）と機序が整合し、修正は「UA の hover state に依存しない明示的な pointer 境界 state」という原因直撃の方式である。listener 常設 + ref 同期更新により enter / leave の race を構造的に排除し、ref 無効時は layout を読まないため常設による性能負荷も無い。境界判定は pure policy へ切り出して単体 test 済みで、DOM 側には rect 取得と class 適用だけが残る責務分割になっている。keyboard 表示、6px track、40px 外寸、reveal、drag、indicator への差分は無く、自動検証もレビュー担当の再実行で一致した。Round 2 の残リスク R3 は本修正で解消し、新たに R5〜R8 を再確認観点として登録した。
+
+Round 3 の実 WebView 確認で 10.6 の 5 項目が期待どおりであれば、Phase 4-a を OK として Phase 4-b へ進めてよい。R5（HTML preview iframe）で残留が再現した場合のみ、`onPointerLeave` 依存部分の補強を Phase 3 の追加修正として扱うこと。
