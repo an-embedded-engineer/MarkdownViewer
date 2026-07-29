@@ -1,0 +1,1 @@
+`docs/design_analysis/new_feature/20260729_tauri_tabstrip_ux/prompts/phase2_design_review_initial_claude.md` を読んで、レビューを開始してください。

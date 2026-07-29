@@ -300,7 +300,7 @@ stop
 - 新規openはglobal dataを作成し、active pane group末尾へ追加・選択する。同一pathはdataを重複せず、そのpane groupへdedupe追加・選択する。
 - local closeはsource groupだけからIDを外し、activeならsource local順の右、なければ左へfallbackする。reducer適用後の両group参照集合がemptyの場合だけglobal dataを削除する。
 - moveはsource removal / fallbackとdestination dedupe add / selectを`move-tab` actionでatomicに更新する。destinationに同じIDがある場合は既存位置を維持し、move後はdestination tabへfocusする。
-- 各paneのTabStripはlocal viewだけを描画し、横overflow、roving tabindex、ArrowLeft / ArrowRight / Home / Endを提供する。split時はactive tabにpane間move buttonを加える。
+- 各paneのTabStripはlocal viewだけを40px固定高の1行tabとして描画し、上端state indicator、横overflow、item全体と進行方向の隣接tab 50%を対象にしたmanual reveal、roving tabindex、ArrowLeft / ArrowRight / Home / Endを提供する。先頭 / 末尾または幅不足時は選択item全体を優先する。split時はactive tabのpane間move buttonに加え、mouseでactive / non-active tabを反対paneのTabStripへdragできる。いずれも既存`move-tab` transitionへ接続する。
 - split off / onは両groupの所属・順序・active tabを変更しない。singleでprimaryがempty、secondaryだけがnonemptyならhidden件数と`Enable Split View`案内を表示する。
 - Reloadはtree scan成功後、active paneのselected tabの同じIDでrevisionを増やし、旧content / URLをclearして再openする。共有tab revisionにより同じtabを表示する両paneが再描画される。
 - root scan成功をcommit pointとし、成功後に旧tabsを破棄して両pane選択をclearする。split mode / requested ratioは維持し、初期文書はprimaryへ開く。scan失敗時は旧root / tabs / pane stateを維持する。
@@ -443,7 +443,7 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
 
 ```text
 <main.app-shell>
-  <MenuBar/>           ← File操作、View: Theme / Split View
+  <MenuBar/>           ← File操作、View: Theme / Split View / Debug Information
   <RootPathBar/>       ← root path。未選択時は No folder selected
   <section.workspace>
     <aside#explorer-pane.explorer-pane>
@@ -464,16 +464,17 @@ app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar
     </section>
   </section>
   <ErrorBanner/>       ← 代表 error。エラー発生時のみ表示
+  <DebugPanel/>        ← Viewで有効化した時だけprovider別の複数行診断を表示
   <StatusBar/>         ← File / State
 </main>
 <SettingsDialog/>      ← modal。Theme / window size / PlantUML jar path
 ```
 
-`MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload`、separator、`Settings...`を持ち、`View` dropdown は theme切替と`role="menuitemcheckbox"`のSplit View切替を持つ。Settingsはapplication-wideな操作であり、dialog close後はFile triggerへfocusを戻す。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
+`MenuBar` は React アプリ内の window-top menu として扱う。`File` / `View` は native button の menu trigger であり、`aria-haspopup="menu"` / `aria-expanded` を持ち、click で `role="menu"` の dropdown を開く。`File` dropdown は `Open Folder...`、Recent Folders list、`Reload`、separator、`Settings...`を持ち、`View` dropdown はtheme切替、`role="menuitemcheckbox"`のSplit View切替、Debug Information切替を持つ。Settingsはapplication-wideな操作であり、dialog close後はFile triggerへfocusを戻す。dropdown 内の実行 item は `role="menuitem"`、layout wrapper は `role="none"` とする。`role="menubar"` は矢印キー移動・roving tabindex と併せて導入すべき ARIA pattern であるため、今回の最小範囲では使わない。outside click と Escape で dropdown を閉じる。矢印キー移動とフォーカストラップは導入しない。
 
-`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。Explorer幅は`explorerPane.ts`のpure policyで180pxからworkspace実寸に応じたdynamic最大幅へclampし、`ResizeObserver`によるwindow追従とpointer captureによるdragを`App`が調停する。Split Viewは`splitView.ts`でpreferred minimum 240px、separator 6px、16px keyboard stepを扱い、狭幅時の実効clampをrequested ratioへ書き戻さない。各`DocumentPane`はAppで解決済みのpane-local ordered tab viewを受ける`TabStrip`とtabpanelを持ち、active paneはaccent枠で示す。split時のtab itemはactivate / move / closeの3列とminimum 160pxを使い、single時はactivate / closeの2列を使う。TabStrip rowはstate labelやhorizontal scrollbarの有無に左右されない58px固定高とし、split左右のpreview上端を揃える。Explorer、Reload、StatusBar、代表errorはactive paneを対象とする。`ErrorBanner`は`role="alert"`、StatusBarの`State`だけを`aria-live="polite"`とする。
+`RootPathBar` は MenuBar 直下に root path を常時表示し、長い path は ellipsis と `title` で全文確認できる。Explorer幅は`explorerPane.ts`のpure policyで180pxからworkspace実寸に応じたdynamic最大幅へclampし、`ResizeObserver`によるwindow追従とpointer captureによるdragを`App`が調停する。Split Viewは`splitView.ts`でpreferred minimum 240px、separator 6px、16px keyboard stepを扱い、狭幅時の実効clampをrequested ratioへ書き戻さない。各`DocumentPane`はAppで解決済みのpane-local ordered tab viewを受ける`TabStrip`とtabpanelを持ち、active paneはaccent枠で示す。split時のtab itemはactivate / move / closeの3列とminimum 160pxを使い、single時はactivate / closeの2列を使う。TabStrip rowは40px固定高とし、ready / loading / rendering / errorを上端indicatorとaccessible name / `aria-busy`で示す。horizontal scrollbarはWebKit pseudo-elementの6px transparent trackを常時確保し、scroll elementを同じ40pxの`tab-strip-shell`で包む。shell enterでpointer ref / stateを同期更新し、window captureのpointermoveは最新座標をrefへ保持してanimation frameごとに最大1回shell矩形と比較する。shell leaveでは保留中のpointer同期frameと座標を破棄してからclearし、領域外move、window blurでもclearする。keyboard modalityはwindow keydown / pointerdownから明示管理し、shell内focus時だけkeyboard stateを有効にする。pointer stateまたはkeyboard stateのORをpure policyで求め、単一の`tab-scrollbar-visible` classだけをthumb表示条件に使う。UAの`:hover` / `:focus-visible` heuristicは使わない。WebKitでnative thumbが以前のpaintを保持するため、表示policyまたはtab数変更後の次frameにoverflow時だけlayoutとthumb computed styleを1回読み、class transitionを明示的にflushする。focus時は`preventScroll`を使い、`tabStrip.ts`のmanual deltaでitem外枠全体と見切れ方向の隣接item 50%をrevealする。先頭 / 末尾または幅不足時は選択item全体を優先する。mouse dragはpointer capture中も`elementFromPoint`で反対paneのTabStripを判定し、pointerup座標で再確認して明示destination付き`move-tab`を1回だけ適用する。previewはApp shell siblingのfixed layer、pointer座標はref / DOM transformで管理し、Escape / cancel / lost capture / split解除ではstateを変えずcleanupする。Explorer、Reload、StatusBar、代表errorはactive paneを対象とする。`ErrorBanner`は`role="alert"`、StatusBarの`State`とdrag結果だけを`aria-live="polite"`とする。
 
-`html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠にはスクロールバーを出さない。Explorer titleは固定し、treeの縦横scrollは`.explorer-scroll`、documentのscrollは`.preview-pane`へ限定する。`.file-tree`と`.tree-row`は`width: max-content; min-width: 100%`を併用し、短いtreeのrow背景をpane端まで維持しながら、深い階層・長い名前で必要な場合だけ水平scrollを発生させる。tree rowはdisclosure / type icon / labelの3列を共通利用し、labelはellipsisしない。MenuBar / RootPathBar / ErrorBanner / StatusBar は常時表示領域として固定する。`ErrorBanner` は条件付き描画のため、chrome 要素は CSS grid の自動配置に依存せず、`grid-row` で MenuBar / RootPathBar / workspace / ErrorBanner / StatusBar の行を明示する。
+`html` / `body` / `#root` / `.app-shell` / `.workspace` は全体 overflow を隠し、アプリ外枠にはスクロールバーを出さない。Explorer titleは固定し、treeの縦横scrollは`.explorer-scroll`、documentのscrollは`.preview-pane`へ限定する。`.file-tree`と`.tree-row`は`width: max-content; min-width: 100%`を併用し、短いtreeのrow背景をpane端まで維持しながら、深い階層・長い名前で必要な場合だけ水平scrollを発生させる。tree rowはdisclosure / type icon / labelの3列を共通利用し、labelはellipsisしない。MenuBar / RootPathBar / ErrorBanner / DebugPanel / StatusBar は固定chrome領域として扱う。条件付きのErrorBannerとDebugPanelを含め、CSS gridの自動配置に依存せず`grid-row`で各行を明示する。DebugPanelは通常OFFでlayoutへ参加せず、ON時だけ最大180px、内部scroll可能な複数行領域として表示する。providerのupdate / remove eventを汎用に処理し、表示器は個別provider IDを判定しない。
 
 Markdown本文の`.markdown-body`は、固定px最大幅を持たず、containing blockである各`.preview-pane`のcontent boxを基準に`calc(100% - 48px)`で幅を決め、`margin: 0 auto`で左右24pxのgutterを確保する。window viewportが760px以下の場合だけ既存media queryにより`calc(100% - 28px)`へ切り替え、左右gutterを14pxとする。本文widthの基準はpaneだがgutterのbreakpointはwindow viewportであるため、viewportが760px超のままsplitで個別paneだけが狭くなっても24pxを維持する。table、code block、Mermaid、PlantUMLは必要時の要素内横scroll、imageとPlantUML SVGは`max-width: 100%`による縮小を維持する。MermaidはApp所有queueで直列描画し、paneを含むrender IDを指定する。trusted HTML iframeはpane全幅を使い、iframe内文書自身の`width` / `max-width`はViewerから上書きしない。
 

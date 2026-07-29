@@ -9,7 +9,7 @@
 - Explorer resize: ExplorerとPreview間のseparatorをpointerでdragする。separatorへfocus後、ArrowLeft / ArrowRightは16px単位、Home / Endは現在の最小 / dynamic最大幅へ移動する。
 - Tab activate: TabStripから表示するdocumentを切り替える。ArrowLeft / ArrowRight / Home / Endでもfocusとselectionを移動できる。
 - Tab close: 操作元pane groupだけからtabを削除する。active tabならsource local順の右隣、なければ左隣、なければ未選択へ移る。反対groupに同じIDが残る場合はglobal document dataと表示を維持し、どのgroupからも参照されなくなった時だけdataを破棄する。
-- Tab move: split時だけactive tabの`→` / `←` buttonで反対paneへ移動する。source removal / fallbackとdestination add / selectをatomicに行い、destinationに同じIDがある場合は既存位置を維持してsourceだけから外す。完了後はdestination tabへfocusする。
+- Tab move: split時はactive tabの`→` / `←` button、またはtab name上から開始するmouse dragで反対paneへ移動する。pointer dragはnon-active tabも直接扱い、反対paneのTabStripだけをdrop targetにする。source removal / fallbackとdestination add / selectをatomicに行い、destinationに同じIDがある場合は既存位置を維持してsourceだけから外す。完了後はdestination tabへfocusし、Escape / invalid release / pointer cancelでは所属・選択を変更しない。
 - Reload: MenuBar の File dropdown から root treeとactive paneのselected tabだけを再読み込みする。同じtabを両paneで表示している場合は共有revision更新により両方を再描画する。
 - Theme switch: MenuBar の View dropdown から Light / Dark を切り替える。
 - Split View: MenuBarの`View > Split View`でsingle / 左右2 paneを切り替える。pane内をpointer操作またはfocusするとそのpaneがactiveになる。
@@ -23,7 +23,7 @@ MenuBar は window top に `File` / `View` を表示する React UI で、menu n
 
 - `File`: `Open Folder...`、`Recent Folders`、`Reload`、`Settings...`
 - `Recent Folders`: 最大 10 件。主表示は保存時点の folder name、補助表示は absolute path。
-- `View`: `Theme: Light` または `Theme: Dark`、`Split View` (`role="menuitemcheckbox"`)
+- `View`: `Theme: Light` または `Theme: Dark`、`Split View`、`Debug Information`（後2項目は`role="menuitemcheckbox"`）
 
 Recent Folders entry click で保存済み path が存在しない場合は error strip に表示し、entry は自動削除しない。削除は delete button による明示操作だけで行う。
 
@@ -57,9 +57,10 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - 多数tabは横scrollで到達可能にする。`role="tablist"` / `role="tab"` とroving tabindexを使う。
 - 各TabStripは自paneの`orderedTabIds`に属するtabだけをlocal挿入順で表示する。ArrowLeft / ArrowRight / Home / Endもlocal順へ適用する。
 - single時はactivate / closeの2領域、split時はactivate / move / closeの3領域を持つ。activate buttonとactive tabのmove / close buttonだけをTabキーのfocus順に含める。非active tabを操作する場合は、先に矢印キーでactivateする。
+- keyboardのfocus契約は維持し、programmatic focusはancestorをscrollしない。pointer dragだけが非active tabを直接移動でき、touch / penではdragを開始しない。
 - move buttonはprimaryで`→`、secondaryで`←`を表示し、accessible nameへdocument名とdestination paneを含める。close buttonもdocument名とsource paneを含める。
 - 同じtab IDを両groupで参照できるが、document dataだけを共有し、選択とLoading / Rendering / Error表示、Markdown DOM、HTML iframeはpaneごとに分離する。
-- TabStripはname 1行、Loading / Rendering / Errorのstate 2行目、empty、水平scrollbar有無にかかわらず58px固定高とし、split時の左右preview上端を一致させる。
+- TabStripはname 1行と上端indicatorでactive / Loading / Rendering / Errorを表し、accessible nameへ状態suffix、Loading / Renderingへ`aria-busy`を公開する。empty、状態遷移、水平overflowにかかわらず40px固定高とし、split時の左右preview上端を一致させる。native scrollbarを内包する`tab-strip-shell`をpointer境界とし、pointer滞在または明示的なkeyboard入力由来focusのどちらかが有効な時だけ単一の表示classでthumbを見せる。pointerdownはkeyboard表示stateを解除し、UAの`:hover` / `:focus-visible`判定を表示条件に使わない。6px track寸法は維持する。activateまたはitem内controlへfocusした場合はmove / closeを含むitem外枠全体をTabStrip内へ表示し、見切れ方向に隣接tabがあればその50%も表示する。先頭 / 末尾または幅不足時は選択item全体を優先する。
 - DOM IDは`tab-${paneId}-${tabId}`、`document-preview-${paneId}`、`document-pane-${paneId}`とし、single時もprimary prefixを使う。
 - tab永続化、reorder、pinは対象外。
 
@@ -97,6 +98,10 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - `Error`: 代表エラー。エラー発生時のみ表示する。
 
 StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術へ通知する。エラーがない場合は表示しない。
+
+## Debug Information表示
+
+`View > Debug Information`がONの場合、ErrorBannerとStatusBarの間に最大180pxの複数行デバッグ領域を表示する。OFFの場合は領域と診断採取処理を無効にする。現在はprimary / secondary TabStripのpointer / keyboard表示state、DOM class、geometry、focus、scrollbar computed style、直近eventを表示する。providerは更新eventと削除eventを同じ汎用契約で通知し、unmountまたは停止したproviderのentryを表示器へ残さない。
 
 ## StatusBar 表示
 

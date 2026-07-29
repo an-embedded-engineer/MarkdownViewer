@@ -45,6 +45,7 @@ import {
   isPaneSelectionCurrent,
   isTabRevisionCurrent,
   resolvePaneTabPresentationState,
+  resolveTabAccessibilityState,
   type PanePreviewPhase,
   type PanePreviewStatus,
 } from "./paneRuntime";
@@ -62,6 +63,15 @@ import {
   type SplitViewAction,
   type SplitViewState,
 } from "./splitView";
+import {
+  formatTabStripDebugLines,
+  getTabRevealDelta,
+  hasExceededTabDragThreshold,
+  isPointInsideTabStrip,
+  resolveTabDropPane,
+  shouldShowTabScrollbar,
+  type TabStripDebugSnapshot,
+} from "./tabStrip";
 
 type FileTreeNode = {
   name: string;
@@ -144,10 +154,43 @@ type PaneImageViewerRequest = ImageViewerRequest & { paneId: PaneId };
 
 type PanePreviewElements = Record<PaneId, HTMLElement | null>;
 
+type TabDragSession = {
+  pointerId: number;
+  sourcePaneId: PaneId;
+  tabId: string;
+  displayName: string;
+  startClientX: number;
+  startClientY: number;
+  phase: "pending" | "dragging";
+  dropPaneId: PaneId | null;
+  captureElement: HTMLButtonElement;
+};
+
+type TabDragPresentation = Pick<
+  TabDragSession,
+  "sourcePaneId" | "tabId" | "displayName" | "dropPaneId"
+>;
+
+type SuppressedTabClick = Pick<TabDragSession, "sourcePaneId" | "tabId">;
+
+type DebugPanelEntry = {
+  id: string;
+  title: string;
+  lines: string[];
+};
+
+type DebugPanelEventDetail =
+  | DebugPanelEntry
+  | {
+      id: string;
+      remove: true;
+    };
+
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 const defaultWindowSize: WindowSize = { width: 800, height: 600 };
 const windowResizeSaveDelay = 500;
+const debugPanelEventName = "markdown-viewer:debug-panel-update";
 
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
@@ -175,6 +218,11 @@ function App() {
   const [splitWorkspaceWidth, setSplitWorkspaceWidth] = useState<number | null>(null);
   const [isSplitResizing, setIsSplitResizing] = useState(false);
   const [imageViewerRequest, setImageViewerRequest] = useState<PaneImageViewerRequest | null>(null);
+  const [tabDragPresentation, setTabDragPresentation] =
+    useState<TabDragPresentation | null>(null);
+  const [tabDragStatus, setTabDragStatus] = useState("");
+  const [isDebugPanelVisible, setIsDebugPanelVisible] = useState(false);
+  const [debugPanelEntries, setDebugPanelEntries] = useState<Record<string, DebugPanelEntry>>({});
   const workspaceRef = useRef<HTMLElement>(null);
   const previewWorkspaceRef = useRef<HTMLElement>(null);
   const explorerResizeRef = useRef<ExplorerResizeState | null>(null);
@@ -191,6 +239,9 @@ function App() {
   const mermaidQueueRef = useRef<Promise<void>>(Promise.resolve());
   const nextTabIdRef = useRef(1);
   const imageViewerFocusReturnRef = useRef<HTMLElement | null>(null);
+  const tabDragSessionRef = useRef<TabDragSession | null>(null);
+  const suppressedTabClickRef = useRef<SuppressedTabClick | null>(null);
+  const tabDragPreviewRef = useRef<HTMLDivElement>(null);
 
   splitViewRef.current = splitViewState;
   panePreviewStatusesRef.current = panePreviewStatuses;
@@ -244,6 +295,29 @@ function App() {
             : currentActivePaneStatus?.phase === "rendering-mermaid"
               ? "Rendering Mermaid diagrams..."
               : null;
+
+  useEffect(() => {
+    if (!isDebugPanelVisible) {
+      setDebugPanelEntries((current) => (Object.keys(current).length === 0 ? current : {}));
+      return;
+    }
+    const handleDebugPanelUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<DebugPanelEventDetail>).detail;
+      setDebugPanelEntries((current) => {
+        if ("remove" in detail) {
+          if (!(detail.id in current)) {
+            return current;
+          }
+          const next = { ...current };
+          delete next[detail.id];
+          return next;
+        }
+        return { ...current, [detail.id]: detail };
+      });
+    };
+    window.addEventListener(debugPanelEventName, handleDebugPanelUpdate);
+    return () => window.removeEventListener(debugPanelEventName, handleDebugPanelUpdate);
+  }, [isDebugPanelVisible]);
 
   function handleExplorerPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || !event.isPrimary || explorerResizeRef.current) {
@@ -777,9 +851,7 @@ function App() {
     return getPaneState(state, paneId).activeTabId;
   }
 
-  function moveTab(sourcePaneId: PaneId, tabId: string) {
-    const destinationPaneId: PaneId =
-      sourcePaneId === "primary" ? "secondary" : "primary";
+  function moveTab(sourcePaneId: PaneId, destinationPaneId: PaneId, tabId: string) {
     applySplitView({
       type: "move-tab",
       sourcePaneId,
@@ -789,16 +861,201 @@ function App() {
     window.requestAnimationFrame(() => {
       const destinationTab = document.getElementById(`tab-${destinationPaneId}-${tabId}`);
       if (destinationTab instanceof HTMLButtonElement) {
-        destinationTab.focus();
-        destinationTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+        destinationTab.focus({ preventScroll: true });
         return;
       }
       const destinationPane = document.getElementById(`document-pane-${destinationPaneId}`);
-      destinationPane?.focus();
+      destinationPane?.focus({ preventScroll: true });
       console.error(
         `Moved tab focus target is missing: tab-${destinationPaneId}-${tabId}`,
       );
     });
+  }
+
+  function getTabDropPaneAtPoint(
+    sourcePaneId: PaneId,
+    clientX: number,
+    clientY: number,
+  ): PaneId | null {
+    const target = document.elementFromPoint(clientX, clientY);
+    const candidate = target
+      ?.closest<HTMLElement>("[data-tab-drop-pane]")
+      ?.dataset.tabDropPane ?? null;
+    return resolveTabDropPane(sourcePaneId, candidate, splitViewRef.current.mode);
+  }
+
+  function updateTabDragPreview(clientX: number, clientY: number) {
+    if (tabDragPreviewRef.current) {
+      tabDragPreviewRef.current.style.transform =
+        `translate3d(${clientX + 12}px, ${clientY + 12}px, 0)`;
+    }
+  }
+
+  function resetTabDragPresentation(status: string) {
+    setTabDragPresentation(null);
+    setTabDragStatus(status);
+    if (tabDragPreviewRef.current) {
+      tabDragPreviewRef.current.style.transform = "";
+    }
+  }
+
+  function cancelTabDrag({
+    preserveClickSuppression = false,
+    status = "Tab move cancelled.",
+  }: {
+    preserveClickSuppression?: boolean;
+    status?: string;
+  } = {}) {
+    const session = tabDragSessionRef.current;
+    if (!session) {
+      return;
+    }
+    tabDragSessionRef.current = null;
+    if (!preserveClickSuppression) {
+      suppressedTabClickRef.current = null;
+    }
+    resetTabDragPresentation(session.phase === "dragging" ? status : "");
+    if (session.captureElement.hasPointerCapture(session.pointerId)) {
+      session.captureElement.releasePointerCapture(session.pointerId);
+    }
+  }
+
+  function handleTabPointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tab: OpenDocumentTab,
+  ) {
+    if (!tabDragSessionRef.current) {
+      suppressedTabClickRef.current = null;
+    }
+    if (
+      splitViewRef.current.mode !== "split" ||
+      event.pointerType !== "mouse" ||
+      !event.isPrimary ||
+      event.button !== 0 ||
+      tabDragSessionRef.current
+    ) {
+      return;
+    }
+    tabDragSessionRef.current = {
+      pointerId: event.pointerId,
+      sourcePaneId: paneId,
+      tabId: tab.id,
+      displayName: tab.displayName,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      phase: "pending",
+      dropPaneId: null,
+      captureElement: event.currentTarget,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleTabPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const session = tabDragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) {
+      return;
+    }
+    if (
+      session.phase === "pending" &&
+      !hasExceededTabDragThreshold(
+        session.startClientX,
+        session.startClientY,
+        event.clientX,
+        event.clientY,
+      )
+    ) {
+      return;
+    }
+    const startedDragging = session.phase === "pending";
+    if (startedDragging) {
+      session.phase = "dragging";
+      suppressedTabClickRef.current = {
+        sourcePaneId: session.sourcePaneId,
+        tabId: session.tabId,
+      };
+      activatePane(session.sourcePaneId);
+      setTabDragStatus(
+        `Dragging ${session.displayName}. Drop on the other pane tab strip or press Escape to cancel.`,
+      );
+      const { clientX, clientY } = event;
+      window.requestAnimationFrame(() => updateTabDragPreview(clientX, clientY));
+    }
+    event.preventDefault();
+    updateTabDragPreview(event.clientX, event.clientY);
+    const dropPaneId = getTabDropPaneAtPoint(
+      session.sourcePaneId,
+      event.clientX,
+      event.clientY,
+    );
+    if (startedDragging || dropPaneId !== session.dropPaneId) {
+      session.dropPaneId = dropPaneId;
+      setTabDragPresentation({
+        sourcePaneId: session.sourcePaneId,
+        tabId: session.tabId,
+        displayName: session.displayName,
+        dropPaneId,
+      });
+      if (dropPaneId) {
+        setTabDragStatus(
+          `Move ${session.displayName} to the ${dropPaneId} pane. Release to drop.`,
+        );
+      } else if (!startedDragging) {
+        setTabDragStatus(
+          `Dragging ${session.displayName}. Drop on the other pane tab strip or press Escape to cancel.`,
+        );
+      }
+    }
+  }
+
+  function handleTabPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
+    const session = tabDragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) {
+      return;
+    }
+    const wasDragging = session.phase === "dragging";
+    const destinationPaneId = wasDragging
+      ? getTabDropPaneAtPoint(session.sourcePaneId, event.clientX, event.clientY)
+      : null;
+    const currentState = splitViewRef.current;
+    const sourceIsCurrent =
+      currentState.mode === "split" &&
+      getPaneState(currentState, session.sourcePaneId).orderedTabIds.includes(session.tabId);
+
+    tabDragSessionRef.current = null;
+    resetTabDragPresentation(
+      wasDragging && destinationPaneId && sourceIsCurrent
+        ? `Moved ${session.displayName} to the ${destinationPaneId} pane.`
+        : wasDragging
+          ? "Tab move cancelled."
+          : "",
+    );
+    if (session.captureElement.hasPointerCapture(session.pointerId)) {
+      session.captureElement.releasePointerCapture(session.pointerId);
+    }
+    if (wasDragging && destinationPaneId && sourceIsCurrent) {
+      moveTab(session.sourcePaneId, destinationPaneId, session.tabId);
+    }
+  }
+
+  function handleTabPointerAbort(event: React.PointerEvent<HTMLButtonElement>) {
+    if (tabDragSessionRef.current?.pointerId === event.pointerId) {
+      cancelTabDrag();
+    }
+  }
+
+  function suppressTabClick(
+    event: React.MouseEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tabId: string,
+  ) {
+    const suppressed = suppressedTabClickRef.current;
+    if (suppressed?.sourcePaneId !== paneId || suppressed.tabId !== tabId) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    suppressedTabClickRef.current = null;
   }
 
   function closeImageViewer() {
@@ -1187,6 +1444,34 @@ function App() {
     }
   }, [splitViewState, tabs]);
 
+  useEffect(() => {
+    if (!tabDragPresentation) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      cancelTabDrag({ preserveClickSuppression: true });
+    }
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [tabDragPresentation]);
+
+  useEffect(() => {
+    const session = tabDragSessionRef.current;
+    if (
+      session &&
+      (splitViewState.mode !== "split" ||
+        !getPaneState(splitViewState, session.sourcePaneId).orderedTabIds.includes(session.tabId) ||
+        !session.captureElement.isConnected)
+    ) {
+      cancelTabDrag();
+    }
+  }, [splitViewState, tabs]);
+
   if (isStartupConfigLoading) {
     return (
       <main className="app-shell startup-shell">
@@ -1200,7 +1485,7 @@ function App() {
   return (
     <>
       <main
-        className={`app-shell ${isExplorerResizing ? "explorer-resizing" : ""} ${isSplitResizing ? "split-resizing" : ""}`}
+        className={`app-shell ${isExplorerResizing ? "explorer-resizing" : ""} ${isSplitResizing ? "split-resizing" : ""} ${tabDragPresentation ? "tab-dragging" : ""}`}
         aria-hidden={settingsDraft || imageViewerRequest ? true : undefined}
         inert={settingsDraft || imageViewerRequest ? true : undefined}
       >
@@ -1210,6 +1495,7 @@ function App() {
           rootPath={rootPath}
           theme={theme}
           isSplitView={splitViewState.mode === "split"}
+          isDebugPanelVisible={isDebugPanelVisible}
           isBusy={isGlobalBusy}
           activeMenu={activeMenu}
           recentFolders={recentFolders}
@@ -1217,6 +1503,7 @@ function App() {
           onReload={reload}
           onToggleTheme={() => void saveTheme(theme === "light" ? "dark" : "light")}
           onToggleSplitView={toggleSplitView}
+          onToggleDebugPanel={() => setIsDebugPanelVisible((visible) => !visible)}
           onOpenSettings={() => void openSettings()}
           onMenuToggle={(menu) => setActiveMenu((value) => (value === menu ? null : menu))}
           onCloseMenu={() => setActiveMenu(null)}
@@ -1293,10 +1580,18 @@ function App() {
                     ? secondaryTabs.length
                     : 0
                 }
+                debugEnabled={isDebugPanelVisible}
                 onActivatePane={activatePane}
                 onActivateTab={activateTab}
                 onCloseTab={closeTab}
                 onMoveTab={moveTab}
+                tabDragPresentation={tabDragPresentation}
+                onTabPointerDown={handleTabPointerDown}
+                onTabPointerMove={handleTabPointerMove}
+                onTabPointerUp={handleTabPointerUp}
+                onTabPointerCancel={handleTabPointerAbort}
+                onTabLostPointerCapture={handleTabPointerAbort}
+                onTabClickCapture={suppressTabClick}
                 onPreviewStatus={updatePanePreviewPhase}
                 onPreviewElement={registerPreviewElement}
                 onPreviewClick={handlePreviewClick}
@@ -1349,10 +1644,18 @@ function App() {
                   theme={theme}
                   isActive={splitViewState.activePaneId === "secondary"}
                   hiddenSecondaryTabCount={0}
+                  debugEnabled={isDebugPanelVisible}
                   onActivatePane={activatePane}
                   onActivateTab={activateTab}
                   onCloseTab={closeTab}
                   onMoveTab={moveTab}
+                  tabDragPresentation={tabDragPresentation}
+                  onTabPointerDown={handleTabPointerDown}
+                  onTabPointerMove={handleTabPointerMove}
+                  onTabPointerUp={handleTabPointerUp}
+                  onTabPointerCancel={handleTabPointerAbort}
+                  onTabLostPointerCapture={handleTabPointerAbort}
+                  onTabClickCapture={suppressTabClick}
                   onPreviewStatus={updatePanePreviewPhase}
                   onPreviewElement={registerPreviewElement}
                   onPreviewClick={handlePreviewClick}
@@ -1384,11 +1687,26 @@ function App() {
 
         {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
 
+        {isDebugPanelVisible ? (
+          <DebugPanel entries={Object.values(debugPanelEntries)} />
+        ) : null}
+
         <StatusBar
           selectedFileName={activeTab?.displayName ?? ""}
           loadingMessage={loadingMessage}
         />
       </main>
+
+      {tabDragPresentation ? (
+        <div className="tab-drag-layer" aria-hidden="true">
+          <div ref={tabDragPreviewRef} className="tab-drag-preview">
+            {tabDragPresentation.displayName}
+          </div>
+        </div>
+      ) : null}
+      <span className="tab-drag-live" aria-live="polite">
+        {tabDragStatus}
+      </span>
 
       {settingsDraft ? (
         <SettingsDialog
@@ -1757,6 +2075,7 @@ type MenuBarProps = {
   rootPath: string | null;
   theme: Theme;
   isSplitView: boolean;
+  isDebugPanelVisible: boolean;
   isBusy: boolean;
   activeMenu: ActiveMenu;
   recentFolders: RecentFolderEntry[];
@@ -1764,6 +2083,7 @@ type MenuBarProps = {
   onReload: () => void;
   onToggleTheme: () => void;
   onToggleSplitView: () => void;
+  onToggleDebugPanel: () => void;
   onOpenSettings: () => void;
   onMenuToggle: (menu: Exclude<ActiveMenu, null>) => void;
   onCloseMenu: () => void;
@@ -1777,6 +2097,7 @@ function MenuBar({
   rootPath,
   theme,
   isSplitView,
+  isDebugPanelVisible,
   isBusy,
   activeMenu,
   recentFolders,
@@ -1784,6 +2105,7 @@ function MenuBar({
   onReload,
   onToggleTheme,
   onToggleSplitView,
+  onToggleDebugPanel,
   onOpenSettings,
   onMenuToggle,
   onCloseMenu,
@@ -1905,6 +2227,14 @@ function MenuBar({
               onClick={onToggleSplitView}
             >
               Split View
+            </button>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={isDebugPanelVisible}
+              onClick={onToggleDebugPanel}
+            >
+              Debug Information
             </button>
           </div>
         ) : null}
@@ -2117,6 +2447,31 @@ function ErrorBanner({ message }: ErrorBannerProps) {
   );
 }
 
+type DebugPanelProps = {
+  entries: DebugPanelEntry[];
+};
+
+function DebugPanel({ entries }: DebugPanelProps) {
+  const sortedEntries = [...entries].sort((left, right) => left.id.localeCompare(right.id));
+  return (
+    <section className="debug-panel" aria-label="Debug information">
+      <div className="debug-panel-heading">Debug Information</div>
+      <div className="debug-panel-content">
+        {sortedEntries.length === 0 ? (
+          <div className="debug-panel-empty">Waiting for diagnostic events...</div>
+        ) : (
+          sortedEntries.map((entry) => (
+            <section className="debug-entry" key={entry.id} aria-label={entry.title}>
+              <div className="debug-entry-title">{entry.title}</div>
+              <pre>{entry.lines.join("\n")}</pre>
+            </section>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 type StatusBarProps = {
   selectedFileName: string;
   loadingMessage: string | null;
@@ -2160,10 +2515,26 @@ type DocumentPaneProps = {
   theme: Theme;
   isActive: boolean;
   hiddenSecondaryTabCount: number;
+  debugEnabled: boolean;
   onActivatePane: (paneId: PaneId) => void;
   onActivateTab: (paneId: PaneId, tabId: string) => void;
   onCloseTab: (paneId: PaneId, tabId: string) => string | null;
-  onMoveTab: (paneId: PaneId, tabId: string) => void;
+  onMoveTab: (sourcePaneId: PaneId, destinationPaneId: PaneId, tabId: string) => void;
+  tabDragPresentation: TabDragPresentation | null;
+  onTabPointerDown: (
+    event: React.PointerEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tab: OpenDocumentTab,
+  ) => void;
+  onTabPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onTabPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onTabPointerCancel: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onTabLostPointerCapture: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onTabClickCapture: (
+    event: React.MouseEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tabId: string,
+  ) => void;
   onPreviewStatus: (
     paneId: PaneId,
     tabId: string,
@@ -2194,10 +2565,18 @@ function DocumentPane({
   theme,
   isActive,
   hiddenSecondaryTabCount,
+  debugEnabled,
   onActivatePane,
   onActivateTab,
   onCloseTab,
   onMoveTab,
+  tabDragPresentation,
+  onTabPointerDown,
+  onTabPointerMove,
+  onTabPointerUp,
+  onTabPointerCancel,
+  onTabLostPointerCapture,
+  onTabClickCapture,
   onPreviewStatus,
   onPreviewElement,
   onPreviewClick,
@@ -2355,9 +2734,17 @@ function DocumentPane({
         activeTabId={pane.activeTabId}
         splitViewState={splitViewState}
         previewStatus={previewStatus}
+        debugEnabled={debugEnabled}
         onActivate={onActivateTab}
         onClose={onCloseTab}
         onMove={onMoveTab}
+        tabDragPresentation={tabDragPresentation}
+        onPointerDown={onTabPointerDown}
+        onPointerMove={onTabPointerMove}
+        onPointerUp={onTabPointerUp}
+        onPointerCancel={onTabPointerCancel}
+        onLostPointerCapture={onTabLostPointerCapture}
+        onClickCapture={onTabClickCapture}
       />
       <div
         className="preview-pane"
@@ -2424,9 +2811,25 @@ type TabStripProps = {
   activeTabId: string | null;
   splitViewState: SplitViewState;
   previewStatus: PanePreviewStatus | null;
+  debugEnabled: boolean;
   onActivate: (paneId: PaneId, tabId: string) => void;
   onClose: (paneId: PaneId, tabId: string) => string | null;
-  onMove: (paneId: PaneId, tabId: string) => void;
+  onMove: (sourcePaneId: PaneId, destinationPaneId: PaneId, tabId: string) => void;
+  tabDragPresentation: TabDragPresentation | null;
+  onPointerDown: (
+    event: React.PointerEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tab: OpenDocumentTab,
+  ) => void;
+  onPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerCancel: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onLostPointerCapture: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onClickCapture: (
+    event: React.MouseEvent<HTMLButtonElement>,
+    paneId: PaneId,
+    tabId: string,
+  ) => void;
 };
 
 function TabStrip({
@@ -2435,11 +2838,168 @@ function TabStrip({
   activeTabId,
   splitViewState,
   previewStatus,
+  debugEnabled,
   onActivate,
   onClose,
   onMove,
+  tabDragPresentation,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onLostPointerCapture,
+  onClickCapture,
 }: TabStripProps) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  const itemRefs = useRef(new Map<string, HTMLDivElement>());
+  const pointerInsideRef = useRef(false);
+  const lastInputWasKeyboardRef = useRef(false);
+  const keyboardFocusInsideRef = useRef(false);
+  const lastScrollbarEventRef = useRef("mount");
+  const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const scrollbarDebugFrameRef = useRef<number | null>(null);
+  const pointerSyncFrameRef = useRef<number | null>(null);
+  const pendingPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const [isPointerInside, setIsPointerInside] = useState(false);
+  const [isKeyboardFocusInside, setIsKeyboardFocusInside] = useState(false);
+
+  function cancelPointerSync() {
+    if (pointerSyncFrameRef.current !== null) {
+      window.cancelAnimationFrame(pointerSyncFrameRef.current);
+      pointerSyncFrameRef.current = null;
+    }
+    pendingPointerRef.current = null;
+  }
+
+  function queueScrollbarDebug(
+    eventName: string,
+    pointerEvent?: { clientX: number; clientY: number },
+  ) {
+    if (!debugEnabled) {
+      return;
+    }
+    lastScrollbarEventRef.current = eventName;
+    if (pointerEvent) {
+      lastPointerPositionRef.current = {
+        x: pointerEvent.clientX,
+        y: pointerEvent.clientY,
+      };
+    }
+    if (scrollbarDebugFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollbarDebugFrameRef.current);
+    }
+    scrollbarDebugFrameRef.current = window.requestAnimationFrame(() => {
+      scrollbarDebugFrameRef.current = null;
+      const shell = shellRef.current;
+      const strip = stripRef.current;
+      if (!shell || !strip) {
+        return;
+      }
+      const lastPointer = lastPointerPositionRef.current;
+      const shellRect = shell.getBoundingClientRect();
+      const activeElement = document.activeElement;
+      const snapshot: TabStripDebugSnapshot = {
+        paneId,
+        pointerInside: pointerInsideRef.current,
+        keyboardFocusInside: keyboardFocusInsideRef.current,
+        shouldShow: shouldShowTabScrollbar(
+          pointerInsideRef.current,
+          keyboardFocusInsideRef.current,
+        ),
+        classVisible: shell.classList.contains("tab-scrollbar-visible"),
+        rawPointInside: lastPointer
+          ? isPointInsideTabStrip(
+              shellRect.left,
+              shellRect.right,
+              shellRect.top,
+              shellRect.bottom,
+              lastPointer.x,
+              lastPointer.y,
+            )
+          : null,
+        cssHover: shell.matches(":hover"),
+        focusWithin: activeElement instanceof Node && shell.contains(activeElement),
+        thumbBackground: window
+          .getComputedStyle(strip, "::-webkit-scrollbar-thumb")
+          .getPropertyValue("background-color"),
+        overflow: strip.scrollWidth > strip.clientWidth,
+        activeElement:
+          activeElement instanceof HTMLElement
+            ? activeElement.id || activeElement.className || activeElement.tagName
+            : "none",
+        lastEvent: lastScrollbarEventRef.current,
+        pointer: lastPointer
+          ? `${Math.round(lastPointer.x)},${Math.round(lastPointer.y)}`
+          : "-",
+      };
+      window.dispatchEvent(
+        new CustomEvent<DebugPanelEventDetail>(debugPanelEventName, {
+          detail: {
+            id: `tab-strip-${paneId}`,
+            title: `${paneId === "primary" ? "Primary" : "Secondary"} TabStrip`,
+            lines: formatTabStripDebugLines(snapshot),
+          },
+        }),
+      );
+    });
+  }
+
+  function updatePointerInside(
+    nextValue: boolean,
+    eventName: string,
+    pointerEvent?: { clientX: number; clientY: number },
+  ) {
+    if (pointerInsideRef.current !== nextValue) {
+      pointerInsideRef.current = nextValue;
+      setIsPointerInside(nextValue);
+    }
+    queueScrollbarDebug(eventName, pointerEvent);
+  }
+
+  function updateKeyboardFocusInside(nextValue: boolean, eventName: string) {
+    if (keyboardFocusInsideRef.current !== nextValue) {
+      keyboardFocusInsideRef.current = nextValue;
+      setIsKeyboardFocusInside(nextValue);
+    }
+    queueScrollbarDebug(eventName);
+  }
+
+  function revealTab(tabId: string) {
+    const strip = stripRef.current;
+    const item = itemRefs.current.get(tabId);
+    if (!strip || !item) {
+      return;
+    }
+    const stripRect = strip.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const itemIndex = tabs.findIndex((tab) => tab.id === tabId);
+    const previousItem =
+      itemIndex > 0 ? itemRefs.current.get(tabs[itemIndex - 1].id) ?? null : null;
+    const nextItem =
+      itemIndex >= 0 && itemIndex < tabs.length - 1
+        ? itemRefs.current.get(tabs[itemIndex + 1].id) ?? null
+        : null;
+    const previousRect = previousItem?.getBoundingClientRect();
+    const nextRect = nextItem?.getBoundingClientRect();
+    const leadingPeekStart = previousRect
+      ? previousRect.left + previousRect.width / 2
+      : itemRect.left;
+    const trailingPeekEnd = nextRect ? nextRect.left + nextRect.width / 2 : itemRect.right;
+    const delta = getTabRevealDelta(
+      stripRect.left,
+      stripRect.right,
+      itemRect.left,
+      itemRect.right,
+      4,
+      leadingPeekStart,
+      trailingPeekEnd,
+    );
+    if (delta !== 0) {
+      strip.scrollBy({ left: delta, behavior: "auto" });
+    }
+  }
 
   useEffect(() => {
     if (!activeTabId) {
@@ -2447,16 +3007,107 @@ function TabStrip({
     }
 
     const frame = window.requestAnimationFrame(() => {
-      tabRefs.current.get(activeTabId)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      revealTab(activeTabId);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeTabId, tabs.length]);
 
+  useEffect(() => {
+    const clearPointerInside = (eventName: string) => {
+      updatePointerInside(false, eventName);
+    };
+    // Two-way geometry sync: boundary events (pointerenter/pointerleave) are
+    // unreliable here because the native scrollbar swallows hit-tests and tab
+    // Drag holds pointer capture, so window pointermove re-derives the inside
+    // state from the shell rect instead of trusting event ordering. Coalesce
+    // geometry reads to one per animation frame so split view performs at most
+    // two shell reads per rendered frame rather than per native pointer event.
+    const trackPointerPosition = (event: PointerEvent) => {
+      if (event.pointerType === "touch") {
+        cancelPointerSync();
+        clearPointerInside("move-touch-clear");
+        return;
+      }
+      pendingPointerRef.current = { x: event.clientX, y: event.clientY };
+      if (pointerSyncFrameRef.current !== null) {
+        return;
+      }
+      pointerSyncFrameRef.current = window.requestAnimationFrame(() => {
+        pointerSyncFrameRef.current = null;
+        const shell = shellRef.current;
+        const pointer = pendingPointerRef.current;
+        pendingPointerRef.current = null;
+        if (!shell || !pointer) {
+          clearPointerInside("move-no-shell");
+          return;
+        }
+        const rect = shell.getBoundingClientRect();
+        const inside = isPointInsideTabStrip(
+          rect.left,
+          rect.right,
+          rect.top,
+          rect.bottom,
+          pointer.x,
+          pointer.y,
+        );
+        if (pointerInsideRef.current !== inside) {
+          updatePointerInside(
+            inside,
+            inside ? "window-move-enter" : "window-move-leave",
+            { clientX: pointer.x, clientY: pointer.y },
+          );
+        } else {
+          queueScrollbarDebug(
+            inside ? "window-move-inside" : "window-move-outside",
+            { clientX: pointer.x, clientY: pointer.y },
+          );
+        }
+      });
+    };
+    const trackKeyboardInput = () => {
+      lastInputWasKeyboardRef.current = true;
+      queueScrollbarDebug("window-keydown");
+    };
+    const trackPointerInput = () => {
+      lastInputWasKeyboardRef.current = false;
+      updateKeyboardFocusInside(false, "window-pointerdown");
+    };
+    const clearVisibility = () => {
+      cancelPointerSync();
+      updatePointerInside(false, "window-blur");
+      updateKeyboardFocusInside(false, "window-blur");
+    };
+
+    window.addEventListener("pointermove", trackPointerPosition, true);
+    window.addEventListener("pointerdown", trackPointerInput, true);
+    window.addEventListener("keydown", trackKeyboardInput, true);
+    window.addEventListener("blur", clearVisibility);
+    queueScrollbarDebug("listener-mounted");
+    return () => {
+      window.removeEventListener("pointermove", trackPointerPosition, true);
+      window.removeEventListener("pointerdown", trackPointerInput, true);
+      window.removeEventListener("keydown", trackKeyboardInput, true);
+      window.removeEventListener("blur", clearVisibility);
+      cancelPointerSync();
+      if (scrollbarDebugFrameRef.current !== null) {
+        window.cancelAnimationFrame(scrollbarDebugFrameRef.current);
+        scrollbarDebugFrameRef.current = null;
+      }
+      if (debugEnabled) {
+        window.dispatchEvent(
+          new CustomEvent<DebugPanelEventDetail>(debugPanelEventName, {
+            detail: { id: `tab-strip-${paneId}`, remove: true },
+          }),
+        );
+      }
+    };
+  }, [debugEnabled]);
+
   function focusTab(tabId: string) {
     window.requestAnimationFrame(() => {
       const button = tabRefs.current.get(tabId);
-      button?.focus();
-      button?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      button?.focus({ preventScroll: true });
+      revealTab(tabId);
     });
   }
 
@@ -2483,6 +3134,9 @@ function TabStrip({
 
     if (nextIndex !== null) {
       event.preventDefault();
+      // Refocusing an already-focused tab fires no focus event, so the
+      // focus-capture path alone cannot mark keyboard navigation here.
+      updateKeyboardFocusInside(true, `key-${event.key}`);
       activateAndFocus(tabs[nextIndex].id);
     }
   }
@@ -2492,17 +3146,89 @@ function TabStrip({
     if (nextFocusId) {
       focusTab(nextFocusId);
     } else {
-      window.requestAnimationFrame(() => document.getElementById(`document-pane-${paneId}`)?.focus());
+      window.requestAnimationFrame(() =>
+        document.getElementById(`document-pane-${paneId}`)?.focus({ preventScroll: true }),
+      );
     }
   }
 
+  const isDropTarget = tabDragPresentation?.dropPaneId === paneId;
+  const isScrollbarVisible = shouldShowTabScrollbar(
+    isPointerInside,
+    isKeyboardFocusInside,
+  );
+
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (strip.scrollWidth <= strip.clientWidth) {
+        return;
+      }
+      // WKWebView can retain the previous native scrollbar thumb paint even
+      // after the visibility class changes. Reading the pseudo-element style
+      // after layout makes that transition observable and flushes its paint.
+      void strip.getBoundingClientRect();
+      void window
+        .getComputedStyle(strip, "::-webkit-scrollbar-thumb")
+        .getPropertyValue("background-color");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isScrollbarVisible, tabs.length]);
+
   return (
     <div
-      className="tab-strip"
-      role="tablist"
-      aria-label={`${paneId === "primary" ? "Primary" : "Secondary"} pane open documents`}
+      ref={shellRef}
+      className={`tab-strip-shell ${isScrollbarVisible ? "tab-scrollbar-visible" : ""}`}
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "touch") {
+          updatePointerInside(true, "shell-pointerenter", event);
+        }
+      }}
+      onPointerLeave={(event) => {
+        // WebKit dispatches pointerleave when the pointer moves onto the
+        // native scrollbar even though it is still within the shell rect;
+        // ignore those so the thumb does not flicker over the scrollbar.
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (
+          event.pointerType !== "touch" &&
+          isPointInsideTabStrip(
+            rect.left,
+            rect.right,
+            rect.top,
+            rect.bottom,
+            event.clientX,
+            event.clientY,
+          )
+        ) {
+          queueScrollbarDebug("shell-pointerleave-ignored", event);
+          return;
+        }
+        cancelPointerSync();
+        updatePointerInside(false, "shell-pointerleave", event);
+      }}
+      onFocusCapture={() => {
+        updateKeyboardFocusInside(
+          lastInputWasKeyboardRef.current,
+          lastInputWasKeyboardRef.current ? "focus-keyboard" : "focus-pointer",
+        );
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          updateKeyboardFocusInside(false, "focus-left-shell");
+        }
+      }}
     >
-      {tabs.map((tab, index) => {
+      <div
+        ref={stripRef}
+        className={`tab-strip ${isDropTarget ? "tab-drop-target" : ""}`}
+        role="tablist"
+        aria-label={`${paneId === "primary" ? "Primary" : "Secondary"} pane open documents`}
+        data-tab-drop-pane={paneId}
+      >
+        {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId;
         const presentationState = resolvePaneTabPresentationState(
           tab,
@@ -2510,18 +3236,25 @@ function TabStrip({
           splitViewState,
           previewStatus,
         );
-        const stateLabel =
-          presentationState === "loading"
-            ? "Loading"
-            : presentationState === "rendering"
-              ? "Rendering"
-              : presentationState === "error"
-                ? "Error"
-                : null;
+        const accessibility = resolveTabAccessibilityState(presentationState);
+        const isDragSource =
+          tabDragPresentation?.sourcePaneId === paneId &&
+          tabDragPresentation.tabId === tab.id;
+        const destinationPaneId: PaneId =
+          paneId === "primary" ? "secondary" : "primary";
         return (
           <div
-            className={`tab-item ${splitViewState.mode === "split" ? "tab-item-split" : ""} ${isActive ? "active" : ""} tab-${presentationState}`}
+            ref={(element) => {
+              if (element) {
+                itemRefs.current.set(tab.id, element);
+              } else {
+                itemRefs.current.delete(tab.id);
+              }
+            }}
+            className={`tab-item ${splitViewState.mode === "split" ? "tab-item-split" : ""} ${isActive ? "active" : ""} ${isDragSource ? "tab-drag-source" : ""} tab-${presentationState}`}
             key={tab.id}
+            data-tab-id={tab.id}
+            onFocusCapture={() => revealTab(tab.id)}
           >
             <button
               ref={(element) => {
@@ -2536,14 +3269,29 @@ function TabStrip({
               className="tab-activate"
               role="tab"
               aria-selected={isActive}
+              aria-label={
+                accessibility.labelSuffix
+                  ? `${tab.displayName}, ${accessibility.labelSuffix}`
+                  : tab.displayName
+              }
+              aria-busy={accessibility.busy || undefined}
               aria-controls={`document-preview-${paneId}`}
               tabIndex={isActive ? 0 : -1}
               title={tab.path}
-              onClick={() => onActivate(paneId, tab.id)}
+              onClickCapture={(event) => onClickCapture(event, paneId, tab.id)}
+              onClick={(event) => {
+                if (!event.defaultPrevented) {
+                  onActivate(paneId, tab.id);
+                }
+              }}
               onKeyDown={(event) => handleKeyDown(event, index)}
+              onPointerDown={(event) => onPointerDown(event, paneId, tab)}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerCancel}
+              onLostPointerCapture={onLostPointerCapture}
             >
               <span className="tab-name">{tab.displayName}</span>
-              {stateLabel ? <span className="tab-state">{stateLabel}</span> : null}
             </button>
             {splitViewState.mode === "split" ? (
               <button
@@ -2552,7 +3300,7 @@ function TabStrip({
                 aria-label={`Move ${tab.displayName} to ${paneId === "primary" ? "secondary" : "primary"} pane`}
                 title={`Move ${tab.displayName} to ${paneId === "primary" ? "secondary" : "primary"} pane`}
                 tabIndex={isActive ? 0 : -1}
-                onClick={() => onMove(paneId, tab.id)}
+                onClick={() => onMove(paneId, destinationPaneId, tab.id)}
               >
                 {paneId === "primary" ? "→" : "←"}
               </button>
@@ -2569,7 +3317,8 @@ function TabStrip({
             </button>
           </div>
         );
-      })}
+        })}
+      </div>
     </div>
   );
 }

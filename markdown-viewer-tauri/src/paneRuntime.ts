@@ -30,6 +30,26 @@ export type TabPresentationInput = TabIdentity & {
   loadState: SharedTabLoadState;
 };
 
+export type TabAccessibilityState = {
+  labelSuffix: "Loading" | "Rendering" | "Error" | null;
+  busy: boolean;
+};
+
+export function resolveTabAccessibilityState(
+  presentationState: SharedTabLoadState,
+): TabAccessibilityState {
+  switch (presentationState) {
+    case "loading":
+      return { labelSuffix: "Loading", busy: true };
+    case "rendering":
+      return { labelSuffix: "Rendering", busy: true };
+    case "error":
+      return { labelSuffix: "Error", busy: false };
+    case "ready":
+      return { labelSuffix: null, busy: false };
+  }
+}
+
 export function isPaneSelectionCurrent(
   paneId: PaneId,
   tabId: string,
