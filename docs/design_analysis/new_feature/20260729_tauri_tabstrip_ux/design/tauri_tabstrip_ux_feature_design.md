@@ -33,7 +33,7 @@
 1. tab名は1行だけ表示し、状態のvisible textは置かない。
 2. readyなactive tabはaccentの上端線とactive背景、errorは赤い上端線、loading / renderingは別variantの上端indicatorで表す。
 3. activate buttonのaccessible nameへ状態名を加え、loading / renderingでは`aria-busy=true`を公開する。
-4. pointer hoverまたはTabStrip内focus時だけhorizontal scrollbar thumbを視認可能にする。scrollbarの占有寸法は常に一定とし、preview上端を動かさない。
+4. pointer hoverまたはTabStrip内のkeyboard `:focus-visible`時だけhorizontal scrollbar thumbを視認可能にする。pointer click由来のfocusだけでは表示を維持しない。scrollbarの占有寸法は常に一定とし、preview上端を動かさない。
 5. active tab変更またはtab item内のactivate / move / close controlへのfocusで、tab item外枠全体をTabStrip内へrevealする。
 
 ### 2.3 drag move導線
@@ -53,7 +53,7 @@
 
 - 40px固定高の1行TabStripと状態indicator。
 - ready / loading / rendering / errorのvisual / accessible mapping。
-- hover / focus-within時だけ視認可能なhorizontal scrollbar。
+- pointer hover / keyboard `:focus-visible`時だけ視認可能なhorizontal scrollbar。
 - tab item全体を対象にしたhorizontal reveal policy。
 - Pointer Eventsによるprimary / secondary間drag move、drop feedback、cancel。
 - 既存move buttonと`move-tab` reducerの再利用。
@@ -107,7 +107,7 @@ DOM ref、pointer capture、focus、`elementFromPoint`、React stateは`TabStrip
 
 ### 4.5 採用: scrollbar geometry固定 + thumb visibility切替
 
-`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparent、`:hover` / `:focus-within`時だけthumbをmuted colorへ切り替える。Tauriの対象WebViewで共通利用できるWebKit scrollbar pseudo-elementへ実装を一本化し、`scrollbar-width` / `scrollbar-color`は併記しない。
+`overflow-x: scroll`と6pxのscrollbar寸法を使い、通常時はthumb / trackをtransparent、`:hover`または`:has(:focus-visible)`時だけthumbをmuted colorへ切り替える。`:focus-within`はpointer click後もbutton focusを保持してthumbが残るため使わない。Tauriの対象WebViewで共通利用できるWebKit scrollbar pseudo-elementへ実装を一本化し、`scrollbar-width` / `scrollbar-color`は併記しない。
 
 scrollbar自体の追加・除去や`overflow-x: auto | hidden`切替は行わない。classic scrollbarではtransparentなtrackを含め常に同じ6px内部寸法を確保し、overlay scrollbar環境でもTabStrip外寸40pxを維持する。overflowがない場合も透明trackの領域は保持するがthumbは生成されず、不要なbarは視認できない。これによりtab追加・closeがoverflow境界を跨いでもtab itemの内寸を34pxから変えない。
 
@@ -131,7 +131,7 @@ scrollbar自体の追加・除去や`overflow-x: auto | hidden`切替は行わ�
 | TabStrip高さ | 58px固定、state textを2行目表示 | 40px固定、name 1行 + 上端indicator |
 | active | accent上端線 | ready時accent上端線 + active背景、busy/error時はactive背景を維持 |
 | loading / rendering / error | visible text、error下端線 | 上端variant + accessible name、busyは`aria-busy` |
-| scrollbar | 常時thin style、OS依存で可視 | overflow時にhover / focusだけthumb可視、geometry不変 |
+| scrollbar | 常時thin style、OS依存で可視 | overflow時にpointer hover / keyboard focus-visibleだけthumb可視、geometry不変 |
 | auto scroll target | activate button | move / closeを含むtab item外枠 |
 | scroll実行範囲 | `scrollIntoView`のancestor chain | TabStripの`scrollLeft`だけ |
 | pane間move | 矢印button | 矢印button + pointer drag、同じ`move-tab` |
@@ -376,7 +376,7 @@ Rust差分は予定しないが、Tauri application全体の回帰確認とし�
 1. ready / active / loading / rendering / errorの上端indicatorとaccessible state。
 2. Light / Darkと`prefers-reduced-motion`で色・pattern・active背景が識別可能。loading / rendering / error tokenがinactiveの`--chrome-bg`とactiveの`--panel-bg`の双方で視認できる。
 3. primary / secondary、empty、overflow、状態遷移で40px固定高とpreview上端が一致。
-4. overflowなしではbarが見えず、overflow時はhover / focusでthumbが現れる。対象WebViewでWebKit pseudo-elementのtrack実寸が6pxであることを確認し、tabをoverflow境界前後で増減してもitemの見た目高さとpreview上端が変わらない。
+4. overflowなしではbarが見えず、overflow時はpointer hoverまたはkeyboard focus-visibleでthumbが現れる。pointer click後にtabへfocusが残ったままpreviewへpointerを移すとthumbが隠れ、keyboard focus中はpointerが領域外でも表示を維持し、TabStrip外へfocusを移すと隠れる。対象WebViewでWebKit pseudo-elementのtrack実寸が6pxであることを確認し、tabをoverflow境界前後で増減してもitemの見た目高さとpreview上端が変わらない。
 5. 矢印キーで先頭・中間・末尾tabをactivateし、Tabでactive item内のactivate → move → closeへ移動してitem全体が見える。focus時にpreview / Explorer / shellが縦横に動かない。
 6. primary→secondary、secondary→primaryのactive / non-active tab drag。
 7. destination same ID、source最後のtab、invalid target release、Escape cancel。非active sourceをdrag中にEscapeし、source上でmouse buttonをreleaseしてもselectionが変わらない。
@@ -440,9 +440,15 @@ ADRは追加しない。Pointer EventsとTabStrip policyは現時点ではTauri 
 | visible textなしで状態識別 | §6 |
 | error / rendering / reduced motion | §6.1–6.2 |
 | compact固定高、段差なし | §7.1 |
-| hover / focus時だけscrollbar可視 | §4.5、§7.1 |
+| pointer hover / keyboard focus-visible時だけscrollbar可視 | §4.5、§7.1、§19 |
 | tab item全体を自動表示 | §4.4、§7.2 |
 | pointer dragとmove整合、cancel no-op | §8、§11–12 |
 | keyboard / assistive technology導線 | §2.3、§6.3 |
 | Light / Dark、single / split、content回帰 | §11、§14 |
 | test / build / Rust check | §13 |
+
+## 19. Phase 4-a feedback: scrollbar focus modality
+
+2026-07-29のユーザ動作確認では、固定高、状態indicator、pane間drag move、右端tabのitem全体revealは期待どおりと確認された。一方、overflowしたTabStripでtabをpointer clickした後、pointerをpreviewへ移動してもhorizontal scrollbar thumbが残ることが報告されたため、Phase 4-aをNGとしてPhase 3へ差し戻す。
+
+原因はthumb表示条件に`:focus-within`を使っていたことにある。pointer clickしたbuttonはpointerが領域外へ移動してもfocusを保持するため、`:focus-within`が継続する。表示条件を`:hover`または`:has(:focus-visible)`へ変更し、pointer操作では領域を離れた時に隠しつつ、keyboard操作ではTabStrip内focus中の視認性を維持する。scrollbar geometry、reveal、drag、tab focus自体は変更しない。

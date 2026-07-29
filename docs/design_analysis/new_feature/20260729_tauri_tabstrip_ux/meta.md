@@ -16,11 +16,11 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "in_progress"
 design_status: "done"
-impl_status: "done"
+impl_status: "in_review"
 completion_status: "not_started"
-verification_status: "not_started"
+verification_status: "in_progress"
 related_commits:
   - "c8edd30 : Phase 0 define TODO-2026-026 TabStrip UX scope"
   - "a1ba28b : Phase 1 initialize Tauri TabStrip UX workflow"
@@ -62,7 +62,7 @@ depends_on:
 | Phase 0 Requirements | Done and approved (`c8edd30`) |
 | Phase 1 Branch and meta | Done (this Phase 1 initialization commit) |
 | Phase 2 Design review | Done and approved (`0c0dd98`); initial 17 findings resolved, 3 non-blocking implementation follow-ups carried into Phase 3 |
-| Phase 3 Implementation and docs review | Done and approved (`ca48356`); initial 4 findings resolved, 0 unresolved |
-| Phase 4-a User verification | Not started |
+| Phase 3 Implementation and docs review | Reopened after Phase 4-a scrollbar focus-modality feedback; fix complete and review pending |
+| Phase 4-a User verification | NG; fixed height, indicators, drag move, and item reveal accepted, but pointer click focus kept scrollbar thumb visible after mouse leave; re-verification pending |
 | Phase 4-b Completion | Not started |
 | Phase 4-c Merge | Not started |

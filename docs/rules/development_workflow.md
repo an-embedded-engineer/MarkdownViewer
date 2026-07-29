@@ -175,6 +175,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - Explorer / relative Markdown linkからactive paneへtabが追加され、primary / secondaryのTabStripが他paneのopen / closeで意図せず増減せず、同じdocumentを両groupへ追加できること
 - primary / secondaryのTabStripから別文書または同じ文書を独立に選択し、pointer / focusでactive paneを変えるとExplorer強調、Reload、相対Markdown link、StatusBar、ErrorBannerの対象が切り替わること
 - split左右でready / active / Loading / Rendering / Error、empty group、水平overflowを組み合わせてもTabStripが40px固定高を維持し、preview上端に段差が出ないこと。Light / Dark、reduced motion、overflow境界のtab追加・closeでもindicator、WebKit scrollbar track実寸、item高さが変動しないこと
+- overflowしたTabStripではpointer hover中だけhorizontal scrollbar thumbが見え、tabをpointer clickしてfocusを残したままpreviewへpointerを移すとthumbが隠れること。keyboardでtab controlへfocusした場合はpointerが領域外でもthumbが見え、focusがTabStrip外へ移ると隠れること
 - overflow中に矢印activate後、Tabでmove / closeへ移動してもitem外枠全体だけがTabStrip内へrevealされ、preview / Explorer / app shellがscrollしないこと
 - split左右でactive / non-active tabをmouse dragし、反対TabStrip drop、invalid release、Escape、pointer cancel、split解除、source close、root変更、destination same IDでatomic moveまたはno-op cleanupになること。非active tabのdrag中にEscapeし、source上でmouse buttonをreleaseしてもselectionが変わらないこと。drag中の追加pointerdownでもclick抑止が失われず、drag直後のtab clickが最初の1回でactivateし、touch / penとkeyboard move buttonが維持されること
 - error / loading tabのactivate buttonへkeyboard focusを置いても、focus outlineと上端indicatorを同時に判別できること

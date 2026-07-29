@@ -24,7 +24,7 @@ MarkdownViewer/
 - Build check: コンパイル、型チェック、Rust check。
 - Automated unit: document response / bridge policy、root / path / MIME / protocol response / bridge injection。
 - Automated unit: `tabStrip.test.ts`でitem reveal geometry、非finite入力、6px drag threshold、drop pane narrowingを、`paneRuntime.test.ts`でvisual stateからaccessible suffix / busyへのmappingを検証する。
-- Manual UI check: フォルダ選択、Markdown / trusted HTML表示、relative resource、Mermaid / PlantUML、Markdown image viewer（zoom / pan / focus / layout非退行）、TabStripの40px geometry / WebView scrollbar / Pointer Events lifecycle / focus scroll、sandbox / CSP、テーマ切替、Reload。DOM pointer capture、click順、CSS実寸はjsdom未採用のため手動matrixで確認する。
+- Manual UI check: フォルダ選択、Markdown / trusted HTML表示、relative resource、Mermaid / PlantUML、Markdown image viewer（zoom / pan / focus / layout非退行）、TabStripの40px geometry / WebView scrollbar（pointer hoverとkeyboard `:focus-visible`の表示切替）/ Pointer Events lifecycle / focus scroll、sandbox / CSP、テーマ切替、Reload。DOM pointer capture、click順、CSS実寸とfocus modalityはjsdom未採用のため手動matrixで確認する。
 - Publish smoke check: `publish/` 配下の `.app` 起動確認。
 
 ## 実行方法

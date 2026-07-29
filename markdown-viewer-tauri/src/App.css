@@ -890,7 +890,7 @@ button {
 }
 
 .tab-strip:hover::-webkit-scrollbar-thumb,
-.tab-strip:focus-within::-webkit-scrollbar-thumb {
+.tab-strip:has(:focus-visible)::-webkit-scrollbar-thumb {
   background: var(--muted);
 }
 

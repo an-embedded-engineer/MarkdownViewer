@@ -60,7 +60,7 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - keyboardのfocus契約は維持し、programmatic focusはancestorをscrollしない。pointer dragだけが非active tabを直接移動でき、touch / penではdragを開始しない。
 - move buttonはprimaryで`→`、secondaryで`←`を表示し、accessible nameへdocument名とdestination paneを含める。close buttonもdocument名とsource paneを含める。
 - 同じtab IDを両groupで参照できるが、document dataだけを共有し、選択とLoading / Rendering / Error表示、Markdown DOM、HTML iframeはpaneごとに分離する。
-- TabStripはname 1行と上端indicatorでactive / Loading / Rendering / Errorを表し、accessible nameへ状態suffix、Loading / Renderingへ`aria-busy`を公開する。empty、状態遷移、水平overflowにかかわらず40px固定高とし、split時の左右preview上端を一致させる。horizontal scrollbarはoverflow時のhover / focusだけthumbを見せるが6px track寸法を維持する。activateまたはitem内controlへfocusした場合はmove / closeを含むitem外枠全体をTabStrip内へ表示する。
+- TabStripはname 1行と上端indicatorでactive / Loading / Rendering / Errorを表し、accessible nameへ状態suffix、Loading / Renderingへ`aria-busy`を公開する。empty、状態遷移、水平overflowにかかわらず40px固定高とし、split時の左右preview上端を一致させる。horizontal scrollbarはoverflow時のpointer hoverまたはkeyboard `:focus-visible`だけthumbを見せ、pointer click由来のfocusだけでは表示を維持しないが6px track寸法は維持する。activateまたはitem内controlへfocusした場合はmove / closeを含むitem外枠全体をTabStrip内へ表示する。
 - DOM IDは`tab-${paneId}-${tabId}`、`document-preview-${paneId}`、`document-pane-${paneId}`とし、single時もprimary prefixを使う。
 - tab永続化、reorder、pinは対象外。
 

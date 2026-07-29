@@ -33,7 +33,7 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 - renderingはindeterminate animation、reduced motionではstatic repeating patternを使う。
 - activate buttonへstate込み`aria-label`、loading / renderingへ`aria-busy`を付与した。
 - item refとstrip refからmanual deltaを計算し、`focus({ preventScroll: true })`と`strip.scrollBy`だけでitem全体をrevealする。
-- horizontal scrollbarは6px trackを常時確保し、hover / focus時だけthumbを表示する。
+- horizontal scrollbarは6px trackを常時確保し、pointer hoverまたはkeyboard `:focus-visible`時だけthumbを表示する。
 
 ### 3.3 pointer drag move
 
@@ -90,3 +90,9 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 - 修正コミット `ddc7e86` でEscape後releaseのclick抑止、追加pointerdown時のidentity保持、indicatorのstacking order、cancel handler重複を是正した。
 - Round 1再レビュー `ca48356` で4件すべて解決、新規指摘なし、未解決0件を確認し、Phase 3は承認された。
 - reviewerもfrontend 97 tests、production build、Rust format / check / 22 tests、`git diff --check`を再実行し、実装側の記録と一致した。
+
+## 9. Phase 4-a feedback対応
+
+2026-07-29のユーザ確認では、40px固定高、状態indicator、pane間drag move、右端tabのitem全体revealは期待どおりだった。一方、tabをpointer clickした後にpointerをpreviewへ移してもhorizontal scrollbar thumbが残ることが報告され、Phase 4-aをNGとしてPhase 3へ差し戻した。
+
+原因は`.tab-strip:focus-within`がpointer click後に残るbutton focusにも一致することだった。thumb表示条件を`.tab-strip:hover`または`.tab-strip:has(:focus-visible)`へ限定し、pointerが領域外へ出た時は隠し、keyboard focus中は表示を維持する。6px trackと40px外寸は変更しない。再確認ではpointer click後のmouse leave、keyboard focus中のmouse leave、TabStrip外へのkeyboard focus移動を確認する。
