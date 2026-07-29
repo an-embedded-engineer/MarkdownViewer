@@ -497,3 +497,170 @@ CSS / DOM event の挙動は自動 test の対象外であり、判定は Round 
 原因分析は報告された症状の傾向（速度依存、scrollbar 上での停止で消えやすい）と機序が整合し、修正は「UA の hover state に依存しない明示的な pointer 境界 state」という原因直撃の方式である。listener 常設 + ref 同期更新により enter / leave の race を構造的に排除し、ref 無効時は layout を読まないため常設による性能負荷も無い。境界判定は pure policy へ切り出して単体 test 済みで、DOM 側には rect 取得と class 適用だけが残る責務分割になっている。keyboard 表示、6px track、40px 外寸、reveal、drag、indicator への差分は無く、自動検証もレビュー担当の再実行で一致した。Round 2 の残リスク R3 は本修正で解消し、新たに R5〜R8 を再確認観点として登録した。
 
 Round 3 の実 WebView 確認で 10.6 の 5 項目が期待どおりであれば、Phase 4-a を OK として Phase 4-b へ進めてよい。R5（HTML preview iframe）で残留が再現した場合のみ、`onPointerLeave` 依存部分の補強を Phase 3 の追加修正として扱うこと。
+
+---
+
+## 11. Phase 3 follow-up / Round 4（レビュー担当、2026-07-30、対象 `55bd8b9..d0d45bf`）
+
+**対象コミット**: `8c91e10` → `d0d45bf`（7 commits）
+**最終実装**: `d0d45bf` Phase 3 reveal adjacent tab context
+**差分規模**: 15 files、+614 / −75（`App.tsx` +344、`tabStrip.ts` +63、`tabStrip.test.ts` +61、`App.css` +79、docs 8 ファイル）
+**判定**: **Phase 3 承認 (Approved)**。**新規指摘 6 件（すべて Low / non-blocking）、未解決 6 件、blocking 0 件。** Phase 4-a は報告どおり scrollbar・peek reveal とも実 WebView で期待どおりのため、**11.5 の記録反映を Phase 4-b 完了処理に含めることを条件に Phase 4-b へ進行可**。
+
+### 11.1 変更の骨子と評価
+
+| 変更 | 評価 |
+| --- | --- |
+| `.tab-strip-shell`（40px）で scroll element を包み、native scrollbar を含む shell 矩形を pointer 境界にした | 妥当。scrollbar 上の擬似 `pointerleave` と hit-test の穴を境界定義そのもので閉じている |
+| 表示条件から `:hover` / `:focus-within` / `:has(:focus-visible)` を全廃し、`shouldShowTabScrollbar(pointerInside, keyboardFocusInside)` の単一 class へ集約 | 妥当。UA 依存の判定を論理から完全に除去し、pure policy + unit test で固定した |
+| keyboard modality を window `keydown` / `pointerdown` capture と shell `onFocusCapture` / `onBlurCapture` で自前管理 | 妥当。pointer click focus で表示しないという確定仕様を UA heuristic 抜きで満たす |
+| window `pointermove` で shell 矩形から inside を**双方向**に再導出 | 妥当（enter 取りこぼしの回復に必須）。ただし性能特性が変わった（→ 11.2 の指摘 1） |
+| 一時 StatusBar 診断 → 診断除去 build → `View > Debug Information` の汎用 DebugPanel、という切り分け手順 | 妥当。診断有無を変数として分離し、「診断 ON で正常化・OFF へ戻しても継続」という観測から native scrollbar の初回 paint invalidation 不足へ到達しており、推測での重ね当てを避けている |
+| 通常経路の style flush（`isScrollbarVisible` / `tabs.length` 変化時、overflow 時だけ次 frame に layout + `::-webkit-scrollbar-thumb` computed style を 1 回読む） | 妥当かつ最小。setState を持たないため再 render を誘発せず、scroll 位置も変えない |
+| `getTabRevealDelta` への optional peek geometry と隣接 50% peek reveal | 妥当。選択 item 全体を常に優先する clamp 付きで、先頭 / 末尾 / 幅不足 / oversized が決定的 |
+
+### 11.2 重点観点の確認結果
+
+**(1) visibility state の event 順・stale closure・pane 間干渉・touch / capture / iframe / split lifecycle**
+
+- 解除・設定経路は shell `pointerenter` / `pointerleave`（矩形内 leave は無視）、window capture `pointermove`（双方向）、window `pointerdown`（keyboard state 解除）、window `keydown`（modality のみ）、shell `focus` / `blur` capture、window `blur`、unmount cleanup の 8 経路。いずれも ref と state を同一関数で更新し、`updatePointerInside` / `updateKeyboardFocusInside` に等値 guard があるため余分な setState は出ない。
+- listener effect の deps は `[debugEnabled]`。閉じ込めているのは ref、`paneId`、`debugEnabled` だけで、`tabs` や `activeTabId` に依存しないため stale closure による誤判定は発生しない。`debugEnabled` は再購読時に更新される。
+- primary / secondary は別 instance で ref / state / shell rect が独立し、共有するのは pane ID を key にした debug event だけ。相互干渉は無い。
+- touch は `pointerenter` で除外し、window move でも `pointerType === "touch"` を即 clear するため、touch pan / tap 契約は不変。
+- drag（pointer capture）中も window capture の `pointermove` は届くため source は矩形外で解除され、destination は矩形内で表示になる。Round 3 の残リスク R7（drag 中 destination に出ない）も解消した。
+- iframe 内へ pointer が入ると親へ `pointermove` が届かないのは変わらず、解除は `pointerleave` / `blur` に依存する（残リスク R5 として継続）。
+- split off で secondary が unmount すると listener と DOM class が同時に消える。`.tab-strip-shell` は `.document-pane` の grid row（`var(--tab-strip-height)`）を占め、`data-tab-drop-pane` と `role="tablist"` は内側 `.tab-strip` に残るため、drop 判定と ARIA 構造は不変。`.tab-strip` が shell を 100% 満たすため `elementFromPoint` が shell だけを返す領域も無い。
+
+**(2) Debug OFF の停止性・ON/OFF 切替・cleanup・stale entry・menu・grid row**
+
+- `queueScrollbarDebug` は先頭で `if (!debugEnabled) return;`。OFF 時は rAF 予約、`getBoundingClientRect`、`getComputedStyle`、`CustomEvent` 発行、`lastEvent` / 座標 ref の書き込みまで一切行わない。App 側も listener を張らず、`DebugPanel` を描画しない。
+- 切替時は listener effect が `[debugEnabled]` で再購読され、直前 epoch の pending rAF は cleanup の `cancelAnimationFrame` で破棄される。unmount 時も同じ経路。
+- ON 時の採取は rAF 1 本に coalesce され（`scrollbarDebugFrameRef` を毎回 cancel して再予約）、pointermove 連打でも 1 frame 1 回に収束する。
+- menu item は `role="menuitemcheckbox"` + `aria-checked` で Split View と同形。panel は `<section aria-label="Debug information">`、entry も `aria-label={title}` を持つ。
+- grid row は `.app-shell` を 6 行へ拡張し、`.debug-panel { grid-row: 5 }` / `.status-bar { grid-row: 6 }` と明示。OFF 時は行が `auto` で高さ 0 となり、既存の「chrome 要素は明示 grid-row」という detail_design の規約とも一致する。狭幅 media query で 1 列へ落とす対応もある。
+- stale entry は `tab-strip-secondary` を split off 時に除外する filter で扱っている（→ 指摘 11.2-2）。
+
+**(3) style flush の最小性・副作用**
+
+- 実行条件は「`isScrollbarVisible` か `tabs.length` が変化した次の frame」かつ「overflow 時」のみ。読み取りは `getBoundingClientRect` 1 回と `getComputedStyle(strip, "::-webkit-scrollbar-thumb")` 1 回で、書き込みも setState も無いため infinite render は構造的に起こらない。`scrollLeft` を触らないため scroll 位置も動かない。
+- pointermove ごとには実行されない。cleanup で frame を cancel するため unmount 後の実行も無い。
+- pseudo-element 名を解さない engine では `getComputedStyle` が要素自身の宣言を返すだけで例外にならず、非 WebKit 回帰は生じない。副作用が「読むこと」自体である以上 engine 依存の workaround だが、その旨は設計 §23 と `common_pitfalls.md` に記録済み。
+
+**(4) `getTabRevealDelta` の peek geometry**
+
+- 追加引数は既定値が `itemStart` / `itemEnd` のため、既存呼び出しと後方互換。`leadingPeekStart > itemStart` / `trailingPeekEnd < itemEnd` を invalid として throw し、peek が item の内側を指す誤用を型ではなく契約で塞いでいる。非 finite も全 7 引数を検査。
+- 左欠け時は `max(leadingPeekStart - visibleStart, itemEnd - visibleEnd)`、右欠け時は `min(trailingPeekEnd - visibleEnd, itemStart - visibleStart)`。前者は「item 右端が視界外へ出ない下限」、後者は「item 左端が視界外へ出ない上限」であり、**選択 item 全体の可視性が常に優先**される。clamp 後も delta は有効域内に収まる。
+- `itemWidth > visibleWidth`（oversized）は peek より先に左端優先へ分岐し、往復を起こさない。padding 過大で `visibleWidth = 0` になる極端な狭幅でも throw せず左端優先へ倒れる。先頭 / 末尾は既定値により従来挙動。
+- test は左右 peek、clamp 2 方向、peek 逆転 2 種の throw を追加し、既存の完全表示 / 端一致 / oversized / 非 finite と合わせて境界が固定されている。
+
+**(5) DOM integration（rect / midpoint / 振動）**
+
+- `revealTab` は `tabs` の index から前後 item ref を引き、`rect.left + rect.width / 2` で中点を渡す。flex 行で item は重ならないため `previousMid <= itemRect.left`、`nextMid >= itemRect.right` が常に成立し、policy の contract 違反（throw）は起きない。ref 未登録時は `?? null` で peek 無しへ縮退する。
+- 呼び出し経路は activeTabId / tabs.length 変化の rAF、`focusTab` の rAF、`.tab-item` の `onFocusCapture` の 3 つ。peek 適用後は選択 item が完全表示になるため、後続呼び出しは delta 0 を返して停止する。pointer click（focus capture → 直後に effect rAF）でも 2 回目は 0 になり、二重 scroll や frame 往復は発生しない。
+- move / close 後の focus 経路（`focus({ preventScroll: true })` + reveal）も同じ関数を通り、ancestor scroll は起きない。
+
+**(6) 既存機能の回帰**
+
+40px 外寸（shell 40px + strip 100%）、6px track、`::-webkit-scrollbar` の transparent 化、上端 indicator、reduced motion、drag session / click 抑止 identity / `elementFromPoint` / pointerup 再判定 / `moveTab` / cancel 経路、`preventScroll` + item 全体 reveal、preview / Explorer / app shell を動かさない性質のいずれにも差分は無い。`splitView.ts` / `paneRuntime.ts` も無変更。自動検証はレビュー担当でも再実行し、113 tests / build / `git diff --check` / fmt / check / 22 Rust tests がすべて記録どおりだった。
+
+**(7) 文書の一貫性**
+
+設計 §2.2 / §3.1 / §4.3 / §4.5 / §5 / §7.2 / §14 / §18 と新設 §21〜§23、実装記録 §3.2 / §9、`verification/phase4a_user_verification.md` の Round 3 / Round 4 記録、`interface_spec.md`（Debug Information 表示節を新設）、`detail_design.md`、`basic_design.md`、`README.md`、`common_pitfalls.md`、`development_workflow.md`、`docs/tests/README.md`、`meta.md` が、試行履歴（`:focus-within` → `:hover` → 明示 class → shell 境界 → 診断 → style flush → peek reveal）と最終仕様を矛盾なく記録している。設計 §22 の「診断 UI は除去する」は StatusBar 一時診断を指し、同節末尾で汎用パネルへ移行する旨を明記しているため §23 と矛盾しない。ただし test 件数と Phase 4-a 結果の記録に不足がある（→ 指摘 11.2-4 / 11.2-5）。
+
+**(8) 新規 API の責務・型・拡張性**
+
+`shouldShowTabScrollbar` は OR policy を 1 箇所に固定し、`formatTabStripDebugLines` / `TabStripDebugSnapshot` は false と unavailable を欠落させない整形規約を型と test で固定している。DebugPanel は provider ID / title / lines の汎用 entry だけを扱い、TabStrip 固有の書式を解さない。`debugPanelEventName` の CustomEvent は同一 window 内部専用で、opaque origin の trusted HTML iframe からは dispatch できないため security 面の新規面は無い。
+
+### 11.3 新規指摘
+
+#### 11.3-1 window `pointermove` が常時 shell 矩形を読むようになり、Round 3 で確認した「領域外では layout を読まない」性質が後退した
+
+**severity**: Low / **blocking**: 非 blocking / **status**: 未解決
+
+**根拠**: Round 3 の handler は `if (!pointerInsideRef.current) return;` を先頭に置き、pointer が TabStrip 外にある通常時は `getBoundingClientRect` に到達しなかった（本レビュー §10.3(4) で性能上の妥当性の根拠にした点）。Round 4 の双方向同期はこの early return を外し、**window 上のすべての `pointermove` で shell 矩形を 1 回読む**（split 時は instance 数ぶんで 2 回）。preview の Mermaid / PlantUML 描画中や drag 中など layout が dirty な瞬間には forced synchronous layout になり得る。実機確認では問題が出ておらず、rAF 採取は debug 時のみのため実害は小さい。
+
+**推奨対応**: 双方向同期自体は enter 取りこぼしの回復に必要なので維持する。負荷が問題になる場合のみ、(a) 判定を rAF 単位へ coalesce する、(b) shell 矩形を cache し `resize` / split 変更 / strip の `scroll` で invalidate する、のいずれかを検討する。Phase 4-b の必須条件とはしない。
+
+#### 11.3-2 汎用 DebugPanel に provider 固有 ID の知識が残り、停止した provider の entry が残留する
+
+**severity**: Low / **blocking**: 非 blocking / **status**: 未解決
+
+**根拠**: App の描画側で `entries.filter((entry) => splitViewState.mode === "split" || entry.id !== "tab-strip-secondary")` と、pane 固有 ID を直接判定している。汎用 entry を掲げる設計に対して表示器が provider を知っており、provider が増えるたびに条件が積み上がる。また provider が発行を止めた場合（unmount 以外の停止）、entry は最後の値のまま残り、診断中に古い値を現在値と誤読する余地がある。
+
+**推奨対応**: provider が unmount / 停止時に「削除」を意味する entry（例: `lines: []`）を発行して App 側で除去する、または entry に `scope` / 更新時刻を持たせて汎用に扱う。今回は診断専用機能であり影響は限定的なので、次に provider を追加する時点での対応で足りる。
+
+#### 11.3-3 Debug OFF 経路の `setDebugPanelEntries({})` が毎回新しい object を作り、余分な App 再 render を 1 回発生させる
+
+**severity**: Low / **blocking**: 非 blocking / **status**: 未解決
+
+**根拠**: `useEffect` の `!isDebugPanelVisible` 分岐が無条件に `setDebugPanelEntries({})` を呼ぶ。初期 mount 時は既に `{}` だが参照が変わるため bail out されず、App が 1 回追加で render する。ON→OFF 遷移でも同様。deps は `[isDebugPanelVisible]` のみで再入しないため無限ループにはならない。
+
+**推奨対応**: `setDebugPanelEntries((current) => (Object.keys(current).length === 0 ? current : {}))` のように空なら同一参照を返す。
+
+#### 11.3-4 実装記録の test 件数が現状と一致しない
+
+**severity**: Low / **blocking**: 非 blocking / **status**: 未解決
+
+**根拠**: 実装記録 §5「検証結果」表は `npm test -- --run` を「6 files / 97 tests」と記載したままで、現在の 113 tests と一致しない（§5 は round 名を持たない現行結果の表として読める）。また §9 末尾の「unit test を 108 件から 113 件へ拡張した」は、`d0d45bf` が追加した test が 4 件であることから実際には 109 → 113 であり、1 件ずれている（104 → +4 `shouldShowTabScrollbar` → +1 formatter = 109）。
+
+**推奨対応**: §5 の表を最新値（113 tests / 22 Rust tests）へ更新するか「Phase 3 初回時点」と明示し、§9 の件数を 109 → 113 へ訂正する。Phase 4-b の完了記録作成時にまとめて反映すればよい。
+
+#### 11.3-5 Phase 4-a の合格結果（scrollbar / peek reveal）が検証記録と meta に未記載
+
+**severity**: Low / **blocking**: 非 blocking（ただし **Phase 4-b の前提**） / **status**: 未解決
+
+**根拠**: 依頼では実 WebView で「起動直後 Debug OFF / ON とも scrollbar が期待どおり」「隣接 tab 50% peek が期待どおり」と確認済みだが、`verification/phase4a_user_verification.md` は style flush build の合格までで、peek reveal については「次回はこうする」という要望記録で終わっている。`meta.md` も Phase 4-a 行が「adjacent-tab peek reveal verification pending」、`verification_status: in_progress` のままである。このままでは Phase 4-b の完了処理が「Phase 4-a 合格」の根拠文書を欠く。
+
+**推奨対応**: Phase 4-b の完了処理で、検証記録へ Round 5 の合格結果（scrollbar は Debug OFF / ON / 再 OFF、peek reveal は左右見切れ・先頭 / 末尾・幅不足）を追記し、`meta.md` の Phase 4-a 行と `verification_status` を合格へ更新する。
+
+#### 11.3-6 `View > Debug Information` が TODO-2026-026 の scope / completion に未記載で、追跡項目と成果物が対応しない
+
+**severity**: Low / **blocking**: 非 blocking / **status**: 未解決
+
+**根拠**: DebugPanel は恒久 docs（`interface_spec.md` の新設節、`README.md`、`detail_design.md`、`development_workflow.md`）に利用者向け機能として記録されたが、`docs/todo/todo.md` の TODO-2026-026 は scope / non_scope / completion のいずれにも診断 UI を挙げていない。原因調査の副産物として妥当な追加ではあるが、追跡項目と成果物の traceability が切れている。
+
+**推奨対応**: TODO-2026-026 の scope へ 1 行追加するか、Phase 4-b 完了記録で「原因調査から派生した追加機能」として明示的に受理を記録する。どちらでも良いが、どこにも書かない状態は避けること。
+
+### 11.4 残リスク
+
+| # | 内容 | severity | 状態 |
+| --- | --- | --- | --- |
+| R1 | UA の `:focus-visible` heuristic 依存 | — | **解消**。表示条件から UA selector を全廃し、window `keydown` / `pointerdown` と shell focus による明示 modality へ置換 |
+| R2 | native scrollbar pseudo-element の style / paint invalidation 不足 | Low | **workaround 済み**。表示 class 変化と tab 数変化の次 frame に overflow 時だけ layout + computed style を 1 回読む。engine 依存の対処であることは設計 §23 と `common_pitfalls.md` に明記済み。将来 WebView 更新で不要になった際に外せるよう、削除条件を Phase 4-b の記録へ残すことが望ましい |
+| R4 | mouse 起点 programmatic focus で thumb を出さない（意図どおり） | Low | 継続 |
+| R5 | trusted HTML iframe 内へ pointer が入ると親へ `pointermove` が届かず、解除が `pointerleave` / `blur` 依存 | Low | 継続。Phase 4-a の追加確認で HTML 文書表示中の往復を 1 度確認しておくと良い |
+| R6 | pointer 静止中の layout 変化は次の move まで反映されない | Low（自己修復） | 継続 |
+| R7 | drag 中に destination へ thumb が出ない | — | **解消**（双方向同期により表示される） |
+| R8 | pure policy の invalid geometry throw が window listener 内で発生し得る | Low | 継続（実 rect では到達しない。peek 契約違反も DOM 実装上発生しない） |
+| R9 | 表示 modality を自前管理したため、UA の focus ring（`:focus-visible`）と thumb 表示条件が理論上ずれ得る（例: 一部の programmatic focus） | Low（新規、cosmetic） | Phase 4-a の keyboard 確認で ring と thumb の同時観察を推奨 |
+
+### 11.5 自動検証（レビュー担当による再実行）
+
+| 検証 | 実装側の記録 | レビュー担当の再実行 |
+| --- | --- | --- |
+| `npm test -- --run` | 6 files / 113 tests passed | 成功。6 files / 113 tests |
+| `npm run build` | success（既存 chunk size warning のみ） | 成功（同 warning のみ） |
+| `cargo fmt -- --check` | success | 成功 |
+| `cargo check` | success | 成功 |
+| `cargo test` | 22 passed | 成功。22 passed |
+| `git diff --check` | success | 成功 |
+
+### 11.6 集計と結論（Round 4）
+
+| 分類 | 件数 |
+| --- | --- |
+| 新規指摘 | **6**（blocking 0 / non-blocking Low 6: 11.3-1〜11.3-6） |
+| 未解決指摘 | **6**（すべて Low） |
+| 過去 round からの未解決 | 0 |
+| 残リスク | 6 件継続（R2 / R4 / R5 / R6 / R8 / R9）、R1 / R3 / R7 は解消 |
+
+**Phase 3 判定**: **承認 (Approved)**。
+
+`:focus-within` → `:hover` → 明示 class → outer shell 境界 → 実機診断 → style flush という 4 round の追跡は、各段階で仮説・観測・棄却理由を検証記録へ残しており、最終的に「表示条件を UA selector から完全に切り離す」「native scrollbar の初回 paint を明示 flush する」という原因対応へ到達している。推測での重ね当てではなく、診断 ON/OFF を変数として分離した切り分けは妥当である。実装面では pure policy への切り出し（`shouldShowTabScrollbar`、`isPointInsideTabStrip`、peek 付き `getTabRevealDelta`、`formatTabStripDebugLines`）と DOM 側の責務分離が保たれ、既存の 40px / 6px track / indicator / reveal / drag lifecycle に回帰は無い。検出した 6 件はいずれも性能特性、debug 機能の拡張性、記録の正確性に関する Low であり、機能の受け入れ判定を左右しない。
+
+**Phase 4-b 進行可否**: **進行可**。Phase 4-a は実 WebView で scrollbar（起動直後 Debug OFF / ON）と隣接 tab 50% peek reveal の双方が期待どおりと確認されており、Phase 3 側に blocking は残っていない。ただし Phase 4-b の完了処理で次を必ず実施すること。
+
+1. `verification/phase4a_user_verification.md` へ Phase 4-a 合格結果（scrollbar と peek reveal）を追記し、`meta.md` の Phase 4-a 行と `verification_status` を合格へ更新する（11.3-5）。
+2. 実装記録 §5 / §9 の test 件数を実測値へ整合させる（11.3-4）。
+3. `View > Debug Information` の受理を TODO-2026-026 または完了記録へ明示する（11.3-6）。
+4. 11.3-1 / 11.3-2 / 11.3-3 は任意対応とし、対応しない場合は既知の改善余地として完了記録へ残す。
