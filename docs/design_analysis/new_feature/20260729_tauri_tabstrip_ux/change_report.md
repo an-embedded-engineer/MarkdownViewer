@@ -94,4 +94,4 @@ Rust command、custom protocol、Tauri capability、CSP、trusted HTML security 
 
 ## Phase 4-c
 
-Phase 4-b完了時点では、`new-feature/tauri-tabstrip-ux`の`main`へのmergeはユーザー承認待ちである。
+ユーザーの最終承認後、`new-feature/tauri-tabstrip-ux`を`main`へ`--no-ff`でマージした。merge commitは`1875ebf`。

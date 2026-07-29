@@ -16,7 +16,7 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "implemented"
+status: "merged"
 design_status: "done"
 impl_status: "done"
 completion_status: "done"
@@ -43,6 +43,8 @@ related_commits:
   - "e6612b6 : Phase 3 Round 5 review resolves Round 4 findings and identifies one Low race"
   - "3e8a1c3 : Phase 3 cancel pending pointer synchronization on shell leave"
   - "ee6d95a : Phase 3 final review approves implementation with 0 unresolved findings"
+  - "39c5661 : Phase 4-b complete change report, diff artifact, archive, and history"
+  - "1875ebf : Phase 4-c merge new-feature/tauri-tabstrip-ux into main"
 source_todo_path: "docs/todo/todo_archive_2026.md#todo-2026-026-tauri-tabstrip-状態表現scroll・drag-move-ux改善"
 source_feedback: "TODO-2026-023 Phase 4-a"
 depends_on:
@@ -76,4 +78,4 @@ depends_on:
 | Phase 3 Implementation and docs review | Done and approved (`ee6d95a`); all review findings resolved, 0 unresolved |
 | Phase 4-a User verification | Done; scrollbar accepted from startup in Debug OFF / ON and adjacent-tab 50% peek reveal accepted |
 | Phase 4-b Completion | Done; change report, binary diff artifact, TODO archive, history, and known constraints recorded |
-| Phase 4-c Merge | Awaiting user approval |
+| Phase 4-c Merge | Done; merged into `main` with `--no-ff` at `1875ebf` |

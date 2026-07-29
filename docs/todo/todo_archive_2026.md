@@ -32,7 +32,7 @@
   - `TODO-2026-025`: Tauri上下・左右split方向。
   - `TODO-2026-011` / `TODO-2026-012`: Avalonia版のpane / multi-tab UX水平展開。
 - Completion:
-  - Phase 4-b成果物を作成済み。Phase 4-cの`main` mergeはユーザー承認待ち。
+  - ユーザーのPhase 4-c承認後、`main`へ`--no-ff`でマージした。merge commitは`1875ebf`。
 
 ## TODO-2026-023 Tauri pane-local tab group / pane 間移動
 

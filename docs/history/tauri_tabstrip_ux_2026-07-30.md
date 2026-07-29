@@ -56,3 +56,5 @@ pane-local tab group導入後のTabStripは固定高になったが、状態表�
   - `d0d45bf` adjacent tab context reveal
   - `41d2da8` Round 4 review findings resolution
   - `ee6d95a` final implementation review approval
+  - `39c5661` Phase 4-b completion artifacts
+  - `1875ebf` Phase 4-c merge into `main`
