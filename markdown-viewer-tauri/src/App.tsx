@@ -2999,6 +2999,8 @@ function TabStrip({
       );
       if (pointerInsideRef.current !== inside) {
         updatePointerInside(inside, inside ? "window-move-enter" : "window-move-leave", event);
+      } else {
+        queueScrollbarDebug(inside ? "window-move-inside" : "window-move-outside", event);
       }
     };
     const trackKeyboardInput = () => {

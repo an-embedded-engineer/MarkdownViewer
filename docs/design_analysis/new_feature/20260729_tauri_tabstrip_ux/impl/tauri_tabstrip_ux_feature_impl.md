@@ -109,4 +109,4 @@ Round 4実WebView確認でも症状は変わらなかった。window `pointermov
 
 診断buildではthumbが正しく非表示となった。診断処理によるevent timing / repaintへの影響を切り分けるため、`TabDebug`の採取、custom event、App state、StatusBar列だけを除去した。双方向geometry同期、scrollbar内`pointerleave`無視、keyboard modality補強、transparent scrollbar backgroundは維持する。この状態をpublishして挙動を確認してから、汎用デバッグ領域の実装へ進む。
 
-診断除去publishでthumb残留が再発したため、`View > Debug Information`で切り替える汎用`DebugPanel`を追加した。OFF時は採取処理を停止し、ON時だけTabStripがanimation frame内でgeometry / focus / computed scrollbar styleを採取してgeneric entry eventを発行する。Appはprovider ID別のentryを保持し、ErrorBannerとStatusBar間の最大180px・複数行scroll領域へ表示する。`tabStrip.ts`へ4行formatterを追加し、false / unavailable値を欠落させないunit testを追加した。
+診断除去publishでthumb残留が再発したため、`View > Debug Information`で切り替える汎用`DebugPanel`を追加した。OFF時は採取処理を停止し、ON時だけTabStripがpointermoveをanimation frame単位にまとめ、geometry / focus / computed scrollbar styleを採取してgeneric entry eventを発行する。stateが変わらない領域内外の移動も最新座標として更新する。Appはprovider ID別のentryを保持し、ErrorBannerとStatusBar間の最大180px・複数行scroll領域へ表示する。`tabStrip.ts`へ4行formatterを追加し、false / unavailable値を欠落させないunit testを追加した。
