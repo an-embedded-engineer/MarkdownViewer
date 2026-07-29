@@ -176,3 +176,16 @@ DOM lifecycle（pointer capture、click 順、focus scroll）と CSS 実寸は j
 差し戻す理由は 1.1 の 1 件のみである。Escape cancel が click 抑止 identity を先に消すため、「cancel 時は state を変更しない」という TODO の完了条件が非 active tab の drag → Escape → release という経路で崩れる。修正は `cancelTabDrag` の identity clear 条件を分けるだけで済み、設計 §8.4 の 1 文と §14 の確認手順を合わせて更新すること。2.1 は同じ箇所、2.2 は CSS 1 行、2.3 は任意の簡素化であり、同じ修正コミットへまとめることを推奨する。
 
 修正後は、`npm test -- --run` / `npm run build` / `cargo fmt -- --check` / `cargo check` / `cargo test` の再実行結果を添えて再確認レビューを依頼すること。1.1 と 2.2 の確認手順（Escape cancel 後の release で選択が変わらないこと、error / loading tab に focus しても indicator が判別できること）を §14 手動 matrix へ追加したうえで Phase 4-a へ進むこと。
+
+---
+
+## 7. 指摘対応 Round 1（実装担当、再確認待ち）
+
+| 指摘 | 対応 | 状態 |
+| --- | --- | --- |
+| 1.1 Escape後releaseでsource activate | `cancelTabDrag`へ`preserveClickSuppression`を追加し、Escapeだけidentityをmatching clickまたは次pointerdownまで維持。設計§8.4 / §14、開発手動matrix、実装記録も同期 | 対応済み・再確認待ち |
+| 2.1 drag中の追加pointerdown | session進行中はidentityをclearしないguardへ変更し、未使用`pointerId`を`SuppressedTabClick`から削除 | 対応済み・再確認待ち |
+| 2.2 focus outlineがindicatorを覆う | `.tab-item::before`を`z-index: 2`へ上げ、focus controlよりindicatorを前面化。手動matrixへerror / loading focus確認を追加 | 対応済み・再確認待ち |
+| 2.3 cancel handler重複 | pointercancel / lostpointercaptureを共通`handleTabPointerAbort`へ統合 | 対応済み・再確認待ち |
+
+未解決はレビュー担当のfollow-up判定待ち4件。新規の別issue化は不要。

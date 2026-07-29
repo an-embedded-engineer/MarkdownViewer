@@ -248,7 +248,7 @@ type TabDragSession = {
 - invalid target上のpointerupはcancelでno-op。
 - dragging中だけ`document`へcapture phaseの`keydown` listenerをeffectで登録する。Escapeでは`preventDefault`と`stopPropagation`を行ってdrag cancelを優先し、captureを安全にreleaseする。cleanupでlistenerを必ず解除し、menu等の別document-level Escape handlerを同じeventでは実行させない。
 - `pointercancel` / `lostpointercapture` / unmount / split解除はno-op cleanupする。
-- drag成立後のsource activate buttonには`onClickCapture`を置き、click抑止identityが同じsource tabなら`preventDefault` / `stopPropagation`してidentityを消費する。時間依存のscheduled clearは行わず、解除経路をmatching clickの消費、次のpointerdown、clickを生成しないEscape / pointercancel / unexpected lost captureの同期clearへ限定する。成功dropでsource itemがunmountしてclickが来ない場合も、次のpointerdownがstale identityを操作前にclearする。pointerup後のimplicit `lostpointercapture`はsessionが既にfinalize済みなのでno-opとし、identityを早めにclearしない。
+- drag成立後のsource activate buttonには`onClickCapture`を置き、click抑止identityが同じsource tabなら`preventDefault` / `stopPropagation`してidentityを消費する。時間依存のscheduled clearは行わない。Escapeは物理button release後にclickを生成し得るためidentityを維持し、matching clickが消費するか、clickが来なければsession終了後の次のprimary pointerdownがclearする。pointercancel / source unmountを伴うunexpected lost captureはclickを生成しないため同期clearする。drag中に追加pointerdownが来てもidentityをclearしない。pointerup後のimplicit `lostpointercapture`はsessionが既にfinalize済みなのでno-opとし、identityを早めにclearしない。
 - cleanupはsession ref、presentation state、`.app-shell.tab-dragging` classに対応するReact state、preview transform、live status、keydown listenerを一つの経路で解除する。click抑止identityだけは前項のevent順序に従ってclearする。lost capture後の二重cleanupはcurrent pointer ID不一致なら何もしない。
 - move後のsource item unmountは正常であり、destination focusは既存`moveTab`の`requestAnimationFrame`経路を使う。
 
@@ -379,13 +379,13 @@ Rust差分は予定しないが、Tauri application全体の回帰確認とし�
 4. overflowなしではbarが見えず、overflow時はhover / focusでthumbが現れる。対象WebViewでWebKit pseudo-elementのtrack実寸が6pxであることを確認し、tabをoverflow境界前後で増減してもitemの見た目高さとpreview上端が変わらない。
 5. 矢印キーで先頭・中間・末尾tabをactivateし、Tabでactive item内のactivate → move → closeへ移動してitem全体が見える。focus時にpreview / Explorer / shellが縦横に動かない。
 6. primary→secondary、secondary→primaryのactive / non-active tab drag。
-7. destination same ID、source最後のtab、invalid target release、Escape cancel。
+7. destination same ID、source最後のtab、invalid target release、Escape cancel。非active sourceをdrag中にEscapeし、source上でmouse buttonをreleaseしてもselectionが変わらない。
 8. drag後とmove button後のsource fallback、destination selection、focus、StatusBar / ErrorBanner一致。move後のfocusでもpreview / Explorer / shellが動かない。
 9. keyboardだけでroving navigation、move button、closeへ到達できる。
 10. narrow window、split resize、Explorer resize中のoverflow / drag feedback。
 11. Markdown / HTML / Mermaid / PlantUML表示中のmoveとruntime guard。
 12. HTML iframe上へ外れたrelease、split解除、tab close、root changeによるcancel。
-13. invalid drop cancel後と成功drag直後に別tabをclickし、最初の1回でactivateされる。source unmount有無の両方を確認する。
+13. invalid drop cancel後、Escape cancel後、成功drag直後に別tabをclickし、最初の1回でactivateされる。source unmount有無を確認し、drag中の追加pointerdownでもsource click抑止identityが失われない。
 14. mouse dragが成立し、touch / penはdragを開始せずhorizontal pan、tap activate、move buttonを維持する。
 
 ## 15. 恒久ドキュメント更新予定

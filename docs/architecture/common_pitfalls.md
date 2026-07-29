@@ -70,7 +70,7 @@
 ## 12. TabStrip scrollとpointer drag
 
 - pointer capture中の`event.target`はsourceへretargetされるため、drop paneは`elementFromPoint`で解決し、pointerup座標でも再判定する。preview layerには`pointer-events: none`を付ける。
-- drag成立後のclick抑止はsource pane / tab / pointer identityへ限定する。matching click、次のpointerdown、clickを生成しないcancelでclearし、時間依存のclearや次の無関係なclickを飲むglobal flagを使わない。
+- drag成立後のclick抑止はsource pane / tab identityへ限定する。Escape後はbutton releaseによるclickが発生し得るためidentityを維持し、matching clickまたはsession終了後の次のprimary pointerdownでclearする。pointercancel / source unmountを伴うunexpected lost captureだけを同期clearし、時間依存のclearやdrag中の追加pointerdownによるclear、次の無関係なclickを飲むglobal flagを使わない。
 - `scrollIntoView`はTabStrip外のancestorも動かし得る。programmatic focusは`preventScroll`を使い、item外枠とstrip rectから求めたdeltaだけをTabStripへ適用する。
 - app shell配下のfixed previewは`overflow: hidden`でclipされる。React root直下のsibling layerへ1つだけ置き、使用するtheme tokenをLight / Dark双方で明示供給する。
 - scrollbar APIを複数併記するとWebViewの優先規則でtrack寸法が変わり得る。本実装はWebKit pseudo-elementへ一本化し、40px外寸と6px trackを対象WebViewで確認する。

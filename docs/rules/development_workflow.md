@@ -176,7 +176,8 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - primary / secondaryのTabStripから別文書または同じ文書を独立に選択し、pointer / focusでactive paneを変えるとExplorer強調、Reload、相対Markdown link、StatusBar、ErrorBannerの対象が切り替わること
 - split左右でready / active / Loading / Rendering / Error、empty group、水平overflowを組み合わせてもTabStripが40px固定高を維持し、preview上端に段差が出ないこと。Light / Dark、reduced motion、overflow境界のtab追加・closeでもindicator、WebKit scrollbar track実寸、item高さが変動しないこと
 - overflow中に矢印activate後、Tabでmove / closeへ移動してもitem外枠全体だけがTabStrip内へrevealされ、preview / Explorer / app shellがscrollしないこと
-- split左右でactive / non-active tabをmouse dragし、反対TabStrip drop、invalid release、Escape、pointer cancel、split解除、source close、root変更、destination same IDでatomic moveまたはno-op cleanupになること。drag直後のtab clickが最初の1回でactivateし、touch / penとkeyboard move buttonが維持されること
+- split左右でactive / non-active tabをmouse dragし、反対TabStrip drop、invalid release、Escape、pointer cancel、split解除、source close、root変更、destination same IDでatomic moveまたはno-op cleanupになること。非active tabのdrag中にEscapeし、source上でmouse buttonをreleaseしてもselectionが変わらないこと。drag中の追加pointerdownでもclick抑止が失われず、drag直後のtab clickが最初の1回でactivateし、touch / penとkeyboard move buttonが維持されること
+- error / loading tabのactivate buttonへkeyboard focusを置いても、focus outlineと上端indicatorを同時に判別できること
 - Split separatorをpointer / ArrowLeft / ArrowRight / Home / Endで操作し、preferred minimum 240px、狭幅時の等幅縮退、ARIA値、focus維持、再拡大時のrequested ratio復元を確認すること
 - active / non-active tabをlocal closeし、source local順の右→左→未選択fallback、shared IDの反対group / data / runtime維持、最後の参照close時だけglobal data破棄、root変更後の両group resetが一貫し、無効tab IDが残らないこと
 - split中にpointer / keyboardで`→` / `←` move buttonへ到達し、source fallback、destination選択、destinationに同じIDがある場合のdedupe、destination focus、StatusBar / ErrorBanner routingが一致すること。image viewer表示中はorigin selectionが変わるmoveで閉じ、identity不変のdestination viewerは維持すること

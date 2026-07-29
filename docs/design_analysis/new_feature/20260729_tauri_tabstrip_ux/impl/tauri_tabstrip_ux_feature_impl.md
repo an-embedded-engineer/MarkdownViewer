@@ -41,7 +41,7 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 - mouse primary buttonだけを受理し、6 CSS pxでdragを開始する。touch / penとmove / close buttonはdrag対象外とした。
 - pointer capture中のtargetは`elementFromPoint`で解決し、pointerup座標でdestinationを再判定する。
 - dragとmove buttonは`moveTab(sourcePaneId, destinationPaneId, tabId)`へ統合し、既存`move-tab` reducerを1回だけ呼ぶ。
-- Escape、pointercancel、unexpected lost capture、split解除、source eviction、invalid releaseはmembershipを変更せずcleanupする。
+- Escapeはclick抑止identityを後続releaseまで維持し、pointercancel / unexpected lost capture / split解除 / source evictionはidentityを同期clearする。いずれもmembershipを変更せずcleanupする。drag中の追加pointerdownではidentityをclearしない。
 - drag previewはApp shell siblingのfixed layerへ置き、座標更新はDOM transform、React state更新はdrag開始 / target変更 / 終了だけに限定した。
 
 ## 4. 恒久ドキュメント反映
@@ -75,6 +75,7 @@ Phase 2再レビューの非ブロッキング3件を、実装と同じ改訂で
 - overflow時のitem全体revealとpreview / Explorer / app shellのscroll不変。
 - active / non-active mouse drag、same ID、invalid release、Escape、source unmount、split解除、root変更。
 - drag直後click、destination focus、StatusBar / ErrorBanner、Markdown / HTML / Mermaid / PlantUML runtime。
+- 非active sourceのEscape後releaseとdrag中の追加pointerdown、error / loading tab focus時のindicator / outline併存。
 - touch / penの非drag契約とkeyboard move button。
 
 ## 7. 既知制約

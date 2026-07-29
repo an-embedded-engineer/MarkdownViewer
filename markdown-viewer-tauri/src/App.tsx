@@ -167,7 +167,7 @@ type TabDragPresentation = Pick<
   "sourcePaneId" | "tabId" | "displayName" | "dropPaneId"
 >;
 
-type SuppressedTabClick = Pick<TabDragSession, "pointerId" | "sourcePaneId" | "tabId">;
+type SuppressedTabClick = Pick<TabDragSession, "sourcePaneId" | "tabId">;
 
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
@@ -856,13 +856,21 @@ function App() {
     }
   }
 
-  function cancelTabDrag(status = "Tab move cancelled.") {
+  function cancelTabDrag({
+    preserveClickSuppression = false,
+    status = "Tab move cancelled.",
+  }: {
+    preserveClickSuppression?: boolean;
+    status?: string;
+  } = {}) {
     const session = tabDragSessionRef.current;
     if (!session) {
       return;
     }
     tabDragSessionRef.current = null;
-    suppressedTabClickRef.current = null;
+    if (!preserveClickSuppression) {
+      suppressedTabClickRef.current = null;
+    }
     resetTabDragPresentation(session.phase === "dragging" ? status : "");
     if (session.captureElement.hasPointerCapture(session.pointerId)) {
       session.captureElement.releasePointerCapture(session.pointerId);
@@ -874,7 +882,9 @@ function App() {
     paneId: PaneId,
     tab: OpenDocumentTab,
   ) {
-    suppressedTabClickRef.current = null;
+    if (!tabDragSessionRef.current) {
+      suppressedTabClickRef.current = null;
+    }
     if (
       splitViewRef.current.mode !== "split" ||
       event.pointerType !== "mouse" ||
@@ -918,7 +928,6 @@ function App() {
     if (startedDragging) {
       session.phase = "dragging";
       suppressedTabClickRef.current = {
-        pointerId: session.pointerId,
         sourcePaneId: session.sourcePaneId,
         tabId: session.tabId,
       };
@@ -986,13 +995,7 @@ function App() {
     }
   }
 
-  function handleTabPointerCancel(event: React.PointerEvent<HTMLButtonElement>) {
-    if (tabDragSessionRef.current?.pointerId === event.pointerId) {
-      cancelTabDrag();
-    }
-  }
-
-  function handleTabLostPointerCapture(event: React.PointerEvent<HTMLButtonElement>) {
+  function handleTabPointerAbort(event: React.PointerEvent<HTMLButtonElement>) {
     if (tabDragSessionRef.current?.pointerId === event.pointerId) {
       cancelTabDrag();
     }
@@ -1408,7 +1411,7 @@ function App() {
       }
       event.preventDefault();
       event.stopPropagation();
-      cancelTabDrag();
+      cancelTabDrag({ preserveClickSuppression: true });
     }
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
@@ -1540,8 +1543,8 @@ function App() {
                 onTabPointerDown={handleTabPointerDown}
                 onTabPointerMove={handleTabPointerMove}
                 onTabPointerUp={handleTabPointerUp}
-                onTabPointerCancel={handleTabPointerCancel}
-                onTabLostPointerCapture={handleTabLostPointerCapture}
+                onTabPointerCancel={handleTabPointerAbort}
+                onTabLostPointerCapture={handleTabPointerAbort}
                 onTabClickCapture={suppressTabClick}
                 onPreviewStatus={updatePanePreviewPhase}
                 onPreviewElement={registerPreviewElement}
@@ -1603,8 +1606,8 @@ function App() {
                   onTabPointerDown={handleTabPointerDown}
                   onTabPointerMove={handleTabPointerMove}
                   onTabPointerUp={handleTabPointerUp}
-                  onTabPointerCancel={handleTabPointerCancel}
-                  onTabLostPointerCapture={handleTabLostPointerCapture}
+                  onTabPointerCancel={handleTabPointerAbort}
+                  onTabLostPointerCapture={handleTabPointerAbort}
                   onTabClickCapture={suppressTabClick}
                   onPreviewStatus={updatePanePreviewPhase}
                   onPreviewElement={registerPreviewElement}
