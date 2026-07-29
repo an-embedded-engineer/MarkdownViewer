@@ -64,11 +64,13 @@ import {
   type SplitViewState,
 } from "./splitView";
 import {
+  formatTabStripDebugLines,
   getTabRevealDelta,
   hasExceededTabDragThreshold,
   isPointInsideTabStrip,
   resolveTabDropPane,
   shouldShowTabScrollbar,
+  type TabStripDebugSnapshot,
 } from "./tabStrip";
 
 type FileTreeNode = {
@@ -171,10 +173,17 @@ type TabDragPresentation = Pick<
 
 type SuppressedTabClick = Pick<TabDragSession, "sourcePaneId" | "tabId">;
 
+type DebugPanelEntry = {
+  id: string;
+  title: string;
+  lines: string[];
+};
+
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 const defaultWindowSize: WindowSize = { width: 800, height: 600 };
 const windowResizeSaveDelay = 500;
+const debugPanelEventName = "markdown-viewer:debug-panel-update";
 
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
@@ -205,6 +214,8 @@ function App() {
   const [tabDragPresentation, setTabDragPresentation] =
     useState<TabDragPresentation | null>(null);
   const [tabDragStatus, setTabDragStatus] = useState("");
+  const [isDebugPanelVisible, setIsDebugPanelVisible] = useState(false);
+  const [debugPanelEntries, setDebugPanelEntries] = useState<Record<string, DebugPanelEntry>>({});
   const workspaceRef = useRef<HTMLElement>(null);
   const previewWorkspaceRef = useRef<HTMLElement>(null);
   const explorerResizeRef = useRef<ExplorerResizeState | null>(null);
@@ -277,6 +288,19 @@ function App() {
             : currentActivePaneStatus?.phase === "rendering-mermaid"
               ? "Rendering Mermaid diagrams..."
               : null;
+
+  useEffect(() => {
+    if (!isDebugPanelVisible) {
+      setDebugPanelEntries({});
+      return;
+    }
+    const handleDebugPanelUpdate = (event: Event) => {
+      const entry = (event as CustomEvent<DebugPanelEntry>).detail;
+      setDebugPanelEntries((current) => ({ ...current, [entry.id]: entry }));
+    };
+    window.addEventListener(debugPanelEventName, handleDebugPanelUpdate);
+    return () => window.removeEventListener(debugPanelEventName, handleDebugPanelUpdate);
+  }, [isDebugPanelVisible]);
 
   function handleExplorerPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || !event.isPrimary || explorerResizeRef.current) {
@@ -1454,6 +1478,7 @@ function App() {
           rootPath={rootPath}
           theme={theme}
           isSplitView={splitViewState.mode === "split"}
+          isDebugPanelVisible={isDebugPanelVisible}
           isBusy={isGlobalBusy}
           activeMenu={activeMenu}
           recentFolders={recentFolders}
@@ -1461,6 +1486,7 @@ function App() {
           onReload={reload}
           onToggleTheme={() => void saveTheme(theme === "light" ? "dark" : "light")}
           onToggleSplitView={toggleSplitView}
+          onToggleDebugPanel={() => setIsDebugPanelVisible((visible) => !visible)}
           onOpenSettings={() => void openSettings()}
           onMenuToggle={(menu) => setActiveMenu((value) => (value === menu ? null : menu))}
           onCloseMenu={() => setActiveMenu(null)}
@@ -1537,6 +1563,7 @@ function App() {
                     ? secondaryTabs.length
                     : 0
                 }
+                debugEnabled={isDebugPanelVisible}
                 onActivatePane={activatePane}
                 onActivateTab={activateTab}
                 onCloseTab={closeTab}
@@ -1600,6 +1627,7 @@ function App() {
                   theme={theme}
                   isActive={splitViewState.activePaneId === "secondary"}
                   hiddenSecondaryTabCount={0}
+                  debugEnabled={isDebugPanelVisible}
                   onActivatePane={activatePane}
                   onActivateTab={activateTab}
                   onCloseTab={closeTab}
@@ -1641,6 +1669,14 @@ function App() {
         </section>
 
         {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
+
+        {isDebugPanelVisible ? (
+          <DebugPanel
+            entries={Object.values(debugPanelEntries).filter(
+              (entry) => splitViewState.mode === "split" || entry.id !== "tab-strip-secondary",
+            )}
+          />
+        ) : null}
 
         <StatusBar
           selectedFileName={activeTab?.displayName ?? ""}
@@ -2026,6 +2062,7 @@ type MenuBarProps = {
   rootPath: string | null;
   theme: Theme;
   isSplitView: boolean;
+  isDebugPanelVisible: boolean;
   isBusy: boolean;
   activeMenu: ActiveMenu;
   recentFolders: RecentFolderEntry[];
@@ -2033,6 +2070,7 @@ type MenuBarProps = {
   onReload: () => void;
   onToggleTheme: () => void;
   onToggleSplitView: () => void;
+  onToggleDebugPanel: () => void;
   onOpenSettings: () => void;
   onMenuToggle: (menu: Exclude<ActiveMenu, null>) => void;
   onCloseMenu: () => void;
@@ -2046,6 +2084,7 @@ function MenuBar({
   rootPath,
   theme,
   isSplitView,
+  isDebugPanelVisible,
   isBusy,
   activeMenu,
   recentFolders,
@@ -2053,6 +2092,7 @@ function MenuBar({
   onReload,
   onToggleTheme,
   onToggleSplitView,
+  onToggleDebugPanel,
   onOpenSettings,
   onMenuToggle,
   onCloseMenu,
@@ -2174,6 +2214,14 @@ function MenuBar({
               onClick={onToggleSplitView}
             >
               Split View
+            </button>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={isDebugPanelVisible}
+              onClick={onToggleDebugPanel}
+            >
+              Debug Information
             </button>
           </div>
         ) : null}
@@ -2386,6 +2434,31 @@ function ErrorBanner({ message }: ErrorBannerProps) {
   );
 }
 
+type DebugPanelProps = {
+  entries: DebugPanelEntry[];
+};
+
+function DebugPanel({ entries }: DebugPanelProps) {
+  const sortedEntries = [...entries].sort((left, right) => left.id.localeCompare(right.id));
+  return (
+    <section className="debug-panel" aria-label="Debug information">
+      <div className="debug-panel-heading">Debug Information</div>
+      <div className="debug-panel-content">
+        {sortedEntries.length === 0 ? (
+          <div className="debug-panel-empty">Waiting for diagnostic events...</div>
+        ) : (
+          sortedEntries.map((entry) => (
+            <section className="debug-entry" key={entry.id} aria-label={entry.title}>
+              <div className="debug-entry-title">{entry.title}</div>
+              <pre>{entry.lines.join("\n")}</pre>
+            </section>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 type StatusBarProps = {
   selectedFileName: string;
   loadingMessage: string | null;
@@ -2429,6 +2502,7 @@ type DocumentPaneProps = {
   theme: Theme;
   isActive: boolean;
   hiddenSecondaryTabCount: number;
+  debugEnabled: boolean;
   onActivatePane: (paneId: PaneId) => void;
   onActivateTab: (paneId: PaneId, tabId: string) => void;
   onCloseTab: (paneId: PaneId, tabId: string) => string | null;
@@ -2478,6 +2552,7 @@ function DocumentPane({
   theme,
   isActive,
   hiddenSecondaryTabCount,
+  debugEnabled,
   onActivatePane,
   onActivateTab,
   onCloseTab,
@@ -2646,6 +2721,7 @@ function DocumentPane({
         activeTabId={pane.activeTabId}
         splitViewState={splitViewState}
         previewStatus={previewStatus}
+        debugEnabled={debugEnabled}
         onActivate={onActivateTab}
         onClose={onCloseTab}
         onMove={onMoveTab}
@@ -2722,6 +2798,7 @@ type TabStripProps = {
   activeTabId: string | null;
   splitViewState: SplitViewState;
   previewStatus: PanePreviewStatus | null;
+  debugEnabled: boolean;
   onActivate: (paneId: PaneId, tabId: string) => void;
   onClose: (paneId: PaneId, tabId: string) => string | null;
   onMove: (sourcePaneId: PaneId, destinationPaneId: PaneId, tabId: string) => void;
@@ -2748,6 +2825,7 @@ function TabStrip({
   activeTabId,
   splitViewState,
   previewStatus,
+  debugEnabled,
   onActivate,
   onClose,
   onMove,
@@ -2765,15 +2843,104 @@ function TabStrip({
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
   const pointerInsideRef = useRef(false);
   const lastInputWasKeyboardRef = useRef(false);
+  const keyboardFocusInsideRef = useRef(false);
+  const lastScrollbarEventRef = useRef("mount");
+  const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const scrollbarDebugFrameRef = useRef<number | null>(null);
   const [isPointerInside, setIsPointerInside] = useState(false);
   const [isKeyboardFocusInside, setIsKeyboardFocusInside] = useState(false);
 
-  function updatePointerInside(nextValue: boolean) {
-    if (pointerInsideRef.current === nextValue) {
+  function queueScrollbarDebug(
+    eventName: string,
+    pointerEvent?: { clientX: number; clientY: number },
+  ) {
+    if (!debugEnabled) {
       return;
     }
-    pointerInsideRef.current = nextValue;
-    setIsPointerInside(nextValue);
+    lastScrollbarEventRef.current = eventName;
+    if (pointerEvent) {
+      lastPointerPositionRef.current = {
+        x: pointerEvent.clientX,
+        y: pointerEvent.clientY,
+      };
+    }
+    if (scrollbarDebugFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollbarDebugFrameRef.current);
+    }
+    scrollbarDebugFrameRef.current = window.requestAnimationFrame(() => {
+      scrollbarDebugFrameRef.current = null;
+      const shell = shellRef.current;
+      const strip = stripRef.current;
+      if (!shell || !strip) {
+        return;
+      }
+      const lastPointer = lastPointerPositionRef.current;
+      const shellRect = shell.getBoundingClientRect();
+      const activeElement = document.activeElement;
+      const snapshot: TabStripDebugSnapshot = {
+        paneId,
+        pointerInside: pointerInsideRef.current,
+        keyboardFocusInside: keyboardFocusInsideRef.current,
+        shouldShow: shouldShowTabScrollbar(
+          pointerInsideRef.current,
+          keyboardFocusInsideRef.current,
+        ),
+        classVisible: shell.classList.contains("tab-scrollbar-visible"),
+        rawPointInside: lastPointer
+          ? isPointInsideTabStrip(
+              shellRect.left,
+              shellRect.right,
+              shellRect.top,
+              shellRect.bottom,
+              lastPointer.x,
+              lastPointer.y,
+            )
+          : null,
+        cssHover: shell.matches(":hover"),
+        focusWithin: activeElement instanceof Node && shell.contains(activeElement),
+        thumbBackground: window
+          .getComputedStyle(strip, "::-webkit-scrollbar-thumb")
+          .getPropertyValue("background-color"),
+        overflow: strip.scrollWidth > strip.clientWidth,
+        activeElement:
+          activeElement instanceof HTMLElement
+            ? activeElement.id || activeElement.className || activeElement.tagName
+            : "none",
+        lastEvent: lastScrollbarEventRef.current,
+        pointer: lastPointer
+          ? `${Math.round(lastPointer.x)},${Math.round(lastPointer.y)}`
+          : "-",
+      };
+      window.dispatchEvent(
+        new CustomEvent<DebugPanelEntry>(debugPanelEventName, {
+          detail: {
+            id: `tab-strip-${paneId}`,
+            title: `${paneId === "primary" ? "Primary" : "Secondary"} TabStrip`,
+            lines: formatTabStripDebugLines(snapshot),
+          },
+        }),
+      );
+    });
+  }
+
+  function updatePointerInside(
+    nextValue: boolean,
+    eventName: string,
+    pointerEvent?: { clientX: number; clientY: number },
+  ) {
+    if (pointerInsideRef.current !== nextValue) {
+      pointerInsideRef.current = nextValue;
+      setIsPointerInside(nextValue);
+    }
+    queueScrollbarDebug(eventName, pointerEvent);
+  }
+
+  function updateKeyboardFocusInside(nextValue: boolean, eventName: string) {
+    if (keyboardFocusInsideRef.current !== nextValue) {
+      keyboardFocusInsideRef.current = nextValue;
+      setIsKeyboardFocusInside(nextValue);
+    }
+    queueScrollbarDebug(eventName);
   }
 
   function revealTab(tabId: string) {
@@ -2808,8 +2975,8 @@ function TabStrip({
   }, [activeTabId, tabs.length]);
 
   useEffect(() => {
-    const clearPointerInside = () => {
-      updatePointerInside(false);
+    const clearPointerInside = (eventName: string) => {
+      updatePointerInside(false, eventName);
     };
     // Two-way geometry sync: boundary events (pointerenter/pointerleave) are
     // unreliable here because the native scrollbar swallows hit-tests and tab
@@ -2818,7 +2985,7 @@ function TabStrip({
     const trackPointerPosition = (event: PointerEvent) => {
       const shell = shellRef.current;
       if (!shell || event.pointerType === "touch") {
-        clearPointerInside();
+        clearPointerInside(event.pointerType === "touch" ? "move-touch-clear" : "move-no-shell");
         return;
       }
       const rect = shell.getBoundingClientRect();
@@ -2831,32 +2998,37 @@ function TabStrip({
         event.clientY,
       );
       if (pointerInsideRef.current !== inside) {
-        updatePointerInside(inside);
+        updatePointerInside(inside, inside ? "window-move-enter" : "window-move-leave", event);
       }
     };
     const trackKeyboardInput = () => {
       lastInputWasKeyboardRef.current = true;
+      queueScrollbarDebug("window-keydown");
     };
     const trackPointerInput = () => {
       lastInputWasKeyboardRef.current = false;
-      setIsKeyboardFocusInside(false);
+      updateKeyboardFocusInside(false, "window-pointerdown");
     };
     const clearVisibility = () => {
-      clearPointerInside();
-      setIsKeyboardFocusInside(false);
+      updatePointerInside(false, "window-blur");
+      updateKeyboardFocusInside(false, "window-blur");
     };
 
     window.addEventListener("pointermove", trackPointerPosition, true);
     window.addEventListener("pointerdown", trackPointerInput, true);
     window.addEventListener("keydown", trackKeyboardInput, true);
     window.addEventListener("blur", clearVisibility);
+    queueScrollbarDebug("listener-mounted");
     return () => {
       window.removeEventListener("pointermove", trackPointerPosition, true);
       window.removeEventListener("pointerdown", trackPointerInput, true);
       window.removeEventListener("keydown", trackKeyboardInput, true);
       window.removeEventListener("blur", clearVisibility);
+      if (scrollbarDebugFrameRef.current !== null) {
+        window.cancelAnimationFrame(scrollbarDebugFrameRef.current);
+      }
     };
-  }, []);
+  }, [debugEnabled]);
 
   function focusTab(tabId: string) {
     window.requestAnimationFrame(() => {
@@ -2891,7 +3063,7 @@ function TabStrip({
       event.preventDefault();
       // Refocusing an already-focused tab fires no focus event, so the
       // focus-capture path alone cannot mark keyboard navigation here.
-      setIsKeyboardFocusInside(true);
+      updateKeyboardFocusInside(true, `key-${event.key}`);
       activateAndFocus(tabs[nextIndex].id);
     }
   }
@@ -2919,7 +3091,7 @@ function TabStrip({
       className={`tab-strip-shell ${isScrollbarVisible ? "tab-scrollbar-visible" : ""}`}
       onPointerEnter={(event) => {
         if (event.pointerType !== "touch") {
-          updatePointerInside(true);
+          updatePointerInside(true, "shell-pointerenter", event);
         }
       }}
       onPointerLeave={(event) => {
@@ -2938,16 +3110,20 @@ function TabStrip({
             event.clientY,
           )
         ) {
+          queueScrollbarDebug("shell-pointerleave-ignored", event);
           return;
         }
-        updatePointerInside(false);
+        updatePointerInside(false, "shell-pointerleave", event);
       }}
       onFocusCapture={() => {
-        setIsKeyboardFocusInside(lastInputWasKeyboardRef.current);
+        updateKeyboardFocusInside(
+          lastInputWasKeyboardRef.current,
+          lastInputWasKeyboardRef.current ? "focus-keyboard" : "focus-pointer",
+        );
       }}
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setIsKeyboardFocusInside(false);
+          updateKeyboardFocusInside(false, "focus-left-shell");
         }
       }}
     >

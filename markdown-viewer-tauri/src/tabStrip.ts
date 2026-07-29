@@ -2,6 +2,31 @@ import { type PaneId, type ViewMode } from "./splitView";
 
 export const tabDragThreshold = 6;
 
+export type TabStripDebugSnapshot = {
+  paneId: PaneId;
+  pointerInside: boolean;
+  keyboardFocusInside: boolean;
+  shouldShow: boolean;
+  classVisible: boolean;
+  rawPointInside: boolean | null;
+  cssHover: boolean;
+  focusWithin: boolean;
+  thumbBackground: string;
+  overflow: boolean;
+  activeElement: string;
+  lastEvent: string;
+  pointer: string;
+};
+
+export function formatTabStripDebugLines(snapshot: TabStripDebugSnapshot): string[] {
+  return [
+    `state: pointerInside=${Number(snapshot.pointerInside)} keyboardFocusInside=${Number(snapshot.keyboardFocusInside)} shouldShow=${Number(snapshot.shouldShow)}`,
+    `dom: classVisible=${Number(snapshot.classVisible)} rawPointInside=${snapshot.rawPointInside === null ? "-" : Number(snapshot.rawPointInside)} cssHover=${Number(snapshot.cssHover)} focusWithin=${Number(snapshot.focusWithin)}`,
+    `scrollbar: thumbBackground=${snapshot.thumbBackground || "-"} overflow=${Number(snapshot.overflow)}`,
+    `context: activeElement=${snapshot.activeElement} lastEvent=${snapshot.lastEvent} pointer=${snapshot.pointer}`,
+  ];
+}
+
 function assertFiniteGeometry(values: number[]): void {
   if (values.some((value) => !Number.isFinite(value))) {
     throw new Error("Tab reveal geometry must be finite");

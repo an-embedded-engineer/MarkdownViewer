@@ -60,3 +60,7 @@ outer shellと明示的なpointer / keyboard stateへ一本化した後も、poi
 - `focus=0 kbd=1`の場合はkeyboard focus stateのcleanupを疑う。
 
 診断buildの実WebView確認では、それまで再現していたthumb残留が発生せず、TabStrip外で正しく非表示になった。診断コードがevent timingまたはrepaintへ影響した可能性を分離するため、まず`TabDebug`のstate収集・event発行・StatusBar表示だけを除去し、Round 4の双方向geometry同期とtransparent scrollbar backgroundは維持したbuildをpublishして再確認する。
+
+診断処理を除去したpublish版ではthumb残留が再発した。表示classへ使うReact stateはDOM出力として観測可能でありRelease buildのdead-code elimination対象ではない。一方、診断処理に含まれた`requestAnimationFrame`、layout / computed style read、custom event、App再renderはnative scrollbarのstyle再評価・repaint timingを変える。このため最適化によるstate消失ではなく、診断副作用で隠れるWebKit native scrollbarの描画依存として扱う。
+
+次のbuildでは`View > Debug Information`をOFFにすると診断処理を停止し、ONにするとErrorBannerとStatusBarの間へ複数行パネルを表示して診断を開始する。起動後OFFのまま残留を再現し、その場でONへ切り替えて、パネル値とthumbの変化を同時に確認する。

@@ -1,11 +1,39 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatTabStripDebugLines,
   getTabRevealDelta,
   hasExceededTabDragThreshold,
   isPointInsideTabStrip,
   resolveTabDropPane,
   shouldShowTabScrollbar,
 } from "./tabStrip";
+
+describe("tab strip debug formatting", () => {
+  it("formats one stable multi-line entry without hiding false or unavailable values", () => {
+    expect(
+      formatTabStripDebugLines({
+        paneId: "primary",
+        pointerInside: false,
+        keyboardFocusInside: true,
+        shouldShow: true,
+        classVisible: false,
+        rawPointInside: null,
+        cssHover: false,
+        focusWithin: true,
+        thumbBackground: "",
+        overflow: true,
+        activeElement: "tab-primary-tab-1",
+        lastEvent: "window-keydown",
+        pointer: "10,20",
+      }),
+    ).toEqual([
+      "state: pointerInside=0 keyboardFocusInside=1 shouldShow=1",
+      "dom: classVisible=0 rawPointInside=- cssHover=0 focusWithin=1",
+      "scrollbar: thumbBackground=- overflow=1",
+      "context: activeElement=tab-primary-tab-1 lastEvent=window-keydown pointer=10,20",
+    ]);
+  });
+});
 
 describe("tab reveal policy", () => {
   it.each([

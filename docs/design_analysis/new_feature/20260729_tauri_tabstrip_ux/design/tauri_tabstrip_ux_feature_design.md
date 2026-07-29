@@ -472,3 +472,9 @@ outer shellと単一表示classへ集約した後も実WebViewの症状が変わ
 診断結果から、state / classが表示を指示している場合はevent lifecycleを、state / classが非表示なのにthumbが見える場合はnative scrollbarのstyle適用またはrepaintを次の修正対象とする。診断UIは原因確定と再確認後に除去する。
 
 診断buildでは症状が再現しなかったため、診断処理の有無を変数として分離する。最初にStatusBarの診断表示と採取処理を除去したbuildを再確認し、その後の別段階で`View`メニューから切り替える汎用の複数行デバッグ領域を設計・実装する。汎用領域はErrorBannerとStatusBarの間に配置し、通常時は非表示、明示切り替え時だけlayoutへ参加させる。TabStrip診断はその最初の情報providerとして接続する。
+
+## 23. 診断OFF / ON比較用デバッグパネル
+
+診断除去buildで症状が再発したため、`View > Debug Information`のcheckable itemから診断の採取と表示を同時に切り替える。OFF時はパネルを描画せず、TabStrip providerもanimation frame、layout read、computed style read、debug eventを実行しない。ON時だけErrorBannerとStatusBarの間へ最大180pxのscroll可能な複数行領域を確保し、provider IDごとのtitleとline配列を表示する。
+
+TabStrip providerはprimary / secondary別にstate、DOM class、生の矩形判定、hover / focus、thumb computed background、overflow、active element、最終event / pointer座標を4行で発行する。表示器はprovider固有の形式を解釈せず、今後ほかの診断情報を追加できる汎用entryとして保持する。この段階では診断ONによる症状消失を修正完了とは扱わず、OFFで再現後にONへ切り替えた瞬間の値と描画変化を原因特定へ使う。

@@ -8,7 +8,7 @@ Tauri v2 + React + TypeScript + Rust による Markdown / trusted HTML document 
 
 - Tauri dialog plugin でフォルダを選択する。
 - Rust `DocumentStore` で current root、ファイルツリー構築、Markdown / HTML open、root-scoped protocolを管理する。
-- React で MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、pane-local TabStrip、Markdown / HTML preview、error strip、StatusBar を表示する。
+- React で MenuBar dropdown、Settings dialog、Recent Folders、root path strip、Explorer、pane-local TabStrip、Markdown / HTML preview、error strip、opt-in debug panel、StatusBar を表示する。
 - 同一 root 内の Markdown / HTML をglobal document dataとして保持し、`SplitViewState`のpane-local ordered tab groupをAppで解決してsingle viewまたは左右2 pane Split Viewへ描画する。local closeは最後のgroup参照だけを破棄し、tab moveはsource fallbackとdestination選択をatomicに更新する。
 - Markdown本文はpreview pane幅からresponsiveな左右gutterを引いた幅へ追従し、trusted HTML iframeはpreview pane全幅へ追従する。
 - `markdown-it`、`mermaid`、Rust 側 PlantUML command で Markdown / Mermaid / PlantUML を描画する。

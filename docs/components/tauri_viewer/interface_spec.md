@@ -23,7 +23,7 @@ MenuBar は window top に `File` / `View` を表示する React UI で、menu n
 
 - `File`: `Open Folder...`、`Recent Folders`、`Reload`、`Settings...`
 - `Recent Folders`: 最大 10 件。主表示は保存時点の folder name、補助表示は absolute path。
-- `View`: `Theme: Light` または `Theme: Dark`、`Split View` (`role="menuitemcheckbox"`)
+- `View`: `Theme: Light` または `Theme: Dark`、`Split View`、`Debug Information`（後2項目は`role="menuitemcheckbox"`）
 
 Recent Folders entry click で保存済み path が存在しない場合は error strip に表示し、entry は自動削除しない。削除は delete button による明示操作だけで行う。
 
@@ -98,6 +98,10 @@ MenuBar 直下に常時表示する。長い path は ellipsis と `title` で�
 - `Error`: 代表エラー。エラー発生時のみ表示する。
 
 StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術へ通知する。エラーがない場合は表示しない。
+
+## Debug Information表示
+
+`View > Debug Information`がONの場合、ErrorBannerとStatusBarの間に最大180pxの複数行デバッグ領域を表示する。OFFの場合は領域と診断採取処理を無効にする。現在はprimary / secondary TabStripのpointer / keyboard表示state、DOM class、geometry、focus、scrollbar computed style、直近eventを表示する。
 
 ## StatusBar 表示
 
