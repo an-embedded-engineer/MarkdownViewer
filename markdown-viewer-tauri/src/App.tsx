@@ -2865,6 +2865,14 @@ function TabStrip({
   const [isPointerInside, setIsPointerInside] = useState(false);
   const [isKeyboardFocusInside, setIsKeyboardFocusInside] = useState(false);
 
+  function cancelPointerSync() {
+    if (pointerSyncFrameRef.current !== null) {
+      window.cancelAnimationFrame(pointerSyncFrameRef.current);
+      pointerSyncFrameRef.current = null;
+    }
+    pendingPointerRef.current = null;
+  }
+
   function queueScrollbarDebug(
     eventName: string,
     pointerEvent?: { clientX: number; clientY: number },
@@ -3007,13 +3015,6 @@ function TabStrip({
   useEffect(() => {
     const clearPointerInside = (eventName: string) => {
       updatePointerInside(false, eventName);
-    };
-    const cancelPointerSync = () => {
-      if (pointerSyncFrameRef.current !== null) {
-        window.cancelAnimationFrame(pointerSyncFrameRef.current);
-        pointerSyncFrameRef.current = null;
-      }
-      pendingPointerRef.current = null;
     };
     // Two-way geometry sync: boundary events (pointerenter/pointerleave) are
     // unreliable here because the native scrollbar swallows hit-tests and tab
@@ -3205,6 +3206,7 @@ function TabStrip({
           queueScrollbarDebug("shell-pointerleave-ignored", event);
           return;
         }
+        cancelPointerSync();
         updatePointerInside(false, "shell-pointerleave", event);
       }}
       onFocusCapture={() => {
