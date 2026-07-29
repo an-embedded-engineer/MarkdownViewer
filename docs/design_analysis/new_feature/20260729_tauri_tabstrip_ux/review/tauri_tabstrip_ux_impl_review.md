@@ -743,3 +743,69 @@ Round 3 の実 WebView 確認で 10.6 の 5 項目が期待どおりであれば
 2. 修正しない場合は、12.2-1 を R5 の一部として完了記録へ明示的に受理記録し、既知の Low 制約として残す。
 
 いずれの選択でも Phase 4-b の完了処理と merge を妨げるものではない。R2 の workaround 削除条件、R5 / R6 / R9 の Low 制約も完了記録へ引き継ぐこと。
+
+---
+
+## 13. Phase 3 follow-up / Round 6（レビュー担当、2026-07-30、対象 `e6612b6..3e8a1c3`）
+
+**修正コミット**: `3e8a1c3` Phase 3 cancel pending TabStrip pointer sync on leave（4 files、`App.tsx` の helper 巻き上げ + leave 経路 1 行、設計 / 実装記録 / `detail_design.md` の契約同期）
+**判定**: **Phase 3 承認 (Approved)。Phase 4-b 進行可。未解決 0 件、新規指摘 0 件 — 本レビューをもって Phase 3 実装レビューを完了とする。**
+
+### 13.1 Round 5 指摘 12.2-1 の解決確認
+
+| 確認項目 | 実装の状態 | 判定 |
+| --- | --- | --- |
+| `cancelPointerSync` の component scope 化 | `TabStrip` 直下の function 宣言（`App.tsx:2868`）へ移動。参照するのは `pointerSyncFrameRef` / `pendingPointerRef` の 2 つの ref だけで、props / state を閉じ込めない。listener effect（deps `[debugEnabled]`）が旧 render の関数を掴んでも ref は同一 identity のため stale closure の実害は無い。project は eslint を導入していないため lint 上の副作用も無い | **解決済み** |
+| shell 外 `pointerleave` での破棄 → clear の順序 | `cancelPointerSync()` を呼んだ**後**に `updatePointerInside(false, "shell-pointerleave", event)`（`App.tsx:3209-3210`）。12.2-1 で示した「leave で class を外した後に予約済み frame が古い領域内座標で `inside=true` を再設定する」経路は、frame と `pendingPointerRef` の双方が破棄されるため成立しない | **解決済み** |
+| 矩形内 `pointerleave`（native scrollbar 上）の扱い | `isPointInsideTabStrip` が true の分岐は `queueScrollbarDebug("shell-pointerleave-ignored", event)` の後に `return` し、**cancel へ到達しない**（`App.tsx:3205-3208`）。scrollbar 上での擬似 leave では pending frame が保持され、双方向 geometry 同期がそのまま継続する | **解決済み**（要求どおりの非対称処理） |
+| touch / window blur / effect cleanup | 同一 helper を呼ぶ 3 箇所（touch 分岐 `3027`、`clearVisibility` `3076`、cleanup `3091`）は呼び出し先が component scope の関数へ差し替わっただけで、破棄対象と順序は不変。cleanup は debug frame の cancel と `null` 代入、Debug ON 時の provider remove 発行も従来どおり | **解決済み** |
+| docs 同期 | 設計 §4.5 へ「outer shell 外への `pointerleave` では保留中 frame と座標を破棄してから clear し、iframe へ移動した後に古い領域内座標が再適用されないようにする」、実装記録 §9 へ同旨、`detail_design.md` の TabStrip 段落へ「shell leave では保留中の pointer 同期 frame と座標を破棄してから clear」を追記。恒久 docs・設計・実装記録が実装と一致する | **解決済み** |
+
+**Round 5 未解決 1 件は解消。新規指摘なし。**
+
+### 13.2 回帰確認
+
+| 観点 | 確認内容 | 結果 |
+| --- | --- | --- |
+| animation frame 単位の coalesce | `trackPointerPosition` の pending 保存 → frame 未予約時のみ rAF 予約という構造は無変更。1 frame・pane あたり shell 矩形 read 1 回の上限を維持 | 非退行 |
+| 双方向 enter / leave 回復 | rAF 内で `pointerInsideRef` と比較して両方向に更新する経路は不変。leave で cancel した後も、再入時は `onPointerEnter` が ref を同期更新し、以降の move が再び frame を予約する（同期が恒久停止する経路は無い） | 非退行 |
+| Debug ON / OFF | `queueScrollbarDebug` は先頭 `if (!debugEnabled) return;` のまま。ignored leave は `shell-pointerleave-ignored`、外側 leave は `updatePointerInside` 経由で `shell-pointerleave` を発行し、event 名の観測性も維持。provider の update / remove 契約と OFF 時の停止性に差分なし | 非退行 |
+| drag capture | pointer capture 中は boundary event が抑止されるため leave 経路自体が走らず、走った場合も次の window move が矩形から再導出する。App 側の drag session / `elementFromPoint` / pointerup 再判定 / `moveTab` に差分なし | 非退行 |
+| 40px 固定高・6px track・indicator・tab reveal | `App.css` と `tabStrip.ts` に差分が無く（今回の差分は `App.tsx` と docs のみ）、geometry・policy・style flush はいずれも不変。113 tests の内訳も Round 4 から不変 | 非退行 |
+
+### 13.3 自動検証（レビュー担当による再実行）
+
+| 検証 | 実装側の記録 | レビュー担当の再実行 |
+| --- | --- | --- |
+| `npm test -- --run` | 6 files / 113 tests passed | 成功。6 files / 113 tests |
+| `npm run build` | success（既存 chunk size warning のみ） | 成功（同 warning のみ） |
+| `cargo fmt -- --check` | success | 成功 |
+| `cargo check` | success | 成功 |
+| `cargo test` | 22 passed | 成功。22 passed |
+| `git diff --check` | success | 成功 |
+
+### 13.4 残リスク（Phase 4-b の完了記録へ引き継ぐ）
+
+| # | 内容 | severity | 状態 |
+| --- | --- | --- | --- |
+| R2 | WebKit native scrollbar の初回 style / paint invalidation に対する明示 flush（engine 依存 workaround） | Low | 継続。将来の WebView 更新で不要化した際の削除条件を完了記録へ残すことを推奨 |
+| R4 | mouse 起点の programmatic focus では thumb を出さない（意図どおり） | Low | 継続 |
+| R5 | trusted HTML iframe が親の `pointermove` を吸収するため、解除は `pointerleave` / `blur` に依存する | Low | **縮小**。「古い座標の再適用」経路は 12.2-1 の修正で消え、leave 時は frame 破棄 + 即時 clear が確定した。残るのは leave 自体が届かない仮定のみ |
+| R6 | pointer 静止中の layout 変化は次の move まで反映されない | Low（自己修復） | 継続 |
+| R8 | pure policy の invalid geometry throw（実 rect では到達しない） | Low | 継続 |
+| R9 | UA の focus ring と自前 keyboard modality の理論上の差 | Low（cosmetic） | 継続 |
+
+### 13.5 集計と結論（Round 6）
+
+| 分類 | 件数 |
+| --- | --- |
+| Round 5 指摘（12.2-1） | **解決済み** |
+| Round 6 新規指摘 | **0** |
+| **未解決指摘** | **0** |
+| 残リスク | 6 件（R2 / R4 / R5 / R6 / R8 / R9、いずれも Low、完了記録へ引き継ぎ） |
+
+**Phase 3 判定**: **承認 (Approved)。実装レビュー完了。**
+
+Round 4 の 6 件、Round 5 の 1 件を含め、Phase 3 実装レビューで検出した指摘はすべて解決した。今回の修正は helper の巻き上げと leave 経路 1 行という最小差分で、要求どおり「shell 外 leave では破棄してから clear」「矩形内 leave（native scrollbar）では破棄しない」という非対称性を正しく実装しており、coalesce・双方向同期・Debug 契約・drag lifecycle・CSS geometry のいずれにも回帰が無い。
+
+**Phase 4-b 進行可否**: **進行可**。Phase 4-a は Round 5 で合格が記録済み（`meta.md` の `verification_status: done`）、Phase 3 の未解決は 0 件である。Phase 4-b の完了処理では、13.4 の残リスク 6 件（特に R2 の workaround 削除条件と R5 の HTML iframe 前提）を既知の Low 制約として完了記録へ引き継ぐこと。
