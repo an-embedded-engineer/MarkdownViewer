@@ -247,3 +247,113 @@ DOM lifecycle（pointer capture、click 順、focus scroll）と CSS 実寸は j
 blocking だった 1.1 は、`cancelTabDrag` の identity clear を経路ごとに分けるという最小限の修正で閉じており、Escape・pointercancel・unexpected lost capture・成功 drop・invalid drop・追加 pointerdown の 6 経路すべてで「cancel 時は state を変更しない」と「無関係な click を飲まない」が同時に成立することを event 順で確認した。2.1〜2.3 も推奨どおりの形で反映され、cancel semantics の変更や新たな重複経路は生じていない。設計・実装記録・meta・恒久docs・手動確認手順の同期も取れている。
 
 Phase 4-a では、実装記録 §6 と `development_workflow.md` に列挙された実 WebView 依存項目（WebKit scrollbar track 実寸 6px と 40px 外寸、Light / Dark / reduced motion の indicator 視認性、item 全体 reveal と ancestor 非 scroll、drag 各経路と Escape 後 release、drag 中の追加 pointerdown、error / loading tab focus 時の indicator 併存、touch / pen の非 drag 契約、keyboard 導線）を確認すること。
+
+---
+
+## 9. Phase 4-a feedback / Round 2 再確認（レビュー担当、2026-07-29、対象 `76daecf`）
+
+**対象**: `76daecf` Phase 3 fix TabStrip scrollbar focus modality（9 files: `App.css` 1 行、設計 6 箇所、実装記録、meta、Phase 4-a 検証記録 新規、恒久docs 4 ファイル）
+**契機**: 実 Tauri WebView での Phase 4-a 動作確認 NG（overflow 時の scrollbar thumb が pointer click 後に残る）
+**判定**: **Phase 3 承認を維持。Phase 4-a 再実施へ進行可。新規指摘 0 件、未解決 0 件（実 WebView での確定は再実施時の確認事項として残る）。**
+
+### 9.1 Phase 4-a feedback の扱い
+
+| # | 内容 | severity | blocking | 状態 |
+| --- | --- | --- | --- | --- |
+| 4a-1 | overflow した TabStrip で tab を pointer click した後、pointer を preview へ移しても horizontal scrollbar thumb が表示され続ける | Low（表示条件の誤りであり、geometry / 操作 / state には影響しない） | **Phase 4-a に対して blocking**（受け入れ条件「hover / focus 時だけ視認可能」を満たさないため）。Phase 3 の他項目には非 blocking | **実装上は解決済み**（`76daecf`）。実 WebView での確定は Phase 4-a 再実施 |
+
+Phase 4-a で期待どおりと確認された 4 項目（40px 固定高、ready / loading / error indicator、左右 pane 間 drag and drop、右端 tab の close button まで含む item 全体 reveal）は、Phase 2 設計 §6 / §7.1 / §7.2 / §8 と Phase 3 実装レビュー §4 の確認内容と一致しており、今回の修正でも触れられていない。
+
+### 9.2 原因分析の妥当性
+
+**結論: 妥当。focus lifecycle と一致する。**
+
+- `.tab-strip:focus-within` は「自身または子孫に focus がある」で一致する。`.tab-strip` の focusable な子孫は `.tab-activate` / `.tab-move` / `.tab-close` の 3 button だけであり（`App.tsx` TabStrip）、`.document-pane`（`tabIndex={-1}`）は TabStrip の外にあるため `:focus-within` の対象にならない。したがって thumb が残る条件は「TabStrip 内 button が focus を保持していること」に限られる。
+- tab の pointer click 経路は `onClick` → `onActivate` だけで、`focusTab` のような programmatic focus を呼ばない（`focusTab` は roving navigation と close 後 fallback 専用）。つまり残っていた focus は button の native click focus であり、pointer が離れても解除されない。ユーザ報告の「scrollbar を操作して focus 状態が変わると非表示になった」という観察とも一致する。
+- 対抗仮説である「pointer capture により `:hover` が保持され続けた」は成立しない。`handleTabPointerDown` の capture は pointerup で暗黙 / 明示に解放され、以後 hover は通常判定へ戻る。focus 状態の変化で消えたという事実も hover 説と矛盾する。
+- したがって「pointer click 後に残る button focus に `:focus-within` が一致し続ける」という分析は、実装の focus 経路と報告事象の双方に整合する。
+
+### 9.3 修正の妥当性
+
+**結論: 妥当。要求文言への適合はむしろ改善している。**
+
+- 変更は `.tab-strip:focus-within::-webkit-scrollbar-thumb` → `.tab-strip:has(:focus-visible)::-webkit-scrollbar-thumb` の 1 行のみ（`App.css:893`）。`:hover` 側の rule、`::-webkit-scrollbar { height: 6px }`、track / thumb の transparent 既定、`border-radius` は不変。
+- **pointer click 後に pointer が TabStrip 外へ出た場合**: `:hover` は外れ、click focus は UA の focus-visible heuristic 上 button では `:focus-visible` を成立させないため、`:has(:focus-visible)` も外れて thumb は隠れる。報告事象の解消経路として正しい。
+- **keyboard focus 時**: ArrowLeft / ArrowRight / Home / End の roving navigation は `activateAndFocus` → `focus({ preventScroll: true })` で、直前の入力が keyboard であるため focus-visible が成立する。Tab 移動も同様。pointer が領域外にあっても `:has(:focus-visible)` で thumb が維持される。focus が TabStrip 外へ移れば `:has()` の対象が消えて隠れる。
+- **要求との整合**: `docs/todo/todo.md` TODO-2026-026 scope は「horizontal scrollbar は pointer hover または keyboard focus 時だけ視認可能にし」と明記している。`:focus-within` は pointer click 由来の focus も拾うため、この文言に対しては元実装が過剰だった。今回の条件はむしろ scope 文言に近づいており、退行ではなく適合である。
+- **代替案との比較**: React 側で focus modality を state 管理する案（`:focus-visible` 相当を JS で再実装）や、click 後に `blur()` する案は、いずれも focus 契約（roving tabindex、item 全体 reveal、`preventScroll`）へ副作用を持ち込む。CSS 選択子 1 行で閉じる今回の方法が最小である。
+
+### 9.4 対象 WebView 互換性
+
+**結論: blocking risk なし。既存 CSS が要求する下限を上げていない。**
+
+- `:has()` は Safari 15.4+ / Chromium 105+ 系、`:focus-visible` は Safari 15.4+ / Chromium 86+ 系で利用できる。本 project の対象は WKWebView（macOS）、WebView2（Chromium）、WebKitGTK であり、いずれも該当世代以降を前提としている。
+- 本 CSS は既に `color-mix(in srgb, ...)` を 5 箇所（`App.css:533`, `571`, `1034`, `1276`, `1283`）で使用しており、これは `:has()` より新しい機能である。したがって `:has()` の追加で実行環境の下限は上がらない。`:focus-visible` も既に 11 箇所で使用済みで、新規依存ではない。
+- `::-webkit-scrollbar-thumb` を originating element の擬似クラスで切り替える形（`:hover::-webkit-scrollbar-thumb`）は、Phase 4-a で実際に動作した実績がある（`:focus-within` 版が適用・非適用とも観測された）。`:has()` を originating element 側に置く今回の形も同じ構造であり、構文的な無効化要因は無い。ただし `:has()` の動的 invalidation が scrollbar pseudo-element の再描画へ確実に伝播するかは engine 実装依存であり、**実 WebView での確認は Phase 4-a 再実施の必須項目**とする（9.6 の残リスク R2）。
+
+### 9.5 非退行の確認
+
+| 観点 | 確認内容 | 結果 |
+| --- | --- | --- |
+| 6px track | `::-webkit-scrollbar { height: 6px }` と track transparent の rule は無変更。thumb の `background` 切替条件だけを変更 | 非退行 |
+| 40px 外寸 | `--tab-strip-height: 40px`、`overflow-x: scroll`、`.document-pane` grid row いずれも無変更。今回の差分に layout property は 1 つも含まれない | 非退行 |
+| overflow 挙動 | `overflow-x: scroll` 維持のため、overflow 有無で内寸は変わらない。thumb は overflow 時のみ生成される既存挙動のまま | 非退行 |
+| focus reveal | reveal は JS（`revealTab` + `getTabRevealDelta` + `scrollBy`）であり CSS 選択子とは独立。`focus({ preventScroll: true })` も無変更 | 非退行 |
+| drag lifecycle | `App.tsx` に差分なし。session、click 抑止 identity、`elementFromPoint`、pointerup 再判定、`moveTab` は Round 1 承認時のまま | 非退行 |
+| indicator / theme | `.tab-item::before`（`z-index: 2`）、`--tab-indicator-*`、reduced motion rule は無変更 | 非退行 |
+| 自動検証 | レビュー担当でも再実行し実装側記録と一致（下表） | 一致 |
+
+| 検証 | 実装側の記録 | レビュー担当の再実行 |
+| --- | --- | --- |
+| `npm test -- --run` | 6 files / 97 tests passed | 成功。6 files / 97 tests |
+| `npm run build` | success（既存 chunk size warning のみ） | 成功（同 warning のみ） |
+| `cargo fmt -- --check` | success | 成功 |
+| `cargo check` | success | 成功 |
+| `cargo test` | 22 tests passed | 成功。22 passed |
+| `git diff --check` | success | 成功 |
+
+なお CSS のみの差分であるため、自動 test 群は本件の合否判定材料にならない。判定は Phase 4-a 再実施の実 WebView 確認に依存する（この境界は `docs/tests/README.md` と実装記録 §6 に記載済み）。
+
+### 9.6 残リスク（いずれも Phase 4-a 再実施で確認、新規指摘としては起票しない）
+
+| # | 残リスク | severity | 確認手段 |
+| --- | --- | --- | --- |
+| R1 | `:focus-visible` の成立判定は UA heuristic であり、macOS の Full Keyboard Access 有効時などに click focus でも成立する可能性がある。その場合 pointer click 後に thumb が残る事象が再現しうる | Low | 再確認条件 1（pointer click → preview へ pointer 移動 → 非表示） |
+| R2 | `:has()` の状態変化が `::-webkit-scrollbar-thumb` の再描画へ伝播するかは engine 実装依存 | Low | 再確認条件 1 / 2（表示・非表示が pointer と keyboard の双方で切り替わること） |
+| R3 | drag 中は pointer capture により source TabStrip の `:hover` が保持されるため、pointer が destination 上にあっても source 側 thumb が見えうる。修正前後で挙動は同じで、geometry / 操作へ影響しない | Low（cosmetic、既存挙動） | 再確認条件 3 の drag move 非退行確認に含まれる |
+| R4 | drag move 完了後の destination focus は programmatic focus であり、mouse 起点では focus-visible が成立しない想定。thumb は出ないが、これは pointer 操作として期待どおり。keyboard 起点の move button では成立する | Low（設計意図どおり） | 再確認条件 2 と手動 matrix 8 |
+
+### 9.7 文書の一貫性
+
+NG 内容・原因・修正・再確認条件が 6 文書で一貫していることを確認した。
+
+| 文書 | 記載 | 判定 |
+| --- | --- | --- |
+| 設計 §2.2-4 / §3.1 / §4.5 / §5（Before/After）/ §14-4 / §18 / 新設 §19 | 表示条件を「pointer hover または keyboard `:focus-visible`」へ統一し、`:focus-within` を使わない理由、NG 事実、原因、修正方針、geometry / reveal / drag を変えない旨を明記。traceability 表の該当行も §19 参照を追加 | 一貫 |
+| 実装記録 §3.2 / 新設 §9 | 実装上の表示条件と、NG 内容・原因・修正・再確認 3 観点を記載 | 一貫 |
+| `verification/phase4a_user_verification.md`（新規） | OK 4 項目、NG 事象、focus 状態変化で消えた観察、差し戻し判断、再確認条件 3 項目を記録 | 一貫 |
+| `docs/components/tauri_viewer/interface_spec.md` / `detail_design.md` | 恒久仕様として「pointer hover または keyboard `:focus-visible` の時だけ thumb を見せ、pointer click 由来の focus だけでは維持しない」「6px track は維持」を記載 | 一貫 |
+| `docs/architecture/common_pitfalls.md` §12 | `:focus-within` が pointer click 後の focus を拾う落とし穴と、`:hover` + `:has(:focus-visible)` での区別を追加 | 一貫 |
+| `docs/rules/development_workflow.md` / `docs/tests/README.md` | 手動確認へ pointer hover・click 後 mouse leave・keyboard focus 中の mouse leave・TabStrip 外への focus 移動を追加し、focus modality が手動 matrix 対象であることを明記 | 一貫 |
+| `meta.md` | `status: in_progress`、`impl_status: in_review`、`verification_status: in_progress`、Phase 3 を「Reopened after Phase 4-a scrollbar focus-modality feedback」、Phase 4-a を「NG；4 項目は受理、再確認待ち」へ更新 | 一貫 |
+
+実装コードに `:focus-within` の残存は無く（`markdown-viewer-tauri/src` を全文検索）、docs 側の言及はいずれも「使わない理由」の説明として意図的に残されている。
+
+### 9.8 集計と結論（Round 2）
+
+| 分類 | 件数 |
+| --- | --- |
+| Phase 4-a feedback 由来（4a-1） | 1（実装上 解決済み、実 WebView 確定は再実施時） |
+| Round 2 新規指摘 | **0** |
+| 未解決指摘 | **0** |
+| 残リスク（再確認で潰す観察事項） | 4（R1〜R4、いずれも Low） |
+
+**結論**: **Phase 3 の承認を維持し、Phase 4-a 再実施へ進行可。**
+
+原因分析は実装の focus 経路と報告事象の双方に整合し、修正は CSS 選択子 1 行で TODO scope の文言（pointer hover または keyboard focus）へより正確に適合する。geometry、reveal、drag lifecycle、indicator、theme への差分は無く、自動検証もレビュー担当の再実行で一致した。互換性面でも既存 `color-mix` より下限が低い機能しか使っておらず、blocking risk は無い。
+
+Phase 4-a 再実施では、`verification/phase4a_user_verification.md` の再確認条件 3 項目に加えて、R1〜R4 を次の形で確認すること。
+
+1. overflow した TabStrip へ pointer を置くと thumb が出る。tab を pointer click し、focus を残したまま preview へ pointer を移すと thumb が隠れる（R1 / R2）。
+2. keyboard で tab control へ focus した状態では pointer が領域外でも thumb が見え、focus を TabStrip 外へ移すと隠れる（R2）。keyboard で move button から移動した直後の destination でも同様に確認する（R4）。
+3. 6px track、40px 固定高、indicator、item 全体 reveal、drag move と cancel 経路に退行が無い。drag 中に source 側 thumb が見えても許容とする（R3）。
