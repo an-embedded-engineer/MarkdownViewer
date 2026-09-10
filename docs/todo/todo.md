@@ -1,5 +1,50 @@
 # TODO
 
+## TODO-2026-029 Tauri複数ウィンドウとディレクトリ名表示
+
+- status: Phase 0 要求整理済み・ユーザ承認待ち
+- workflow: new-feature
+- summary: macOSでアプリ操作から複数ウィンドウを開き、macOS / Windowsのウィンドウ切替時にRootディレクトリを識別できるようにする。
+- target_users: 複数のプロジェクトや仕様書ディレクトリを並行して閲覧するTauri版利用者。
+- use_cases:
+  - macOSで新規ウィンドウを開き、それぞれ別のディレクトリを選択して並行閲覧する。
+  - Windowsのタイトルバー・タスクバーのサムネイル見出し、macOSのWindowメニュー・Dockの開いているウィンドウ一覧からディレクトリを識別して切り替える。
+- feasibility:
+  - 実現可能。lockfileのTauri 2.11.2およびローカル依存ソースでWebviewWindowBuilder、set_title、set_as_windows_menu_for_nsappを確認した。OS表示の最終判定にはpackaged appの実機検証が必要。
+  - 現行DocumentStore.current_rootはアプリ全体で1つ。単純にwindowを増やすと別windowのRootが上書きされるため、commandの呼出元windowとprotocolのwebview_labelを使ったwindow別管理が必須。
+  - mvhtml handlerはmain以外を拒否し、capabilityもmain限定。新規Viewer windowを明示的に認可し、HTML preview originのIPC禁止とroot boundaryを維持する必要がある。
+  - ReactのRoot / tabs / split / runtimeは各App instanceで分離可能。設定とRecent Foldersは共有storeのため、保存競合・他windowでの更新反映方針を設計する。
+- proposed_scope:
+  - アプリ内File > New WindowとmacOS native menu / Cmd+Shift+Nから空のViewer windowを生成し、Open Folder / Recent FoldersでRootを選択する。
+  - Windowsにも同じアプリ内新規window導線を提供し、既存のショートカット起動を維持する。
+  - タイトル案は「ディレクトリ名 — MarkdownViewer」。未選択は「MarkdownViewer」。同名directoryは親path等で区別できる表記にする。
+  - macOSのnative WindowメニューとDockの開いているwindow一覧でRoot名を表示し、選択で対応windowへ移動する。
+  - window close時のstate破棄と、全windowを閉じた後のmacOS Dock再起動 / 再表示を扱う。
+- non_scope:
+  - Avalonia版への適用、window間のtab移動、全windowのsession復元。
+  - 添付VS CodeのDock上部にある最近使ったfolder一覧やfolder iconの完全再現。
+  - Dock独自のNew Window項目は初期必須範囲に含めない。メニューバーの新規作成と異なりAppKit連携の追加調査が必要であり、必要性をPhase 2で整理する。
+- completion:
+  - macOSでCLIを使わず2つ以上のwindowを開き、異なるRootを同時閲覧できる。
+  - 一方のRoot変更・Reload・closeが他方のtree / tabs / Markdown / HTML resourceへ影響せず、HTMLは呼出元windowのRoot外を参照できない。
+  - Root選択成功時にタイトルが更新され、キャンセル・失敗時には以前のRootとタイトルを保持する。
+  - 同名directory、日本語・空白入りpath、Root未選択でもwindowを識別できる。
+  - Windowsのタイトルバー・サムネイル見出し、macOSのWindowメニュー・Dock一覧にRoot名が表示され、対象windowを選択できることを実機確認する。OSの省略表示やサムネイル設定による差異は記録する。
+  - 追加windowでもdialog、外部link、settings、Recent Folders、size復元が機能し、設定更新で他fieldを失わない。
+  - 最後のwindowを閉じた後もDockから再びViewerを開ける。
+  - npm test -- --run、npm run build、cargo check、cargo testが成功し、複数windowのRoot分離と既存previewの回帰を検証する。
+- success_metrics: macOSで2 directory以上を同時に開けること、Root欄を確認せずOSのwindow切替UIで対象を選択できること、window間のRoot混線が0件であること。
+- affected_components: src-tauri/src/lib.rs（window生成・lifecycle・DocumentStore・protocol・config）、src/App.tsx（File操作・タイトル・設定反映）、tauri.conf.json、capabilities/default.json、frontend / Rust tests、Tauri README / component / architecture / development workflow docs。
+- integration_points: 既存Open Folder / Recent Folders、Root読込成功処理、React App初期化、Rust setup、native menu、window close / reopen、HTML protocol。
+- phase_2_decisions: native menuとReact File menuの操作共有、同名Rootの表示規則、共有設定の更新反映とwindow size保存方針、macOS全window close後のlifecycle、Dock標準一覧の実機挙動と追加AppKit対応の要否。
+- evidence:
+  - [Tauri WebviewWindowBuilder](https://docs.rs/tauri/2.11.2/tauri/webview/struct.WebviewWindowBuilder.html)
+  - [Tauri WebviewWindow / set_title](https://docs.rs/tauri/2.11.2/tauri/webview/struct.WebviewWindow.html#method.set_title)
+  - [Tauri Submenu / native Window menu](https://docs.rs/tauri/2.11.2/tauri/menu/struct.Submenu.html#method.set_as_windows_menu_for_nsapp)
+  - [Tauri UriSchemeContext](https://docs.rs/tauri/2.11.2/tauri/struct.UriSchemeContext.html)
+  - [Apple Dock menus](https://developer.apple.com/design/human-interface-guidelines/dock-menus)
+  - [Apple applicationDockMenu](https://developer.apple.com/documentation/AppKit/NSApplicationDelegate/applicationDockMenu(_:))
+
 ## TODO-2026-025 Tauri上下・左右split方向対応
 
 - status: open
