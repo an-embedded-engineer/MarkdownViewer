@@ -2,8 +2,11 @@
 
 ## TODO-2026-029 Tauri別プロセス起動・ディレクトリ別設定・タイトル表示
 
-- status: Phase 0 要求整理済み・ユーザ承認待ち
+- status: Phase 1 完了・Phase 2 未着手
 - workflow: new-feature
+- work_branch: new-feature/tauri-multi-instance-project-settings
+- meta: [案件メタ情報](../design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/meta.md)
+- phase_0_approval: 2026-09-12 ユーザ承認済み。別プロセス方式・ディレクトリ別設定を含む要求に対しPhase 1への進行指示を受領。
 - summary: macOSでアプリ操作から別プロセスを起動し、macOS / Windows共通でディレクトリ別の設定を保持し、ウィンドウ切替時にRootを識別できるようにする。
 - target_users: 複数のプロジェクトや仕様書ディレクトリを並行して閲覧するTauri版利用者。
 - use_cases:
