@@ -9,7 +9,9 @@
 **初回レビューコミット**: `e2a846d`
 **Round 1 fix コミット**: `4814fbf`（docs: address all initial multi-instance design review findings）
 **Round 1 再確認日**: 2026-09-12
-**最終判定**: **承認 (Approved)**。Phase 3 へ進行可。初回 18 件は Round 1 fix で設計上すべて解決済みと再確認した。Round 1 で新規検出した **Medium 1 件 / Low 1 件 = 2 件はいずれも non-blocking** で、Phase 3 の設計追記または実装レビューで閉じられる。**未解決 2 件（MI-DR-19、MI-DR-20、いずれも non-blocking）。** Phase 3 冒頭の packaged activation spike（go / no-go）は未実施であり、本承認は spike の成立を前提としない（§8.3）。
+**Round 2 fix コミット**: `8034327`（docs: clarify startup presentation and remaining documentation updates）
+**Round 2 最終確認日**: 2026-09-12
+**最終判定**: **承認 (Approved)**。Phase 3 へ進行可。初回 18 件は Round 1 fix（`4814fbf`）で、Round 1 新規 2 件（MI-DR-19 / 20）は Round 2 fix（`8034327`）で、設計上すべて解決済みと確認した。**未解決 0 件。** 本承認は設計のみを対象とする。Phase 3 冒頭の packaged activation spike（go / no-go）は未実施であり、承認は spike の成立を前提としない（§8.4、§10）。
 **照合した実装**: `markdown-viewer-tauri/src-tauri/src/lib.rs`、`src-tauri/Cargo.toml` / `Cargo.lock` / `tauri.conf.json` / `capabilities/default.json` / `gen/schemas/acl-manifests.json`、`markdown-viewer-tauri/src/App.tsx`、依存 source（`tauri-2.11.2`、`tao-0.35.2`、`muda-0.19.1`）
 **レビュー環境**: macOS 26.6.2（25G83）、rustc 1.95.0。Phase 2 はドキュメントのみのため build / test は実行していない。
 
@@ -59,8 +61,8 @@
 | MI-DR-16 | Low | No | design | 解決済み | Linux の扱いが「既存動作維持」と「New Window 共通経路」で矛盾 |
 | MI-DR-17 | Low | No | design | 解決済み | 複数 process テストの harness、macOS NFC / NFD path、Windows cfg code の検証手段が未記載 |
 | MI-DR-18 | Low | No | design | 解決済み | PlantUML の「最新 jar 設定」が file 再読込か session snapshot か曖昧 |
-| MI-DR-19 | Medium | No | design | 対応済み・再確認待ち（§9） | global load を setup から外した結果、起動時の defaults size / title の適用主体と resize baseline が §4.1 に無い |
-| MI-DR-20 | Low | No | design | 対応済み・再確認待ち（§9） | §10 置換表に `detail_design.md:318`（protocol read 中の read lock 保持）と `interface_spec.md:133` / `:151`（`open_document` / `render_plantuml_diagrams` 契約）が無い |
+| MI-DR-19 | Medium | No | design | 解決済み（Round 2 確認。§10） | global load を setup から外した結果、起動時の defaults size / title の適用主体と resize baseline が §4.1 に無い |
+| MI-DR-20 | Low | No | design | 解決済み（Round 2 確認。§10） | §10 置換表に `detail_design.md:318`（protocol read 中の read lock 保持）と `interface_spec.md:133` / `:151`（`open_document` / `render_plantuml_diagrams` 契約）が無い |
 
 ---
 
@@ -390,7 +392,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Medium（non-blocking）
 **工程**: design
-**対応状態**: 対応済み・再確認待ち（§9）
+**対応状態**: 解決済み（Round 2 最終確認済み。§10 参照）
 
 **根拠**: 現行は `setup` hook が global settings を読み、frontend の resize listener 登録前に `set_size` で起動時 size を復元している（`lib.rs:2140-2160`）。Round 1 で MI-DR-08 に対応するため、設計 §7.2 は「setup では service / listener / menu 登録だけを行い、global load / migration は frontend startup command へ移す」とした。その結果、次の点が未定義になった。
 
@@ -406,7 +408,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Low（non-blocking）
 **工程**: design
-**対応状態**: 対応済み・再確認待ち（§9）
+**対応状態**: 解決済み（Round 2 最終確認済み。§10 参照）
 
 **根拠**: 次の現行記述が §10 の表に含まれていない。
 
@@ -438,3 +440,33 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 - MI-DR-19: 設計§4.1でstartup commandがRustからNo Folder title / defaults sizeを適用しpresentationを返すと明記。frontendのstartup busyと共通実測baselineで適用時resizeを保存しない。global破損時は表示用既定sizeと明示error、getter失敗はnull baselineとwarningを返す。§11へ対応testを追加。
 - MI-DR-20: 設計§10の恒久docs置換表にdetail_design.md:318とinterface_spec.md:133 / :151を追加。protocolはsnapshot clone後lock解放、document / renderはcontextとsession snapshotへ更新すると明記。
 - 上記は設計上の対応であり、Phase 3の実装・恒久docs反映・実機spikeは未実施。
+
+---
+
+## 10. Round 2 最終確認（2026-09-12、reviewer）
+
+**対象**: `8034327` の設計・TODO・meta 差分（`f5fafe3..8034327`）。承認済みの全体は再調査せず、MI-DR-19 / 20 の対応だけを確認した。build / test と Phase 3 の実機 spike は実施していない。
+
+| ID | 判定 | 確認内容 |
+| --- | --- | --- |
+| MI-DR-19 | 解決 | 設計 §4.1 の `load_startup_state` の戻り値に `presentation` が追加され、startup の手順が明記された。Rust が global load / migration を background で実行した後、main thread で `No Folder — MarkdownViewer` の title と defaults の logical size を適用する。maximized / fullscreen / minimized 中は size を適用しない。frontend は応答まで startup busy として resize event を破棄し、実測 size を baseline に設定してから busy を解除する。startup による resize で defaults を書き戻さない。startup・Root open・Retry は §7.2 の共通 presentation policy を使うため、baseline 規則の二重実装も無い。global 破損時は表示用既定値の size を適用するが JSON へは保存せず、明示 error を返す。§6.2 の「無断 reset しない」と整合する。getter 失敗時は `actualLogicalSize = null` と warning を返し、最初に取得できた実測値を baseline にするだけで保存しない。§11 の追加自動ケースに、startup の size / title 適用、実測 baseline、defaults へ保存しないこと、破損 global / getter 失敗時の明示 error が入った。frontend が `setSize` / `setTitle` を呼ばない方針（§7.2-3）と capability 非拡張も維持されている。 |
+| MI-DR-20 | 解決 | 設計 §10 の置換表で、`interface_spec.md` の行に `:133`（`open_document`）/ `:151`（`render_plantuml_diagrams`）が、`detail_design.md` の行に `:318`（protocol read 中の lock 保持）が加わった。置換内容として「単一 RootSnapshot を clone 後に lock を解放し snapshot で I/O」「§4.1 の context 引数・session snapshot」が明記され、設計 §7.2 の RootSnapshot 方式と恒久 docs の更新先が対応した。 |
+
+TODO（status）と meta（`related_commits` への `4814fbf` / `f5fafe3` の追記、Phase 状態）も、この段階と整合している。
+
+**Phase 3 への申し送り（指摘ではない）**:
+
+- `presentation.actualLogicalSize` の nullable 化は startup の記述にある。§7.2-3 の `RootOpenResult.presentation` にも同じ共通 policy が適用される前提なので、実装では 1 つの型で共有すること。
+- startup の size 適用が setup から frontend の startup command へ移ったため、起動直後に `tauri.conf.json` の 800x600 で見えている時間が現行より長くなりうる。Phase 3 の手動確認で目立つ場合は、window を非表示で作成し presentation 適用後に表示する方式を検討する。
+
+### 10.1 最終件数と判定
+
+| 区分 | 件数 |
+| --- | --- |
+| 初回指摘 | 18 件（High 1 / Medium 9 / Low 8）→ 全件解決（Round 1） |
+| Round 1 新規 | 2 件（Medium 1 / Low 1）→ 全件解決（Round 2） |
+| **未解決** | **0 件** |
+
+**最終判定: 承認 (Approved)。Phase 2 設計レビュー完了。Phase 3 へ進行可。**
+
+本承認は設計のみを対象とする。§8.4 の前提はそのまま引き継ぐ。Phase 3 の最初に macOS の packaged activation spike を実施し、macOS 14 以降の通常 / 最小化 / 別 Space fullscreen で key・active を deadline 内に観測できなければ、後続実装へ進まずユーザへ報告して要件を再確認すること。spike の成否、`open_document` の context 検証元（§8.1 MI-DR-04）、§10 置換表どおりの恒久 docs 反映は、Phase 3 実装レビューで確認する。
