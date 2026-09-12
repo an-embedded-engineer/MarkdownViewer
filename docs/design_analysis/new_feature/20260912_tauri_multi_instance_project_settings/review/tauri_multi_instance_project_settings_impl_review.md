@@ -1,7 +1,7 @@
 # TODO-2026-029 Tauri別プロセス起動・ディレクトリ別設定・タイトル表示 実装レビュー
 
 **レビュー日**: 2026-09-13
-**レビュー種別**: Phase 3 実装・恒久ドキュメントレビュー（初回 + Round 1 再確認）
+**レビュー種別**: Phase 3 実装・恒久ドキュメントレビュー（初回 + Round 1 再確認 + Round 2 最終確認）
 **対象コミット**: `78039cd`（feat: add independent Viewer instances and per-directory settings）
 **差分 base**: `75a7ac7`（docs: complete Phase 2 multi-instance feature design）
 **設計**: `docs/design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/design/tauri_multi_instance_project_settings_feature_design.md`（Phase 2 承認済み、`c4bf9c7`）
@@ -11,7 +11,10 @@
 **初回レビューコミット**: `dc34e0b`
 **Round 1 fix コミット**: `ff84654`（fix: address multi-instance implementation review and expand boundary tests）
 **Round 1 再確認日**: 2026-09-13
-**最終判定**: **承認 (Approved)**。初回 8 件は `ff84654` ですべて解決済みと再確認した。Round 1 で新規検出した Low 1 件（MI-IR-09）は non-blocking。**未解決 1 件（MI-IR-09、non-blocking）。** Phase 3 実装レビューとしては Phase 4 へ進行可。ただし Phase 4 のユーザ動作確認はユーザ承認を前提とし、§4 と実装記録の §11 対応表にある GUI・実機の未確認項目は Phase 4 / completion で結果を記録すること（§8.4）。
+**Round 1 再確認コミット**: `2f292ac`
+**Round 2 fix コミット**: `3cc5f06`（fix: resolve final window identity test layout warning）
+**Round 2 最終確認日**: 2026-09-13
+**最終判定**: **承認 (Approved)**。初回 8 件は `ff84654`、Round 1 新規の MI-IR-09 は `3cc5f06` で解決済みと確認した。**未解決 0 件。** Phase 3 実装レビューとしては完了で、Phase 4 へ進行可。ただし、本承認はユーザの Phase 4 承認ではない。Phase 4 のユーザ動作確認はユーザ承認を得てから行い、§4 と実装記録の §11 対応表にある製品 GUI・実機の未確認項目は Phase 4 / completion へ引き継ぐ（§9）。
 
 **初回判定**: **差し戻し (Changes Requested)**。Phase 4 へは進めない。
 **検出件数**: 8 件 = Medium 2 件（blocking 1、non-blocking 1）/ Low 6 件
@@ -60,7 +63,7 @@ reviewer は次を自分で再実行した。いずれも tracked file を変更
 | MI-IR-06 | Low | No | impl | 解決済み | `CREATE_NO_WINDOW` を literal で重複定義し、comment も実際の効果と異なる |
 | MI-IR-07 | Low | No | impl（docs） | 解決済み | 恒久 docs に旧説明・誤リンク・architecture 3 文書への同一段落の重複が残る |
 | MI-IR-08 | Low | No | impl（記録） | 解決済み | Phase 2 からの申し送り（起動時 size 適用の見え方）と WebView 再読込が、実装記録の未確認・Phase 4 確認項目に無い |
-| MI-IR-09 | Low | No | impl | 未対応（Round 1 新規） | Round 1 の test module 追加で clippy `items_after_test_module` が `window_identity.rs:11` に新規発生 |
+| MI-IR-09 | Low | No | impl | 解決済み（Round 2 確認。§9） | Round 1 の test module 追加で clippy `items_after_test_module` が `window_identity.rs:11` に新規発生 |
 
 ---
 
@@ -274,7 +277,7 @@ reviewer が自分で再実行した結果は次のとおり。いずれも trac
 
 #### MI-IR-09 test module の配置で clippy `items_after_test_module` が新規発生
 
-**重大度**: Low / **blocking**: No / **工程**: impl / **対応状態**: 未対応（completion までに対応）
+**重大度**: Low / **blocking**: No / **工程**: impl / **対応状態**: 解決済み（Round 2 最終確認済み。§9 参照）
 
 **根拠**: Round 1 で `window_identity.rs` に追加された `#[cfg(test)] mod tests` が `impl WindowIdentity` より前に置かれ、`cargo clippy --all-targets` が `items_after_test_module`（`window_identity.rs:11`）を報告する。本差分以前の既存 warning 2 件とは別の、新規 warning である。動作・テスト結果への影響は無い。
 **推奨対応**: test module を file 末尾へ移す。新規 module（`project_settings.rs` / `macos_instances.rs` / `viewer_session.rs`）も test module の位置を file 末尾に揃えると、将来の同種 warning を防げる。completion の検証で clippy の新規 warning が 0 件であることを確認する。
@@ -284,7 +287,7 @@ reviewer が自分で再実行した結果は次のとおり。いずれも trac
 - `SettingsQueue.changeRoot`（`projectSettings.ts`）は、busy の設定、旧 context の flush（失敗は callback へ渡して続行）、candidate 失敗時の context / baseline 保持、成功時の `apply`、finally での busy 解除を 1 か所に集めた。App は戻り値から表示を更新するだけになり、設計 §7.2-1 の責務が queue 側へ閉じた。busy は App が表示を更新する前に解除されるが、その時点で context と baseline は既に新 Root の値なので、直後の resize は新 context へ正しく保存される。
 - IPC protocol test は activation を callback の stub に置き換えている。実装記録どおり、製品の AppKit 前面化（handoff・key / active / onActiveSpace の観測）の end-to-end は Phase 4 の packaged app で確認する項目であり、本再確認でも成立済みとは扱わない。
 
-### 8.4 件数と判定
+### 8.4 件数と判定（Round 1 時点。最終判定は §9）
 
 | 区分 | 件数 |
 | --- | --- |
@@ -299,3 +302,40 @@ Phase 4 / completion への引き継ぎ:
 1. Phase 4 のユーザ動作確認はユーザ承認を得てから行う。本承認は、GUI・実機の未確認項目を成功扱いするものではない。
 2. 実装記録「設計 §11 の検証対応表」と本レビュー §4 の未確認項目の結果を、Phase 4 / completion で記録する。対象は、製品 IPC 経路での前面化（通常 / 最小化 / 非表示 / 別 Space fullscreen / 失効 item）、native menu の実表示と Cmd+W / M / Q / Full Screen、起動時の表示遷移、WebView 再読込、Windows の build / test / UI、Linux、macOS 14 未満、App Translocation、NFC / NFD、実利用者設定の migration である。環境が無い項目は未確認のまま残す。
 3. MI-IR-09 は completion までに解消し、clippy の新規 warning 0 件を確認する。
+
+---
+
+## 9. Round 2 最終確認（2026-09-13、reviewer）
+
+**対象**: `2f292ac..3cc5f06`。MI-IR-09 だけを確認し、承認済みの全体は再調査していない。
+
+| 確認 | 結果 |
+| --- | --- |
+| 移動差分 | `window_identity.rs` の `#[cfg(test)] mod tests`（`titles_identify_same_names_and_unicode_paths` 1 件）を `impl WindowIdentity` の前から file 末尾へ移しただけで、テスト本文も製品コードも変更が無い。他に変更されたのは実装記録と meta の記録追記だけで、製品 source の変更は無い |
+| `cargo fmt -- --check` | 成功（reviewer 再実行） |
+| `cargo clippy --offline --all-targets` | warning は既存の `lib.rs:81`（derivable impl）と `lib.rs:1355`（items after test module）の 2 件だけ。`window_identity.rs:11` の `items_after_test_module` は消え、新規 warning は 0 件（reviewer 再実行） |
+| `cargo test --offline` | lib 46 件成功。`window_identity::tests::titles_identify_same_names_and_unicode_paths` を含む（reviewer 再実行、socket 系を含め skip 無し） |
+
+| ID | 判定 | 確認内容 |
+| --- | --- | --- |
+| MI-IR-09 | 解決 | 上表のとおり新規 clippy warning 0 件を確認した。§8.2 で推奨した他の新規 module の test module 配置は clippy の対象外であり、warning も出ていないため、追加対応は求めない |
+
+### 9.1 最終件数と判定
+
+| 区分 | 件数 |
+| --- | --- |
+| 初回指摘 | 8 件（Medium 2 / Low 6）→ 全件解決（Round 1、`ff84654`） |
+| Round 1 新規 | 1 件（Low）→ 解決（Round 2、`3cc5f06`） |
+| **未解決** | **0 件** |
+
+**最終判定: 承認 (Approved)。Phase 3 実装レビュー完了。**
+
+本承認は Phase 3 の実装・恒久 docs レビューとしての判定であり、**ユーザの Phase 4 承認として扱わない**。Phase 4 のユーザ動作確認は、ユーザの承認を得てから実施すること。
+
+製品 GUI・実機の未確認項目は Phase 4 / completion へ引き継ぎ、確認できた範囲だけを結果として記録すること。環境が無い項目は未確認のまま残す。引き継ぐ項目は次のとおり（§4、§8.4、実装記録「設計 §11 の検証対応表」）。
+
+- 製品 IPC 経路での前面化（通常 / 最小化 / 非表示 / 別 Space fullscreen / 失効 item）
+- native menu の実表示と Cmd+W / M / Q / Full Screen
+- 起動時の表示遷移、WebView 再読込後の表示と保存先
+- Windows の build / test / UI、Linux、macOS 14 未満、App Translocation、NFC / NFD
+- 実利用者設定の migration
