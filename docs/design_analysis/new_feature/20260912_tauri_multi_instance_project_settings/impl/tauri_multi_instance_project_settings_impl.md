@@ -63,7 +63,7 @@ Tauri README、component basic / detail / interface / README、architecture over
 
 ## 実装レビュー
 
-Round 1（2f292ac）で初回8件の解決確認・承認。追加Low 1件の最終再確認中。
+acbf345で最終レビュー承認。初回8件・追加1件の全9件解決、未解決0件。
 
 ## 初回実装レビュー対応
 
@@ -101,4 +101,10 @@ Unix socketのbindはsandboxでOperation not permittedとなったため、同�
 
 ## Round 1追加指摘対応
 
-MI-IR-09: window_identity.rsのtest moduleをファイル末尾へ移動。製品コードの動作変更なし。cargo fmt -- --check、タイトルの対象test（1件）、cargo clippy --offline --all-targetsが成功。新規warningは0件、lib.rsの既存warning 2件（derivable_impls / items_after_test_module）のみ。最終再確認待ち。
+MI-IR-09: window_identity.rsのtest moduleをファイル末尾へ移動。製品コードの動作変更なし。cargo fmt -- --check、タイトルの対象test（1件）、cargo clippy --offline --all-targetsが成功。新規warningは0件、lib.rsの既存warning 2件（derivable_impls / items_after_test_module）のみ。acbf345で解決確認済み。
+
+## Phase 3完了・引継ぎ
+
+最終レビュー承認: acbf345。Phase 4-aはユーザー承認待ち。上記matrixの未確認項目は引き続き未確認であり、レビュー承認を製品GUIやWindows動作確認の代替としない。
+
+確認用appは `publish/tauri/TODO-2026-029/markdown-viewer-tauri.app` に配置（生成物・非コミット）。ff84654のrelease build成果物をコピーした。以降のsource差分はtest moduleの配置のみ。実利用者の設定を用いた製品起動は実施していない。

@@ -22,11 +22,13 @@ components:
   - "docs/rules/development_workflow.md"
   - "docs/setup/README.md"
   - "docs/tests/README.md"
-status: "phase_3_review_followup"
+status: "implemented"
 design_status: "done"
-impl_status: "in_review"
+impl_status: "done"
 completion_status: "not_started"
 related_commits:
+  - "3cc5f06 : 追加Low指摘の修正・新規Clippy警告解消"
+  - "acbf345 : Phase 3 最終実装レビュー承認・全9件解決"
   - "ff84654 : 初回実装レビュー8件への対応"
   - "2f292ac : Round 1 全8件解決確認・追加Low 1件"
   - "75a7ac7 : Phase 2 完了記録"
@@ -61,7 +63,7 @@ related_commits:
 - 2026-09-12追加回答によりmacOSはメニューバーのWindow一覧でよい。Dock独自一覧は対象外。
 - 別instanceへのcooperative activationはPhase 3冒頭のpackaged app spikeでgo / no-goを判定する。現時点では実機未検証。
 - 初回18件・追加2件の全20件を解決し、c4bf9c7で最終設計レビュー承認。未解決0件。
-- [レビュー結果](review/tauri_multi_instance_project_settings_design_review.md)を参照。Phase 3の進行はユーザ承認待ち。
+- [レビュー結果](review/tauri_multi_instance_project_settings_design_review.md)を参照。Phase 3の進行は2026-09-13にユーザ承認済み。
 
 ## Phase 状態
 
@@ -70,8 +72,8 @@ related_commits:
 | 0 要求整理 | 完了・2026-09-12ユーザ承認済み |
 | 1 ブランチ・meta初期化 | 完了（本初期化コミット） |
 | 2 設計・レビュー | 完了・最終レビュー承認、未解決0件 |
-| 3 実装・恒久ドキュメント反映 | 2026-09-13進行承認済み・実装draft、検証・レビュー準備中 |
-| 4 検証・完了処理 | 未着手 |
+| 3 実装・恒久ドキュメント反映 | 完了・最終レビュー承認、全9件解決 |
+| 4 検証・完了処理 | 未着手・Phase 4-aユーザ承認待ち |
 
 ## Phase 1確認
 
@@ -93,3 +95,10 @@ related_commits:
 - ユーザーからPhase 3進行承認を受領。
 - macOS 26.6.2のpackaged Tauri spikeでyieldだけの経路は失敗。requesterのactivateFromApplicationを追加した経路で通常68ms・最小化647ms・別Space fullscreen401ms、すべてkey / active / onActiveSpaceを確認してgoとした。
 - [実装記録](impl/tauri_multi_instance_project_settings_impl.md)に設計差分・検証・未確認項目を記録する。
+
+## Phase 3完了
+
+- 実装・恒久docs・検証結果のレビューをacbf345で承認。指摘9件すべて解決、未解決0件。
+- npm build / Vitest 118件、cargo check / Rust 46件、fmt、release app bundle buildが成功。Clippyの新規warningは0件（既存2件）。
+- 確認用bundle: `publish/tauri/TODO-2026-029/markdown-viewer-tauri.app`。ff84654のrelease成果物を配置した。以降のsource差分はcfg(test)の配置のみで製品binaryへの変更なし。
+- 製品GUI / Windows等の未確認項目は実装記録のmatrixに残す。Phase 4-aはユーザ承認待ち。
