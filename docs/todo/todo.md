@@ -2,7 +2,7 @@
 
 ## TODO-2026-029 Tauri別プロセス起動・ディレクトリ別設定・タイトル表示
 
-- status: Phase 2 完了・設計レビュー全20件解決・Phase 3ユーザ承認待ち
+- status: Phase 3 実装draft・検証と実装レビュー準備
 - workflow: new-feature
 - work_branch: new-feature/tauri-multi-instance-project-settings
 - meta: [案件メタ情報](../design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/meta.md)

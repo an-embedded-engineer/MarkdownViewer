@@ -1,3 +1,5 @@
+import { listen } from "@tauri-apps/api/event";
+import { SettingsQueue, preferencesPatch, type SettingsContext, type Presentation, type SettingsPatch } from "./projectSettings";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -189,10 +191,12 @@ type DebugPanelEventDetail =
 const markdownExtensions = new Set(["md", "markdown"]);
 const externalUrlPattern = /^(https?:)?\/\//i;
 const defaultWindowSize: WindowSize = { width: 800, height: 600 };
-const windowResizeSaveDelay = 500;
 const debugPanelEventName = "markdown-viewer:debug-panel-update";
 
 function App() {
+  const settingsQueueRef = useRef(new SettingsQueue());
+  const settingsOriginalRef = useRef<ViewerSettings | null>(null);
+  const [isLaunching, setIsLaunching] = useState(false);
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [fileTree, setFileTree] = useState<FileTreeNode | null>(null);
   const [tabs, setTabs] = useState<OpenDocumentTab[]>([]);
@@ -512,7 +516,7 @@ function App() {
   }
 
   async function openFolder() {
-    if (isGlobalBusy) {
+    if (isGlobalBusy || settingsQueueRef.current.busy) {
       return;
     }
 
@@ -533,34 +537,70 @@ function App() {
   }
 
   async function loadRoot(path: string, options: { recordRecent?: boolean } = {}) {
+    const queue = settingsQueueRef.current;
+    if (queue.busy) return;
+    queue.busy = true;
     setIsRootLoading(true);
     setRootOperationError(null);
+    const warnings: string[] = [];
     try {
-      const tree = await invoke<FileTreeNode>("scan_directory", {
-        rootPath: path,
-      });
-      setRootPath(path);
-      setFileTree(tree);
-      setIsRootLoading(false);
+      try { await queue.flush(); } catch (error) { warnings.push(toErrorMessage(error)); }
+      const result = await invoke<ViewerSettingsLoadResult & {
+        tree: FileTreeNode; canonicalRootPath: string; context: SettingsContext; presentation: Presentation;
+      }>("open_root", { path, expectedContext: queue.context });
+      queue.apply(result.context, result.presentation);
+      setRootPath(result.canonicalRootPath);
+      setFileTree(result.tree);
+      setViewerSettings(result.settings);
+      setTheme(result.settings.theme);
+      if (result.presentation.actualLogicalSize) setCurrentWindowSize(result.presentation.actualLogicalSize);
+      warnings.push(...result.warnings);
       applySplitView({ type: "reset-root" });
       updateTabs(() => []);
-
-      const initialFile = findReadme(tree) ?? findFirstMarkdown(tree) ?? findFirstHtml(tree);
-      if (initialFile) {
-        openOrActivateTab("primary", initialFile.path);
-      }
-
+      const initialFile = findReadme(result.tree) ?? findFirstMarkdown(result.tree) ?? findFirstHtml(result.tree);
+      if (initialFile) openOrActivateTab("primary", initialFile.path);
       if (options.recordRecent) {
-        const recentError = await recordRecentFolder(path);
-        if (recentError) {
-          setRootOperationError(recentError);
-        }
+        const recentError = await recordRecentFolder(result.canonicalRootPath);
+        if (recentError) warnings.push(recentError);
       }
     } catch (error) {
       setRootOperationError(toErrorMessage(error));
     } finally {
+      if (warnings.length > 0) setAppConfigError(warnings.join(" "));
+      queue.busy = false;
       setIsRootLoading(false);
     }
+  }
+
+  async function patchSettings(patch: SettingsPatch) {
+    const queue = settingsQueueRef.current;
+    const context = queue.context;
+    return queue.enqueue(() => invoke<ViewerSettingsLoadResult>("patch_context_settings", { context, patch }));
+  }
+
+  async function newWindow() {
+    if (isLaunching) return;
+    setIsLaunching(true);
+    setActiveMenu(null);
+    try { await invoke<void>("new_window"); }
+    catch (error) { setAppConfigError(toErrorMessage(error)); }
+    finally { setIsLaunching(false); }
+  }
+
+  async function retryPresentation() {
+    const queue = settingsQueueRef.current;
+    if (queue.busy || isGlobalBusy) return;
+    queue.busy = true;
+    try {
+      await runForegroundConfigOperation(async () => {
+        try { await queue.flush(); } catch (error) { setAppConfigError(toErrorMessage(error)); }
+        const [presentation, warnings] = await invoke<[Presentation, string[]]>("retry_window_presentation", { context: queue.context });
+        queue.apply(queue.context, presentation);
+        if (presentation.actualLogicalSize) setCurrentWindowSize(presentation.actualLogicalSize);
+        setAppConfigError(warnings.join(" ") || null);
+      });
+    } catch (error) { setAppConfigError(toErrorMessage(error)); }
+    finally { queue.busy = false; }
   }
 
   async function recordRecentFolder(path: string) {
@@ -576,7 +616,7 @@ function App() {
   }
 
   async function openRecentFolder(path: string) {
-    if (isGlobalBusy) {
+    if (isGlobalBusy || settingsQueueRef.current.busy) {
       return;
     }
 
@@ -585,7 +625,7 @@ function App() {
   }
 
   async function removeRecentFolder(path: string) {
-    if (isGlobalBusy) {
+    if (isGlobalBusy || settingsQueueRef.current.busy) {
       return;
     }
 
@@ -601,7 +641,7 @@ function App() {
   }
 
   async function saveTheme(nextTheme: Theme) {
-    if (isGlobalBusy || !viewerSettings) {
+    if (isGlobalBusy || settingsQueueRef.current.busy || !viewerSettings) {
       return;
     }
 
@@ -609,10 +649,7 @@ function App() {
     setAppConfigError(null);
     try {
       const result = await runForegroundConfigOperation(() =>
-        invoke<ViewerSettingsLoadResult>("save_viewer_preferences", {
-          theme: nextTheme,
-          plantUmlJarPath: viewerSettings.plantUmlJarPath,
-        }),
+        patchSettings({ theme: { kind: "set", value: nextTheme } }),
       );
       setViewerSettings(result.settings);
       setTheme(result.settings.theme);
@@ -623,26 +660,18 @@ function App() {
   }
 
   async function openSettings() {
-    if (isGlobalBusy || !viewerSettings) {
-      return;
-    }
-
+    if (isGlobalBusy || settingsQueueRef.current.busy) return;
     setActiveMenu(null);
     setSettingsError(null);
     try {
-      const appWindow = getCurrentWindow();
-      const [physicalSize, scaleFactor] = await Promise.all([
-        appWindow.innerSize(),
-        appWindow.scaleFactor(),
-      ]);
-      setCurrentWindowSize(toLogicalWindowSize(physicalSize, scaleFactor));
-    } catch (error) {
-      setAppConfigError(`Failed to read current window size: ${toErrorMessage(error)}`);
-    }
-    setSettingsDraft({
-      theme: viewerSettings.theme,
-      plantUmlJarPath: viewerSettings.plantUmlJarPath ?? "",
-    });
+      const loaded = await runForegroundConfigOperation(() =>
+        settingsQueueRef.current.enqueue(() => invoke<ViewerSettingsLoadResult>("load_context_settings", { context: settingsQueueRef.current.context })));
+      setViewerSettings(loaded.settings);
+      setTheme(loaded.settings.theme);
+      settingsOriginalRef.current = loaded.settings;
+      setSettingsDraft({ theme: loaded.settings.theme, plantUmlJarPath: loaded.settings.plantUmlJarPath ?? "" });
+      setAppConfigError(loaded.warnings.join(" ") || null);
+    } catch (error) { setAppConfigError(toErrorMessage(error)); }
   }
 
   function closeSettings() {
@@ -652,17 +681,16 @@ function App() {
   }
 
   async function saveSettings() {
-    if (!settingsDraft || isAppConfigBusy) {
+    if (!settingsDraft || !settingsOriginalRef.current || isAppConfigBusy) {
       return;
     }
 
     setSettingsError(null);
     try {
       const result = await runForegroundConfigOperation(() =>
-        invoke<ViewerSettingsLoadResult>("save_viewer_preferences", {
-          theme: settingsDraft.theme,
-          plantUmlJarPath: settingsDraft.plantUmlJarPath,
-        }),
+        patchSettings(preferencesPatch(settingsOriginalRef.current!, {
+          theme: settingsDraft.theme, plantUmlJarPath: settingsDraft.plantUmlJarPath.trim() || null,
+        })),
       );
       setViewerSettings(result.settings);
       setTheme(result.settings.theme);
@@ -700,10 +728,13 @@ function App() {
     setIsRootLoading(true);
     setRootOperationError(null);
     try {
-      const tree = await invoke<FileTreeNode>("scan_directory", {
-        rootPath,
+      const result = await invoke<ViewerSettingsLoadResult & { tree: FileTreeNode }>("reload_root", {
+        context: settingsQueueRef.current.context,
       });
-      setFileTree(tree);
+      setFileTree(result.tree);
+      setViewerSettings(result.settings);
+      setTheme(result.settings.theme);
+      setAppConfigError(result.warnings.join(" ") || null);
       setIsRootLoading(false);
 
       if (activeTab) {
@@ -752,10 +783,12 @@ function App() {
   }
 
   async function loadTab(tabId: string, filePath: string, revision: number) {
+    const context = settingsQueueRef.current.context;
     try {
       const document = parseOpenDocumentResponse(
-        await invoke<unknown>("open_document", { path: filePath }),
+        await invoke<unknown>("open_document", { context, path: filePath }),
       );
+      if (context !== settingsQueueRef.current.context) return;
       if (document.documentType === "html") {
         updateTabIfCurrent(tabId, revision, (tab) => ({
           ...tab,
@@ -790,7 +823,8 @@ function App() {
       }
 
       try {
-        const response = await invoke<PlantUmlRenderResponse>("render_plantuml_diagrams", { sources });
+        const response = await invoke<PlantUmlRenderResponse>("render_plantuml_diagrams", { context, sources });
+        if (context !== settingsQueueRef.current.context) return;
         updateTabIfCurrent(tabId, revision, (tab) => ({
           ...tab,
           loadState: response.firstError ? "error" : "ready",
@@ -798,6 +832,7 @@ function App() {
           plantUmlDiagrams: response.diagrams,
         }));
       } catch (error) {
+        if (context !== settingsQueueRef.current.context) return;
         const message = toErrorMessage(error);
         updateTabIfCurrent(tabId, revision, (tab) => ({
           ...tab,
@@ -811,6 +846,7 @@ function App() {
         }));
       }
     } catch (error) {
+        if (context !== settingsQueueRef.current.context) return;
       const message = toErrorMessage(error);
       updateTabIfCurrent(tabId, revision, (tab) => ({
         ...tab,
@@ -826,9 +862,11 @@ function App() {
     revision: number,
     href: string,
   ) {
+    const context = settingsQueueRef.current.context;
     try {
       await openUrl(href);
     } catch (error) {
+        if (context !== settingsQueueRef.current.context) return;
       updatePanePreviewPhase(
         paneId,
         tabId,
@@ -1212,167 +1250,86 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-
-    async function loadAppConfig() {
-      const [settingsResult, recentFoldersResult] = await Promise.allSettled([
-        invoke<ViewerSettingsLoadResult>("load_viewer_settings"),
-        invoke<RecentFolderEntry[]>("load_recent_folders"),
-      ]);
-      if (cancelled) {
-        return;
-      }
-
-      const errors: string[] = [];
-      if (settingsResult.status === "fulfilled") {
-        const loaded = settingsResult.value;
-        document.documentElement.dataset.theme = loaded.settings.theme;
+    let unlisten: (() => void) | undefined;
+    const queue = settingsQueueRef.current;
+    queue.busy = true;
+    async function drain() {
+      const notices = await invoke<{ id: string; message: string }[]>("drain_viewer_notices");
+      if (!cancelled && notices.length) setAppConfigError(notices.map((notice) => notice.message).join(" "));
+    }
+    async function load() {
+      try {
+        const dispose = await listen("viewer-notices-available", () => { void drain().catch((error) => setAppConfigError(toErrorMessage(error))); });
+        if (cancelled) { dispose(); return; }
+        unlisten = dispose;
+        const loaded = await invoke<ViewerSettingsLoadResult & {
+          context: SettingsContext; presentation: Presentation; recentFolders: RecentFolderEntry[];
+          globalConfigError: { message: string } | null;
+        }>("load_startup_state");
+        if (cancelled) return;
+        queue.apply(loaded.context, loaded.presentation);
         setViewerSettings(loaded.settings);
         setTheme(loaded.settings.theme);
-        setCurrentWindowSize(loaded.settings.windowSize);
-        errors.push(...loaded.warnings);
-        if (loaded.warnings.length > 0) {
-          try {
-            await invoke<WindowSize>("save_window_size", loaded.settings.windowSize);
-          } catch (error) {
-            errors.push(`Failed to repair saved window size: ${toErrorMessage(error)}`);
-          }
-        }
-      } else {
-        errors.push(toErrorMessage(settingsResult.reason));
-        document.documentElement.dataset.theme = "light";
-        setViewerSettings({
-          theme: "light",
-          windowSize: defaultWindowSize,
-          plantUmlJarPath: null,
-        });
-      }
-
-      if (recentFoldersResult.status === "fulfilled") {
-        setRecentFolders(recentFoldersResult.value);
-      } else {
-        errors.push(toErrorMessage(recentFoldersResult.reason));
-      }
-
-      if (!cancelled) {
-        setAppConfigError(errors.length > 0 ? errors.join(" ") : null);
-        setIsStartupConfigLoading(false);
+        document.documentElement.dataset.theme = loaded.settings.theme;
+        setRecentFolders(loaded.recentFolders);
+        if (loaded.presentation.actualLogicalSize) setCurrentWindowSize(loaded.presentation.actualLogicalSize);
+        setAppConfigError([...loaded.warnings, loaded.globalConfigError?.message].filter(Boolean).join(" ") || null);
+        await drain();
+      } catch (error) {
+        if (!cancelled) setAppConfigError(toErrorMessage(error));
+      } finally {
+        if (!cancelled) { queue.busy = false; setIsStartupConfigLoading(false); }
       }
     }
-
-    void loadAppConfig();
-
-    return () => {
-      cancelled = true;
-    };
+    void load();
+    return () => { cancelled = true; unlisten?.(); queue.cancelPending(); };
   }, []);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
+    const queue = settingsQueueRef.current;
     let active = true;
+    let revision = 0;
     let unlisten: (() => void) | undefined;
-    let timer: number | undefined;
-    let inFlight = false;
-    let pendingSize: WindowSize | null = null;
-    let resizeRevision = 0;
-
-    async function persistPendingSize() {
-      if (!active || inFlight || !pendingSize) {
-        return;
-      }
-      const size = pendingSize;
-      pendingSize = null;
-      inFlight = true;
+    async function resized() {
+      if (queue.busy) return;
+      const context = queue.context;
+      const currentRevision = ++revision;
       try {
-        const saved = await invoke<WindowSize>("save_window_size", size);
-        if (active) {
-          setCurrentWindowSize(saved);
-        }
-      } catch (error) {
-        if (active) {
-          setAppConfigError(`Failed to save window size: ${toErrorMessage(error)}`);
-        }
-      } finally {
-        inFlight = false;
-        if (active && pendingSize && timer === undefined) {
-          void persistPendingSize();
-        }
-      }
-    }
-
-    function scheduleSizeSave(size: WindowSize) {
-      pendingSize = size;
-      if (timer !== undefined) {
-        window.clearTimeout(timer);
-      }
-      timer = window.setTimeout(() => {
-        timer = undefined;
-        void persistPendingSize();
-      }, windowResizeSaveDelay);
-    }
-
-    async function handleResize(physicalSize: { width: number; height: number }) {
-      const revision = ++resizeRevision;
-      try {
-        const [isMaximized, isMinimized, isFullscreen, scaleFactor] = await Promise.all([
-          appWindow.isMaximized(),
-          appWindow.isMinimized(),
-          appWindow.isFullscreen(),
-          appWindow.scaleFactor(),
+        const [physical, scale, maximized, minimized, fullscreen] = await Promise.all([
+          appWindow.innerSize(), appWindow.scaleFactor(), appWindow.isMaximized(), appWindow.isMinimized(), appWindow.isFullscreen(),
         ]);
-        if (
-          !active ||
-          revision !== resizeRevision ||
-          isMaximized ||
-          isMinimized ||
-          isFullscreen
-        ) {
-          return;
+        if (!active || currentRevision !== revision || context !== queue.context || queue.busy) return;
+        const size = toLogicalWindowSize(physical, scale);
+        setCurrentWindowSize(size);
+        if (queue.observe(size, maximized || minimized || fullscreen)) {
+          queue.schedule(async () => {
+            const result = await invoke<ViewerSettingsLoadResult>("patch_context_settings", {
+              context, patch: { windowSize: { kind: "set", value: size } },
+            });
+            if (active && context === queue.context) {
+              setViewerSettings(result.settings);
+              setTheme(result.settings.theme);
+              if (result.warnings.length) setAppConfigError(result.warnings.join(" "));
+            }
+          }, (error) => { if (active) setAppConfigError(toErrorMessage(error)); });
         }
-        const logicalSize = toLogicalWindowSize(physicalSize, scaleFactor);
-        setCurrentWindowSize(logicalSize);
-        scheduleSizeSave(logicalSize);
-      } catch (error) {
-        if (active) {
-          setAppConfigError(`Failed to observe window size: ${toErrorMessage(error)}`);
-        }
-      }
+      } catch (error) { if (active) setAppConfigError(toErrorMessage(error)); }
     }
-
-    void Promise.all([appWindow.innerSize(), appWindow.scaleFactor()])
-      .then(([physicalSize, scaleFactor]) => {
-        if (active) {
-          setCurrentWindowSize(toLogicalWindowSize(physicalSize, scaleFactor));
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          setAppConfigError(`Failed to read window size: ${toErrorMessage(error)}`);
-        }
-      });
-
-    void appWindow
-      .onResized(({ payload }) => void handleResize(payload))
-      .then((dispose) => {
-        if (active) {
-          unlisten = dispose;
-        } else {
-          dispose();
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          setAppConfigError(`Failed to subscribe to window resize: ${toErrorMessage(error)}`);
-        }
-      });
-
-    return () => {
-      active = false;
-      if (timer !== undefined) {
-        window.clearTimeout(timer);
-      }
-      unlisten?.();
-    };
+    void appWindow.onResized(() => void resized()).then((dispose) => {
+      if (active) unlisten = dispose; else dispose();
+    }).catch((error) => { if (active) setAppConfigError(toErrorMessage(error)); });
+    return () => { active = false; unlisten?.(); queue.cancelPending(); };
   }, []);
+
+  useEffect(() => {
+    if (activeMenu !== "file") return;
+    let cancelled = false;
+    void invoke<RecentFolderEntry[]>("load_recent_folders").then((entries) => {
+      if (!cancelled) setRecentFolders(entries);
+    }).catch((error) => { if (!cancelled) setAppConfigError(`Recent folders may be outdated: ${toErrorMessage(error)}`); });
+    return () => { cancelled = true; };
+  }, [activeMenu]);
 
   useEffect(() => {
     if (!activeMenu) {
@@ -1490,6 +1447,9 @@ function App() {
         inert={settingsDraft || imageViewerRequest ? true : undefined}
       >
         <MenuBar
+          onNewWindow={() => void newWindow()}
+          isLaunching={isLaunching}
+          onRetryPresentation={() => void retryPresentation()}
           menuBarRef={menuBarRef}
           fileMenuButtonRef={fileMenuButtonRef}
           rootPath={rootPath}
@@ -1710,6 +1670,7 @@ function App() {
 
       {settingsDraft ? (
         <SettingsDialog
+          scope={rootPath ? `Settings for ${rootPath}` : "Default settings for new folders"}
           draft={settingsDraft}
           currentWindowSize={currentWindowSize}
           error={settingsError}
@@ -2070,6 +2031,9 @@ function ImageViewerDialog({ request, onClose }: ImageViewerDialogProps) {
 }
 
 type MenuBarProps = {
+  onNewWindow: () => void;
+  isLaunching: boolean;
+  onRetryPresentation: () => void;
   menuBarRef: React.RefObject<HTMLElement | null>;
   fileMenuButtonRef: React.RefObject<HTMLButtonElement | null>;
   rootPath: string | null;
@@ -2092,6 +2056,7 @@ type MenuBarProps = {
 };
 
 function MenuBar({
+  onNewWindow, isLaunching, onRetryPresentation,
   menuBarRef,
   fileMenuButtonRef,
   rootPath,
@@ -2127,6 +2092,12 @@ function MenuBar({
         </button>
         {activeMenu === "file" ? (
           <div className="menu-dropdown file-menu-dropdown" role="menu" aria-label="File">
+            <button type="button" role="menuitem" disabled={isLaunching} onClick={() => { onCloseMenu(); onNewWindow(); }}>
+              {isLaunching ? "Opening New Window..." : "New Window"}
+            </button>
+            <button type="button" role="menuitem" disabled={isBusy} onClick={() => { onCloseMenu(); onRetryPresentation(); }}>
+              Reapply Window Settings
+            </button>
             <button
               type="button"
               role="menuitem"
@@ -2244,6 +2215,7 @@ function MenuBar({
 }
 
 type SettingsDialogProps = {
+  scope: string;
   draft: ViewerPreferencesDraft;
   currentWindowSize: WindowSize;
   error: string | null;
@@ -2255,6 +2227,7 @@ type SettingsDialogProps = {
 };
 
 function SettingsDialog({
+  scope,
   draft,
   currentWindowSize,
   error,
@@ -2340,6 +2313,7 @@ function SettingsDialog({
           </button>
         </div>
 
+        <p className="settings-scope">{scope}</p>
         <form
           className="settings-form"
           onSubmit={(event) => {
@@ -3791,6 +3765,7 @@ function toLogicalWindowSize(
 }
 
 function toErrorMessage(error: unknown) {
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") return error.message;
   if (error instanceof Error) {
     return error.message;
   }

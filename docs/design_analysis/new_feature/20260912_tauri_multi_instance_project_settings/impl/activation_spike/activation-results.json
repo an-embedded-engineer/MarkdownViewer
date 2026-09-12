@@ -1,0 +1,80 @@
+{
+  "runtime": "/var/folders/bv/b7hn6j0d13d3_cxbbj0y8wtm0000gn/T/mv-activation-0sry6uoj",
+  "bundle": "/var/folders/bv/b7hn6j0d13d3_cxbbj0y8wtm0000gn/T/mv-activation-0sry6uoj/Activation Spike.app",
+  "macos": "26.6.2",
+  "results": [
+    {
+      "scenario": "prepare-requester",
+      "passed": false,
+      "elapsedMs": 2024,
+      "before": {
+        "source": {
+          "pid": 84460,
+          "sequence": 0,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null
+        },
+        "target": {
+          "pid": 84375,
+          "sequence": 0,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null
+        }
+      },
+      "after": {
+        "source": {
+          "pid": 84460,
+          "sequence": 1,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null
+        },
+        "target": {
+          "pid": 84375,
+          "sequence": 1,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null
+        }
+      },
+      "error": "Probe timeout: a={'pid': 84375, 'sequence': 1, 'active': False, 'key': False, 'minimized': False, 'fullscreen': False, 'onActiveSpace': True, 'error': None}, b={'pid': 84460, 'sequence': 1, 'active': True, 'key': True, 'minimized': False, 'fullscreen': False, 'onActiveSpace': True, 'error': None}"
+    }
+  ],
+  "failure": "Activation failed: prepare-requester",
+  "finalStates": {
+    "a": {
+      "pid": 84375,
+      "sequence": 1,
+      "active": false,
+      "key": false,
+      "minimized": false,
+      "fullscreen": false,
+      "onActiveSpace": true,
+      "error": null
+    },
+    "b": {
+      "pid": 84460,
+      "sequence": 1,
+      "active": true,
+      "key": true,
+      "minimized": false,
+      "fullscreen": false,
+      "onActiveSpace": true,
+      "error": null
+    }
+  }
+}

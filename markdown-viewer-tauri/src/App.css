@@ -455,6 +455,12 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
+.settings-scope {
+  margin: 12px 20px 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
 .settings-header h2 {
   margin: 0;
   font-size: 18px;

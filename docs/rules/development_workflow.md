@@ -35,7 +35,7 @@ java -version
 - runtime directory に `plantuml.jar` を置く。
 - runtime directory に `plantuml.config.json` を置き、`plantUmlJarPath` にjar pathを記載する。
 
-Tauri版の探索優先順位は、app config JSONの明示path、runtime directoryの`plantuml.config.json`、同directoryの`plantuml.jar`の順。明示pathが無効な場合は他のjarへfallbackせずerrorにする。Settingsで`Clear`した場合だけruntime directory探索へ戻る。Theme、logical window size、明示jar path、Recent FoldersはTauri app config directoryの`settings.json`へ保存する。
+Tauri版の探索優先順位は、app config JSONの明示path、runtime directoryの`plantuml.config.json`、同directoryの`plantuml.jar`の順。明示pathが無効な場合は他のjarへfallbackせずerrorにする。Settingsで`Clear`した場合だけruntime directory探索へ戻る。Theme、logical window size、明示jar pathはTauri app config directoryの`projects/<path hash>/settings.json`へ保存し、共通`settings.json`にはdefaultsとRecent Foldersを保持する。
 
 ```json
 {
@@ -204,7 +204,7 @@ UI 動作を変更した場合は、少なくとも以下を手動確認する�
 - PlantUML 描画中に読み込み中表示が出ること
 - Light / Dark 切替
 - Settings dialogでTheme / window size / PlantUML jar pathを確認・保存できること
-- resizeと再起動後にlogical window sizeが復元され、最大化中のsizeを保存しないこと
+- 再起動直後はglobal defaultsのsizeで、folder open時にproject sizeへ復元され、最大化・最小化・fullscreen中のsizeを保存しないこと
 - 既存Recent Foldersを保持し、明示jar pathの設定 / invalid path / Clearが仕様どおり動くこと
 - Reload 後の再描画
 - Explorerからtrusted UTF-8 HTMLを開き、self-contained SVG / Canvasとroot内relative CSS / JS / MJS / JSON / imageが表示されること
@@ -231,3 +231,21 @@ cargo fmt
 ```
 
 Tauri フロントエンドは現時点で lint script 未定義のため、`npm run build` の TypeScript compile を完了条件に含める。
+
+## Tauri複数process・directory設定の検証
+
+- New WindowとmacOS Cmd+Shift+Nが別PIDを起動し、親を終了しても子が利用できること。
+- Window一覧で別Root・同Root・複数No Folderを識別し、通常 / 最小化 / 別Space fullscreenから選択できること。Cmd+W / Cmd+M / Cmd+Q / Full Screenを維持すること。
+- 初回folder設定生成、再open復元、旧schema migration、同directory別field保存、Recent同時更新、破損・read-only・lock timeoutと復旧を確認すること。
+- Root切替中のresize / document / HTML resource / PlantUML結果が新Rootへ混線せず、旧保存失敗でも別Rootへ移れること。
+- Windows上でcargo check / cargo test / release buildとタスクバー見出しを確認すること。macOS buildで代替しない。
+- macOSのApp Translocation、14未満、Linux UIは該当環境が無ければ未確認と記録すること。
+
+activation spike（検証専用windowが前面化・最小化・fullscreenへ移るため、通常作業と同時に実行しない）:
+
+```bash
+cd markdown-viewer-tauri/src-tauri
+cargo build --example activation_spike
+cd ../..
+python3 scripts/check_macos_activation_spike.py --binary markdown-viewer-tauri/src-tauri/target/debug/examples/activation_spike --output /tmp/mv-activation-results --strategy yield-explicit
+```

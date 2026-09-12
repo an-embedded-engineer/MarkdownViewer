@@ -79,13 +79,13 @@ markdown-viewer-tauri/
 | `explorerPane.ts` | Explorerの初期/最小/dynamic最大幅、clamp、ArrowLeft / ArrowRight / Home / End操作をDOM非依存のpure functionで管理する | [markdown-viewer-tauri/src/explorerPane.ts](../../../markdown-viewer-tauri/src/explorerPane.ts) |
 | `imageViewer.ts` | image viewerのfit / zoom / pan / wheel / intrinsic size / activation policyと、Markdown DOM内の3種visualだけを扱うdecoration / resolverを提供する | [markdown-viewer-tauri/src/imageViewer.ts](../../../markdown-viewer-tauri/src/imageViewer.ts) |
 | `App.css` | Light / Dark テーマ、MenuBar、Settings dialog、幅変更可能なExplorer / Split View、active pane、pane-local TabStrip、error strip、StatusBar、pane相対のMarkdown本文幅と図表スタイル | [markdown-viewer-tauri/src/App.css](../../../markdown-viewer-tauri/src/App.css) |
-| `scan_directory` | Rust command。root 配下を再帰走査して `FileTreeNode` を返す。除外ディレクトリあり | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
+| `open_root` | Rust command。root 配下を再帰走査して `FileTreeNode` を返す。除外ディレクトリあり | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `open_document` | Rust command。`DocumentStore` current root内のMarkdownはUTF-8本文、HTMLはroot-relative `previewUrl`を排他的responseで返す | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `mvhtml` protocol | segment decode、canonical root、MIME allowlist、CSP/CORSを検証し、HTMLへready / external-link bridgeを注入する | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `render_plantuml_diagrams` | Rust command。`spawn_blocking` で各 source を `java -jar plantuml.jar -tsvg -pipe` に渡し、SVG / エラー HTML を返す | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | `load_recent_folders` / `record_recent_folder` / `remove_recent_folder` | Rust command。app config JSON の `recentFolders` を読み込み、成功した root folder を最大 10 件で保存し、明示削除を反映する | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
-| `load_viewer_settings` / `save_viewer_preferences` / `save_window_size` | Rust command。Theme、logical window size、PlantUML jar pathを型付き app config JSON で読み書きする | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
-| `AppConfigStore` | Store lock 内で config 全体を read-modify-writeし、temporary fileのsync後にatomic replaceする。replace後のdirectory sync失敗はlogical success + durability warningとする | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
+| `load_startup_state` / `load_context_settings` / `patch_context_settings` | Rust command。Theme、logical window size、PlantUML jar pathを型付き app config JSON で読み書きする | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
+| `SettingsRepository` | Store lock 内で config 全体を read-modify-writeし、temporary fileのsync後にatomic replaceする。replace後のdirectory sync失敗はlogical success + durability warningとする | [markdown-viewer-tauri/src-tauri/src/lib.rs](../../../markdown-viewer-tauri/src-tauri/src/lib.rs) |
 | Tauri config | window、production/dev shell CSP、asset protocol、bundle target | [markdown-viewer-tauri/src-tauri/tauri.conf.json](../../../markdown-viewer-tauri/src-tauri/tauri.conf.json) |
 | Capability | `core:default` / `dialog:default` / `opener:default` | [markdown-viewer-tauri/src-tauri/capabilities/default.json](../../../markdown-viewer-tauri/src-tauri/capabilities/default.json) |
 | Cargo manifest | `tauri-plugin-dialog` / `tauri-plugin-opener` / `serde` 依存 | [markdown-viewer-tauri/src-tauri/Cargo.toml](../../../markdown-viewer-tauri/src-tauri/Cargo.toml) |
@@ -108,3 +108,9 @@ TabStripは40px固定高の1行表示と上端state indicatorを使う。split�
 - 詳細設計: [detail_design.md](detail_design.md)
 - インターフェース仕様: [interface_spec.md](interface_spec.md)
 - 既知課題: [issues.md](issues.md)
+
+## 複数processとdirectory設定
+
+1 process 1 windowを維持し、`instance_launcher.rs`が別process起動、`window_identity.rs`がnative title、`macos_instances.rs`がWindow一覧とcooperative activationを担当する。`viewer_session.rs`がRoot世代とsettings snapshot、`project_settings.rs`がdirectory別JSON・共通defaults/Recent・プロセス間file lockを管理する。frontendの保存queueとresize baselineは`projectSettings.ts`にある。
+
+現行command・schemaは[interface_spec.md](interface_spec.md)、原子性・thread・IPCは[detail_design.md](detail_design.md)を参照。

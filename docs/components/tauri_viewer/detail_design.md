@@ -85,14 +85,14 @@ package "Tauri JS API" {
 }
 
 package "Rust backend (src-tauri/src/lib.rs)" {
-  class "scan_directory" as Scan <<command>>
+  class "open_root" as Scan <<command>>
   class "open_document" as Read <<command>>
   class DocumentStore
   class "render_plantuml_diagrams" as Render <<command>>
   class "load_recent_folders" as LoadRecent <<command>>
   class "record_recent_folder" as RecordRecent <<command>>
   class "remove_recent_folder" as RemoveRecent <<command>>
-  class AppConfigStore
+  class SettingsRepository
   class build_tree
   class render_plantuml_diagram
   class render_plantuml_svg
@@ -117,16 +117,16 @@ App --> invoke
 App --> convertFileSrc
 App --> openDialog
 App --> openUrl
-invoke ..> Scan : "scan_directory"
+invoke ..> Scan : "open_root"
 invoke ..> Read : "open_document"
 invoke ..> Render : "render_plantuml_diagrams"
 invoke ..> LoadRecent : "load_recent_folders"
 invoke ..> RecordRecent : "record_recent_folder"
 invoke ..> RemoveRecent : "remove_recent_folder"
 Scan --> build_tree
-LoadRecent --> AppConfigStore
-RecordRecent --> AppConfigStore
-RemoveRecent --> AppConfigStore
+LoadRecent --> SettingsRepository
+RecordRecent --> SettingsRepository
+RemoveRecent --> SettingsRepository
 Render --> render_plantuml_diagram
 render_plantuml_diagram --> render_plantuml_svg
 render_plantuml_svg --> resolve_plantuml_runtime
@@ -137,8 +137,8 @@ render_plantuml_diagram --> sanitize_svg
 ## 処理フロー (Open Folder → Preview)
 
 1. `@tauri-apps/plugin-dialog` の `open({ directory: true })` でフォルダを選択する。
-2. `scan_directory` command で Explorer 用ツリーを取得する。
-3. `record_recent_folder` command で選択 root を Recent Folders へ保存する。document file が 1 つもない root でも、`scan_directory` が成功した directory であれば保存対象にする。
+2. `open_root` command で Explorer 用ツリーを取得する。
+3. `record_recent_folder` command で選択 root を Recent Folders へ保存する。document file が 1 つもない root でも、`open_root` が成功した directory であれば保存対象にする。
 4. `findReadme` → `findFirstMarkdown` → `findFirstHtml` の順で初期表示ファイルを決める。
 5. 初期documentをloading tabとして作成し、`open_document` commandのdiscriminated responseで分岐する。Markdownは本文を保持し、HTMLはpreview URLだけを保持する。Explorer選択も同じ`openOrActivateTab`を使い、同一pathなら既存tabをactivateする。
 6. `renderMarkdown` (`markdown-it`) で HTML 化する。fence rule で:
@@ -157,7 +157,7 @@ actor User
 participant "App (React)" as App
 participant "plugin-dialog" as Dlg
 participant "invoke" as Inv
-participant "Rust\nscan_directory" as Scan
+participant "Rust\nopen_root" as Scan
 participant "Rust\nopen_document" as Read
 participant "renderMarkdown\n(markdown-it)" as MD
 participant "WebView DOM" as DOM
@@ -166,7 +166,7 @@ participant "mermaid" as Mer
 User -> App : Open Folder click
 App -> Dlg : open({ directory: true })
 Dlg --> App : path
-App -> Inv : invoke("scan_directory", { rootPath })
+App -> Inv : invoke("open_root", { path, expectedContext })
 Inv -> Scan : command
 Scan --> Inv : FileTreeNode
 Inv --> App : FileTreeNode
@@ -315,15 +315,15 @@ stop
 
 ## trusted HTML preview
 
-- `DocumentStore`は成功した`scan_directory`のcanonical rootを`RwLock<Option<PathBuf>>`へ保持し、`open_document`と`mvhtml` protocolが共有する。protocol read中はread lockを保持する。
+- `DocumentStore`は`RwLock<Option<RootSnapshot {path,generation}>>`を正本とする。成功したopen_rootで両fieldを同時commitし、document / protocolはsnapshotをcloneしてlock解放後にそのpathでI/Oする。context照合も同じsnapshotを使う。
 - HTML URLはRustがroot-relative segmentを個別percent-encodeして生成し、absolute filesystem pathをWebViewへ公開しない。`convertFileSrc`はMarkdown asset imageだけに使う。
-- protocolは`/document/` prefix、segment decode、separator / dot / drive注入、canonical root、symlink、regular file、固定MIME allowlistを検証する。GET / HEAD以外は405、root未設定409、invalid 400、root外403、missing 404とする。
+- protocolは`/document/<generation>/`（世代不一致410、未指定400）、segment decode、separator / dot / drive注入、canonical root、symlink、regular file、固定MIME allowlistを検証する。GET / HEAD以外は405、root未設定409、invalid 400、root外403、missing 404とする。
 - HTML responseへCSPとbridgeを注入する。各paneのiframeは`sandbox="allow-scripts"`だけを持ち、bridgeの`ready`が5秒以内にsource / opaque origin / pane selection / revision policyを通った場合だけpane runtimeをreadyにする。
 - `openExternal`は発生paneのiframe source、`Origin: null`、exact shape、ready済み、transient user activation、pane-local duplicate guard、`http(s)` URLを満たす場合だけOS browserへ渡す。active paneであることはsecurity条件にしない。
 - HTML branchではMarkdown変換、Mermaid effect、PlantUML commandを実行しない。Theme変更だけではiframeをremountしない。
 - `MarkdownPreview`は`renderMarkdown`結果だけでなく`dangerouslySetInnerHTML`へ渡すobjectもHTML単位でmemoizeする。Mermaidは初期source nodeをReact外でSVGへ置換するため、window size保存やExplorer操作による無関係なApp再描画で元HTMLを再注入しない。Markdown / PlantUML結果 / path変更時は新しいHTMLを注入し、Theme / revision変更時は既存keyとMermaid effectにより再描画する。
 
-## ファイル走査 (`scan_directory`)
+## ファイル走査 (`open_root`)
 
 ```plantuml
 @startuml
@@ -354,71 +354,48 @@ stop
 
 - `open_document` はcurrent root配下のregular Markdown / HTMLだけをUTF-8で検証し、排他的な`sourceText` / `previewUrl` responseを返す。
 
-## Recent Folders
+## Directory Settings / Recent Folders
 
-Recent Folders は React の MenuBar dropdown から操作し、永続化と path 検証は Rust command に集約する。OS native menu は使わず、window top の `File` / `View` menu name をクリックして dropdown item を展開する React UI とする。
+`ViewerSession`がプロセス内操作gateとin-memory settingsを所有する。`SettingsRepository`はglobalとprojectのJSONを読み、固定sidecar settings.lockをFile::try_lockで最大2秒待つ。ファイルI/O・scan・lock待ち・spawn待ちはasync commandからspawn_blockingへ移し、native操作だけmain threadへdispatchする。
 
-### データと永続化
-
-`RecentFolderEntry` は次のフィールドを持つ。
-
-| field | 役割 |
-| --- | --- |
-| `path` | `record_recent_folder` で canonicalize した絶対 directory path |
-| `name` | Rust 側で保存時に確定した basename snapshot。frontend は通常 `getFileName(entry.path)` で再導出しない |
-| `lastOpenedAt` | Unix seconds 文字列 |
-
-Rust は `AppConfigStore` を Tauri state として管理し、Recent Folders、Viewer settings、PlantUML runtime設定のreadとapp config JSON更新を同一 lockで直列化する。document rootは別の`DocumentStore`が管理し、`scan_directory`、document open / protocol read、Java processによるPlantUML rendering本体をconfig lockへ含めない。
-
-設定ファイルは Tauri app config directory 配下の `settings.json` で、Recent Folders部分は次の通り。完全schemaは後述のViewer Settingsを参照する。
-
-```json
-{
-  "recentFolders": [
-    {
-      "path": "/absolute/path/to/project",
-      "name": "project",
-      "lastOpenedAt": "1783440000"
-    }
-  ]
-}
+```text
+<app_config_dir>/settings.json                    # schemaVersion:2, defaultSettings, recentFolders
+<app_config_dir>/settings.lock
+<app_config_dir>/projects/<sha256>/settings.json  # schemaVersion:1, rootPath, settings
+<app_config_dir>/projects/<sha256>/settings.lock
 ```
 
-`AppConfigStore` はRecent FoldersとViewer settingsのfield-specific updateを同じlock内のread-modify-writeへ集約する。保存は同じdirectoryのtemporary fileへ全量write / syncし、Unixはrename、Windowsはreplace-existing + write-throughでdestinationを置換する。replace成功をlogical commit pointとし、serialize / temporary create / write / sync / replace失敗時は既存`settings.json`を維持する。replace後のdirectory sync失敗はlogical saveを成功のままdurability warningとしてstderrへ記録する。
+SHA-256はdomain + platform + canonical絶対UTF-8 pathから作る。symlinkは実体に収束し、同名異pathは別project。caseを一律変換しない。保存rootPath不一致はerror。rename / 移動時は新projectとして扱う。
 
-`record_recent_folder` は directory であることを確認してから同一 `path` の既存 entry を削除し、新しい entry を先頭へ挿入する。最大件数は 10 件で、超過分は末尾から切り捨てる。保存後に folder が OS 側でリネームされた場合、既存 entry の `name` は保存時点の snapshot のまま残る。
+初回project openではtree準備成功後にglobal defaultsをsnapshotして生成する。global / project lockは同時保持せず、初回作成競合はlock内で再確認する。既存project openはglobal破損時も可能。current project fileの削除はmissingConfigとし、明示openまで再生成しない。
 
-### UI と操作
+旧schemaのviewerSettingsをdefaultSettingsへ移しrecentFoldersを保持する。未知schema・不正JSONは上書きせず、対象pathをerrorへ含める。旧版は新版globalを上書きしてdefaultsを無音で失うため混在起動は非対応。復旧は全Viewer終了後にユーザーが該当JSONを退避して再起動 / folder openする。
 
-- App 起動時に `load_recent_folders` を呼び、復元できた entry を File dropdown に表示する。
-- `File` dropdown には `Open Folder...`、`Recent Folders` list、`Reload`、separator、application-wideな`Settings...`を表示する。Settings dialogを閉じた後はFile menu triggerへfocusを戻す。
-- Recent entry は `entry.name` を主表示、`entry.path` を補助表示にする。`entry.name` が空の場合のみ path 全体を fallback 表示する。
-- Recent entry click は `scan_directory` → `record_recent_folder` → initial Markdown 読み込みの順で既存 `loadRoot` に統合する。
-- `x` delete button は `remove_recent_folder` を呼び、entry を明示削除する。
-- 保存済み path が存在しない場合、recent entry click は `scan_directory` / `record_recent_folder` の失敗を error strip に表示し、entry を自動削除しない。
+read-modify-write全体を固定sidecar lockで直列化し、field単位patchを最新JSONへ適用する。既存のtemp write / sync / atomic replaceをgeneric helperとして再利用する。replace前の失敗は旧file保持、replace後のdirectory sync失敗は保存成功+stderr durability warning。lock fileはreplace / unlinkしない。同fieldは最後の保存が有効で、別fieldは失わない。
 
-## Viewer Settings
+Recentは最大10件をcanonical pathでdedupeし、record成功時に先頭へ移す。Fileメニューを開く時に最新履歴を読む。存在しないfolderは明示削除まで残す。
 
-app config JSON の`viewerSettings`へTheme、logical window size、PlantUML jar pathを保存する。既存の`recentFolders`だけのJSONはserde defaultで読み、次回保存時に新schemaへ更新する。
+## Viewer Settings / Root Transition
 
-```json
-{
-  "recentFolders": [],
-  "viewerSettings": {
-    "theme": "dark",
-    "windowSize": { "width": 1200, "height": 800 },
-    "plantUmlJarPath": "/absolute/path/to/plantuml.jar"
-  }
-}
-```
+再起動直後はglobal defaults、folder open時にdirectoryのtheme / window size / jarへ切り替わる。session自動復元はしない。Settings dialogは対象Rootを表示し、open時に最新fileを読む。Saveは変更fieldだけpatchし、jar Clearだけ明示nullを送る。Theme操作もthemeだけを送る。背景shellのinert / focus管理は維持する。
 
-- `Builder::setup`がmain windowへ保存済みlogical sizeを適用する。範囲外sizeだけは800 x 600へ正規化してwarningを返し、frontendが正常値を再保存する。
-- frontendは`load_viewer_settings`と`load_recent_folders`を`Promise.allSettled`で読み、Dark themeのstartup flashを避けるため完了までloading shellを表示する。
-- `View > Theme`と`File > Settings...`は同じ`save_viewer_preferences`を使う。Settings dialogはdraftを持ち、Save成功前にapp Theme / runtimeを変更しない。
-- Settings dialog表示中はbackground app shellを`inert`かつ`aria-hidden`にする。保存中に全controlがdisabledでもdialog containerへfocusを保持し、Tabでbackgroundへ移動させない。jar file pickerのplugin / OS errorはdialog内alertへ表示し、Cancelはerrorにしない。
-- window resizeはphysical sizeをscale factorでlogical sizeへ変換し、500ms debounce後に`save_window_size`へ送る。maximized / minimized / fullscreen中は保存しない。resize commandは直列queueにし、最新pending sizeを追送する。
-- foreground config操作はoperation countでbusyを管理する。background resizeはMenuBarをdisableせず、backend lockとfield-specific updateでRecent Folders / preferencesとの競合を防ぐ。
-- 明示`plantUmlJarPath`がある場合は最優先し、削除済み・無効pathをruntime directory探索へfallbackしない。`Clear`した場合だけ`plantuml.config.json`、同梱`plantuml.jar`の探索へ戻る。
+`SettingsQueue`が保存を直列化し、resizeを500ms debounceする。Root切替開始時はbusyを同期設定して旧resizeをflushする。旧保存失敗はwarningで続行し、candidate scan / 設定失敗だけ切替を中止する。commit後にcontextを交換し旧pendingを破棄する。document / render結果はcontextとtab revisionで古い結果を捨てる。
+
+startup / Root open / Retryのnative title / sizeはRustから適用し、実測size・sizeApplied・specialStateを返す。Reactはその間のresizeを捨て、実測baselineと異なる利用者resizeだけを保存する。イベントの古いpayloadではなく最新getter値を使う。maximized / minimized / fullscreenではsize適用・保存をせず、通常状態に戻る最初の値はbaselineにするだけ。
+
+PlantUMLは現在sessionのin-memory jar設定を実行開始時にsnapshotする。fileの再読込はfolder open / Settings open / Reload / patch時だけ。実行中jobのruntimeは変更しない。明示jar無効時の自動探索fallbackは禁止し、Clear時だけruntime directory探索へ戻る。
+
+## Multi-instance / macOS Window Menu
+
+1プロセス1main windowを維持する。New WindowはmacOS bundle内ではcurrent_exe由来の絶対bundleへopen -n -aを実行し、dev / Windows / Linuxではcurrent_exeをspawnする。親が終了しても子をkillしない。dev子の表示はVite serverに依存する。
+
+native titleはRoot名と親path、未選択はNo Folder。macOSはTauri標準App / File / Edit / View / Window / Helpの操作を維持し、FileのNew Windowと独自Window submenuのinstance一覧を追加する。予約Window IDを使わず、AppKit自動一覧と二重化しない。checkは常に自instanceだけ、重複labelにUUID suffixを付け安定sortする。
+
+mode0700の`/tmp/mv-<uid>-<appid hash>/`にUUID socketを作る。0700 / owner / 非symlinkを確認し、16KiBのlength-prefixed JSONでInfo / Activateだけを扱う。Infoは250ms、一覧全体2秒・並列8件、listenerも同時8件。起動 / Root変更 / focus / Refreshで更新し、到達不能時はpartial表示。接続拒否・不存在だけをstaleとして削除しtimeoutでは削除しない。
+
+macOS 14以降はrequesterがyieldActivationを行い、さらにtargetのactivateFromApplication(options: ActivateAllWindows)を実行してからtargetへActivateを送る。targetはunhide / deminiaturize完了待ち / makeKeyAndOrderFront / activateを行い、key・active・onActiveSpaceを確認してackする。全体2秒を超えたらerror。14未満はAPI availabilityのため旧APIを用いるが、14以降の失敗からfallbackしない。
+
+native errorはRust queueのid/messageをdrainして既存ErrorBannerへ表示する。capabilityはmain限定を維持し、HTML originへ権限を追加しない。close / Quitは当該processのみ。Dock / Cmd+Tabでの単一icon集約やCmd+`でのprocess間巡回は保証しない。
 
 ## エラーハンドリング
 

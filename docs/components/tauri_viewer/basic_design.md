@@ -122,17 +122,17 @@ package "Tauri Runtime / WebView" as TR {
 }
 
 package "Rust backend (lib.rs)" as R {
-  [scan_directory]
+  [open_root]
   [open_document]
   [DocumentStore]
   [render_plantuml_diagrams\n(spawn_blocking)]
   [load_recent_folders]
   [record_recent_folder]
   [remove_recent_folder]
-  [load_viewer_settings]
-  [save_viewer_preferences]
-  [save_window_size]
-  [AppConfigStore]
+  [load_startup_state]
+  [patch_context_settings]
+  [patch_context_settings]
+  [SettingsRepository]
 }
 
 package "External" as E {

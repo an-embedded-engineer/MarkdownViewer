@@ -1,0 +1,357 @@
+{
+  "runtime": "/var/folders/bv/b7hn6j0d13d3_cxbbj0y8wtm0000gn/T/mv-activation-gszh0u4s",
+  "bundle": "/var/folders/bv/b7hn6j0d13d3_cxbbj0y8wtm0000gn/T/mv-activation-gszh0u4s/Activation Spike.app",
+  "strategy": "yield-explicit",
+  "macos": "26.6.2",
+  "results": [
+    {
+      "scenario": "prepare-requester",
+      "passed": true,
+      "elapsedMs": 85,
+      "before": {
+        "source": {
+          "pid": 86397,
+          "sequence": 0,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": null
+        },
+        "target": {
+          "pid": 86293,
+          "sequence": 0,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": null
+        }
+      },
+      "after": {
+        "source": {
+          "pid": 86397,
+          "sequence": 1,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86293,
+          "sequence": 1,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": null
+        }
+      },
+      "error": null
+    },
+    {
+      "scenario": "normal",
+      "passed": true,
+      "elapsedMs": 68,
+      "before": {
+        "source": {
+          "pid": 86293,
+          "sequence": 1,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": null
+        },
+        "target": {
+          "pid": 86397,
+          "sequence": 1,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "after": {
+        "source": {
+          "pid": 86293,
+          "sequence": 2,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86397,
+          "sequence": 2,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "error": null
+    },
+    {
+      "scenario": "prepare-minimized",
+      "passed": true,
+      "elapsedMs": 90,
+      "before": {
+        "source": {
+          "pid": 86397,
+          "sequence": 2,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86293,
+          "sequence": 2,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "after": {
+        "source": {
+          "pid": 86397,
+          "sequence": 3,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86293,
+          "sequence": 3,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "error": null
+    },
+    {
+      "scenario": "minimized",
+      "passed": true,
+      "elapsedMs": 647,
+      "before": {
+        "source": {
+          "pid": 86293,
+          "sequence": 3,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86397,
+          "sequence": 4,
+          "active": false,
+          "key": false,
+          "minimized": true,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "after": {
+        "source": {
+          "pid": 86293,
+          "sequence": 4,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86397,
+          "sequence": 5,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "error": null
+    },
+    {
+      "scenario": "prepare-other-space",
+      "passed": true,
+      "elapsedMs": 448,
+      "before": {
+        "source": {
+          "pid": 86397,
+          "sequence": 6,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": true,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86293,
+          "sequence": 4,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": false,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "after": {
+        "source": {
+          "pid": 86397,
+          "sequence": 7,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": true,
+          "onActiveSpace": false,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86293,
+          "sequence": 5,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "error": null
+    },
+    {
+      "scenario": "fullscreen-other-space",
+      "passed": true,
+      "elapsedMs": 401,
+      "before": {
+        "source": {
+          "pid": 86293,
+          "sequence": 5,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86397,
+          "sequence": 7,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": true,
+          "onActiveSpace": false,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "after": {
+        "source": {
+          "pid": 86293,
+          "sequence": 6,
+          "active": false,
+          "key": false,
+          "minimized": false,
+          "fullscreen": false,
+          "onActiveSpace": false,
+          "error": null,
+          "handoffAccepted": true
+        },
+        "target": {
+          "pid": 86397,
+          "sequence": 8,
+          "active": true,
+          "key": true,
+          "minimized": false,
+          "fullscreen": true,
+          "onActiveSpace": true,
+          "error": null,
+          "handoffAccepted": true
+        }
+      },
+      "error": null
+    }
+  ],
+  "failure": null,
+  "finalStates": {
+    "a": {
+      "pid": 86293,
+      "sequence": 6,
+      "active": false,
+      "key": false,
+      "minimized": false,
+      "fullscreen": false,
+      "onActiveSpace": false,
+      "error": null,
+      "handoffAccepted": true
+    },
+    "b": {
+      "pid": 86397,
+      "sequence": 8,
+      "active": true,
+      "key": true,
+      "minimized": false,
+      "fullscreen": true,
+      "onActiveSpace": true,
+      "error": null,
+      "handoffAccepted": true
+    }
+  }
+}

@@ -12,7 +12,7 @@
 
 - Git
 - Avalonia 版: .NET SDK 10.0 以上
-- Tauri 版: Node.js LTS、npm、Rust stable / Cargo、OS 固有の Tauri 依存
+- Tauri 版: Node.js LTS、npm、Rust 1.89以上 / Cargo、OS 固有の Tauri 依存
 - PlantUML 表示を使う場合のみ: Java と `plantuml.jar`
 
 各 SDK は公式の配布元からインストールしてください。

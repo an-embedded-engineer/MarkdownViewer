@@ -42,7 +42,7 @@ Rootの分離、設定、起動、一覧を1案件の統合設計として扱う
 | モジュール / 型 | 責務 |
 | --- | --- |
 | `src-tauri/src/project_settings.rs` / `SettingsRepository` | typed schema、identity、初期化・migration・field単位更新 |
-| 同module / `AtomicJsonFile`、`ConfigFileLock` | 共通JSONのatomic replace、durability warning、sidecar lockのRAII |
+| 既存generic JSON write helper、同module / `ConfigFileLock` | 共通JSONのatomic replace、durability warning、sidecar lockのRAII |
 | `src-tauri/src/viewer_session.rs` / `ViewerSession` | 設定context・settings snapshot・Root切替の調停。Rootと世代の正本はDocumentStoreの単一RootSnapshot |
 | `src-tauri/src/instance_launcher.rs` / `InstanceLauncher` | cfg別の別process起動、起動失敗の説明 |
 | `src-tauri/src/window_identity.rs` / `WindowIdentity` | titleとinstance一覧の同一表示モデル |
@@ -59,7 +59,7 @@ Rootの分離、設定、起動、一覧を1案件の統合設計として扱う
 
 Rust `SettingsContext`はserdeのtagged enum、TSは`{ kind: "default", rootGeneration: string } | { kind: "project", projectId: string, rootGeneration: string }`。rootGenerationはu64をcanonical十進文字列で渡しJS整数精度へ依存しない。Root未選択は世代0。Rust以外が新contextを発行しない。
 
-変更するcommandのerrorは`ViewerError { code: "staleContext" | "invalidConfig" | "missingConfig" | "io" | "lockTimeout" | "launch" | "activation" | "invalidRequest", message: string, configPath?: string }`。英語messageはUIへ表示し、既存toErrorMessageもこのshapeを認識する。warningは同じcode / message / optional pathに安定IDを付けて重複表示を抑止する。
+変更するcommandのerrorは`ViewerError { code: "staleContext" | "invalidConfig" | "missingConfig" | "io" | "lockTimeout" | "launch" | "activation" | "invalidRequest", message: string, configPath?: string }`。英語messageはUIへ表示し、既存toErrorMessageもこのshapeを認識する。ViewerSettingsLoadResultのwarningは既存のstring配列を維持する。native操作のnoticeはUUIDのidとmessageを持つqueueで取り出す。
 
 | command | 引数 | 戻り値 / 操作 | 旧経路 |
 | --- | --- | --- | --- |
@@ -72,8 +72,8 @@ Rust `SettingsContext`はserdeのtagged enum、TSは`{ kind: "default", rootGene
 | `render_plantuml_diagrams` | context、sources | 既存render response。session settings snapshot使用 | 同名commandの契約更新 |
 | `load_recent_folders` | なし | 既存entries | global lock経路へ更新 |
 | `record_recent_folder` / `remove_recent_folder` | path | 既存entries | global lock経路へ更新 |
-| `new_window` | なし | 起動要求受理 `{ accepted: true }` | 新規 |
-| `retry_window_presentation` | context | OS title / size適用結果、warnings | 新規。現session値だけを適用 |
+| `new_window` | なし | 起動要求受理（成功時void） | 新規 |
+| `retry_window_presentation` | context | `[presentation, warnings]` | 新規。現session値だけを適用 |
 | `drain_viewer_notices` | なし | Rustに保持したnotice配列を取り出す | 新規 |
 
 patchはTSのoptional fieldsとRustの明示PatchField enumで`未指定` / `Set(value)`を区別する。jarの`Set(null)`はClearであり未指定ではない。empty patchはno-op。任意path / generationへの保存は拒否する。
@@ -82,7 +82,7 @@ patchはTSのoptional fieldsとRustの明示PatchField enumで`未指定` / `Set
 
 noticeはRust queueを正本とし、`viewer-notices-available` eventは取り出しの通知だけに使う。frontendはlistenerを登録後にstartup loadとdrainを行い、その後eventでdrainする。未登録時もqueueに残り、native dialogとの二重表示経路は持たない。startup global errorはstartup応答にだけ載せる。close時には当該processのqueueを破棄する。
 
-startupはRust側でglobal load / migrationをbackground実行後、main threadで`No Folder — MarkdownViewer`とdefaults logical sizeを適用する。maximized / fullscreen / minimized中はsizeを適用しない。global破損時は表示用既定値のsizeを適用するがJSONへ保存せず明示errorを返す。`presentation { actualLogicalSize: WindowSize | null, sizeApplied: boolean }`を返し、frontendは応答までstartup busyとしてresize eventを破棄し、実測sizeをbaselineに設定してからbusyを解除する。startup・Root open・Retryは§7.2の共通presentation policyを使う。getter失敗時はactualLogicalSize=nullとwarningを返し、最初に取得できた実測値をbaselineにするだけで保存しない。startup適用によるresizeでdefaultsを書き戻さない。
+startupはRust側でglobal load / migrationをbackground実行後、main threadで`No Folder — MarkdownViewer`とdefaults logical sizeを適用する。maximized / fullscreen / minimized中はsizeを適用しない。global破損時は表示用既定値のsizeを適用するがJSONへ保存せず明示errorを返す。`presentation { actualLogicalSize: WindowSize | null, sizeApplied: boolean, specialState: boolean }`を返し、frontendは応答までstartup busyとしてresize eventを破棄し、実測sizeをbaselineに設定してからbusyを解除する。startup・Root open・Retryは§7.2の共通presentation policyを使う。getter失敗時はactualLogicalSize=nullとwarningを返し、最初に取得できた実測値をbaselineにするだけで保存しない。startup適用によるresizeでdefaultsを書き戻さない。
 
 ## 5. 起動と終了
 
@@ -161,7 +161,7 @@ Root切替:
 
 1. UIのRoot / 設定操作をbusyにし、新規resize debounce受付を止める。旧contextのpending resizeをflushし、進行中設定保存queueを待つ。旧context保存の失敗はwarningとして表示しpendingを破棄して切替を続行する。切替中止はcandidate scan / 設定準備の失敗に限定し、旧設定の破損・lock timeoutでそのprocessを閉じ込めない。
 2. `open_root` commandでcandidate treeとproject設定を準備する。DocumentStoreのscan_rootをprepare / commitに分離し、失敗時にcurrent rootを先に変えない。設定生成が成功した後にsession gate内でRootとcontext世代をcommitする。
-3. Root commit後、Rustがmain thread上でnative titleとlogical sizeを適用して実測sizeを読む。応答`RootOpenResult { tree, canonicalRootPath, settings, context, presentation: { actualLogicalSize, sizeApplied }, warnings }`でReactのRoot / tabs / splitをresetしtheme / jarを反映する。frontendはsetSize / setTitleを直接呼ばず、capability追加は不要。context交換時に旧timer・pendingを破棄する。
+3. Root commit後、Rustがmain thread上でnative titleとlogical sizeを適用して実測sizeを読む。応答`RootOpenResult { tree, canonicalRootPath, settings, context, presentation: { actualLogicalSize, sizeApplied, specialState }, warnings }`でReactのRoot / tabs / splitをresetしtheme / jarを反映する。frontendはsetSize / setTitleを直接呼ばず、capability追加は不要。context交換時に旧timer・pendingを破棄する。
 4. Root切替busy中のresize eventは破棄し、応答の実測sizeを保存不要のbaselineとする。busy解除後はevent payloadの古いサイズを使わずgettersで現在sizeを再取得し、取得開始時contextと現在contextが一致しbaselineと異なる場合だけ保存する。animation frame等の時間窓は使わない。maximized / fullscreen / minimized中はRootのsize適用も保存もしない。通常状態へ戻った際の現在実測sizeを新baselineとして受け入れ、戻る操作自体ではproject設定を上書きしない。次の利用者resizeから新contextへ保存する。特殊状態から戻った際のproject size自動適用は行わず、必要なら通常状態でfolderを開き直す。
 5. 一覧snapshotを更新し初期documentを開く。タイトル・OS size適用失敗はRoot成功後のUI適用warningとして表示し、成功したRootを別Rootへrollbackしない。Retryは`retry_window_presentation`へ現在contextを渡し、Rustが現在sessionのtitle / sizeだけを再適用する。baseline更新はopen_rootと共通化し、その間のresizeを抑止する。一覧には新Rootの正しいsnapshotを出す。
 6. Recent FoldersはRoot成功後に更新する。履歴保存だけ失敗した時は新Rootを維持し既存どおりwarningを表示する。
@@ -184,10 +184,10 @@ Root / identity snapshotはRustを正本にし、document.titleの更新だけ�
 
 - Runtime領域は短い`/tmp/mv-<uid>-<app identifier SHA256先頭16桁>/`、mode0700。UIDはOS APIで取得。directoryはsymlink_metadataでowner、種別、modeを検証し、他owner / symlink / 不正modeなら作成・通信を拒否する。socket名は`<UUID>.sock`。Unix socket path上限を事前検証する。
 - socket一覧を列挙して直接問い合わせるためPIDレジストリや常駐brokerは不要。同ユーザー・同appid・同protocol versionのinstanceだけを扱う。devは別namespace suffixとし配布版へ混在させない。
-- typed protocol V1: `Info` → `{instanceId, pid, title, rootPath, protocolVersion}`、`Activate { instanceId }` → focused / error。通常Infoは1接続1要求。選択時は同じlive接続上でInfoを再取得してUUID / PIDを照合し、次にActivateを送る2段階handshakeを許す。length prefix付きJSON、最大16KiB。不正型・未知version・過大frameを拒否する。
+- typed protocol V1: `Info { version }` → `{id, pid, title, version}`、`Activate { version, id, remaining_ms }` → focused / error。通常Infoは1接続1要求。選択時は同じlive接続上でInfoを再取得してUUID / PIDを照合し、次にActivateを送る2段階handshakeを許す。length prefix付きJSON、最大16KiB。不正型・未知version・過大frameを拒否する。
 - Tokioでconnect / 完全frame read-writeをdeadline付きで行い、Infoは1相手250ms、一覧全体2秒、同時接続8件まで。部分一覧時は`Some windows could not be reached`をdisabled menu itemで示す。readerの小分け送信でdeadlineを延長しない。
-- macOS 14以降はrequesterのmain threadでlive接続先PIDのNSRunningApplicationを取得し、NSApplication.yieldActivation(to:)でactivationを譲ってからActivateを送る。targetはUUIDを再照合し、main threadでNSApp.unhide、deminiaturizeを必要時に実行し、復元完了後にmakeKeyAndOrderFrontとNSApp.activateを行う。taoのset_focus単独やAPI呼出成功だけに依存しない。deminiaturize完了notification / state観測を待ち、待機中main threadを塞がない。
-- ackは対象windowがkeyかつNSAppがactiveであることをmain threadで観測して初めて返す。Focused eventは再確認のtriggerとし、window key / app activeの両方を確認する。要求全体のdeadlineはhandoff開始から2秒、遅れて届いたtarget処理は期限切れなら新たなactivateを開始しない。相手終了・timeout・OS拒否はerrorとして表示し一覧をrefreshする。
+- macOS 14以降はrequesterのmain threadでlive接続先PIDのNSRunningApplicationを取得し、NSApplication.yieldActivation(to:)でactivationを譲り、target.activateFromApplication(currentApplication, ActivateAllWindows)の成功を確認してからActivateを送る。Phase 3の実機spikeでyieldだけでは失敗し、この明示handoff追加により3条件のgoを確認した。targetはUUIDを再照合し、main threadでNSApp.unhide、deminiaturizeを必要時に実行し、復元完了後にmakeKeyAndOrderFrontとNSApp.activateを行う。taoのset_focus単独やAPI呼出成功だけに依存しない。deminiaturize完了notification / state観測を待ち、待機中main threadを塞がない。
+- ackは対象windowがkeyかつNSAppがactiveであることをmain threadで観測して初めて返す。Focused eventは再確認のtriggerとし、window key / app activeの両方を確認する。要求全体のdeadlineはlive Info再取得開始から2秒、遅れて届いたtarget処理は期限切れなら新たなactivateを開始しない。相手終了・timeout・OS拒否はerrorとして表示し一覧をrefreshする。
 - 現在のmacOS最低対応versionをこの機能だけで引き上げない。14未満はAPI availability判定で従来のAppKit activation APIを使い、同じkey / active ack条件を適用する。これはOS API availabilityのための必須分岐であり、14以降のhandoff失敗から旧APIへfallbackしない。AppKit bindingのavailability guardとmain-thread ownershipをmacOS adapterへ閉じ込める。
 - listenerのin-flight上限8、超過接続は閉じる。InfoはRoot / identity snapshotを読み、設定ファイルへは触れない。通信でファイルopenや設定変更は受け付けない。
 - 正常終了で自分のsocketを削除。異常終了の残骸は接続拒否またはNotFoundのみをstaleと判定する。timeoutだけで削除しない。UUID socket pathを再利用しないためstale削除が新processのsocketを消すことはない。親directoryは稼働中に削除しない。
@@ -198,7 +198,7 @@ menu構築は`#[cfg(target_os = "macos")]`に閉じ、Windowsにnative menu bar�
 
 | menu | 項目 |
 | --- | --- |
-| App | About / Services / Hide / Hide Others / Show All / Quit（既定PredefinedMenuItemを維持） |
+| App | About / Services / Hide / Hide Others / Quit（既定PredefinedMenuItemを維持） |
 | File | New Window（Cmd+Shift+N）/ Close Window（Cmd+W） |
 | Edit | Undo / Redo / Cut / Copy / Paste / Select All（既定どおり） |
 | View | Enter Full Screen（既定どおり） |
@@ -286,7 +286,7 @@ Windows cfgのspawn / lock / path codeはWindows上のcargo check / cargo test /
 
 ## 14. レビュー対応履歴
 
-初回レビュー`e2a846d`の18件は`f5fafe3`で解決確認。追加MI-DR-19 / 20も含む全20件が`c4bf9c7`で解決確認され、設計レビュー承認・未解決0件。Phase 3の実機spike自体は未実施。
+初回レビュー`e2a846d`の18件は`f5fafe3`で解決確認。追加MI-DR-19 / 20も含む全20件が`c4bf9c7`で解決確認され、設計レビュー承認・未解決0件。Phase 3の実機spikeは明示handoff追加でgo確認済み。詳細はimpl記録を参照。
 
 | 指摘 | 反映先 |
 | --- | --- |

@@ -22,9 +22,9 @@ components:
   - "docs/rules/development_workflow.md"
   - "docs/setup/README.md"
   - "docs/tests/README.md"
-status: "phase_2_complete_awaiting_phase_3_approval"
+status: "phase_3_implementation_draft"
 design_status: "done"
-impl_status: "not_started"
+impl_status: "draft"
 completion_status: "not_started"
 related_commits:
   - "8034327 : Phase 2 追加2件の設計指摘対応"
@@ -65,7 +65,7 @@ related_commits:
 | 0 要求整理 | 完了・2026-09-12ユーザ承認済み |
 | 1 ブランチ・meta初期化 | 完了（本初期化コミット） |
 | 2 設計・レビュー | 完了・最終レビュー承認、未解決0件 |
-| 3 実装・恒久ドキュメント反映 | 未着手 |
+| 3 実装・恒久ドキュメント反映 | 2026-09-13進行承認済み・実装draft、検証・レビュー準備中 |
 | 4 検証・完了処理 | 未着手 |
 
 ## Phase 1確認
@@ -81,4 +81,10 @@ related_commits:
 - 変更はドキュメントのみ。npm / cargoの実装build・testとUI動作確認は未実施。
 - Phase 3最初の作業はmacOS packaged activation spike。通常 / 最小化 / 別Space fullscreenでkey・activeをdeadline内に観測する。失敗時は後続実装前に要件を再確認する。
 - 実装レビューではopen_documentのcontext照合がI/Oと同じRootSnapshotを使うこと、presentationの共通nullable型、起動時サイズ適用の見え方、恒久docs更新を確認する。
-- Claude review sessionは後続Phaseで再利用するため維持する。Phase 3実装を開始した意味ではない。
+- Claude review sessionはPhase 3レビューでも再利用する。
+
+## Phase 3進捗
+
+- ユーザーからPhase 3進行承認を受領。
+- macOS 26.6.2のpackaged Tauri spikeでyieldだけの経路は失敗。requesterのactivateFromApplicationを追加した経路で通常68ms・最小化647ms・別Space fullscreen401ms、すべてkey / active / onActiveSpaceを確認してgoとした。
+- [実装記録](impl/tauri_multi_instance_project_settings_impl.md)に設計差分・検証・未確認項目を記録する。

@@ -21,18 +21,26 @@
 
 MenuBar は window top に `File` / `View` を表示する React UI で、menu name click により dropdown item を展開する。
 
-- `File`: `Open Folder...`、`Recent Folders`、`Reload`、`Settings...`
+- `File`: `New Window`、`Reapply Window Settings`、`Open Folder...`、`Recent Folders`、`Reload`、`Settings...`
 - `Recent Folders`: 最大 10 件。主表示は保存時点の folder name、補助表示は absolute path。
 - `View`: `Theme: Light` または `Theme: Dark`、`Split View`、`Debug Information`（後2項目は`role="menuitemcheckbox"`）
 
 Recent Folders entry click で保存済み path が存在しない場合は error strip に表示し、entry は自動削除しない。削除は delete button による明示操作だけで行う。
 
+## 複数プロセスとタイトル
+
+`New Window`はRoot未選択の別プロセスを起動する。macOS native Fileにも同じ操作（Cmd+Shift+N）を提供する。macOS native WindowにはMinimize / Zoom / Close Windowを維持し、Refresh Window Listと自アプリのinstance一覧を表示する。起動・Root更新・focus・Refreshで更新し、失効項目の選択はerrorを表示する。現在instanceだけcheckし、同じ表示名はIDで区別する。
+
+native titleは`<directory name> — <parent path> — MarkdownViewer`、未選択は`No Folder — MarkdownViewer`。設定の初期化・Root切替・Retryに伴うsize/titleはRust側で適用する。maximized / minimized / fullscreen中はsizeの適用・保存をskipする。
+
 ## Settings dialog
+
+- 保存対象は選択Root。未選択時は`Default settings for new folders`、選択後は`Settings for <root>`を表示する。
 
 - `Theme`: Light / Dark select。
 - `Window size`: 現在のlogical width x heightをread-only表示し、resizeで自動保存する。
 - `PlantUML jar`: path input、`.jar` file picker、`Clear`。空欄はruntime directory自動探索を表す。
-- `Save`: pathを検証してpreferencesを保存し、成功後にThemeへ反映して閉じる。
+- `Save`: 変更fieldだけを保存する。jarのClearは明示null、未変更fieldは送らない。Settings open時に最新値を読む。
 - `Cancel` / Escape / close / backdrop click: draftを破棄する。
 - `role="dialog"` / `aria-modal="true"`、初期focus、Tab focus loop、dialog内validation alertを持つ。backgroundは`inert`とし、保存中に全controlがdisabledでもdialog containerへfocusを保持する。file picker失敗はdialog内alertへ表示し、Cancelはerrorにしない。
 
@@ -112,11 +120,13 @@ StatusBar 直上に薄い赤背景で表示し、`role="alert"` で支援技術�
 
 ## Tauri Commands
 
-### `scan_directory(root_path: String) -> Result<FileTreeNode, String>`
+### `open_root(path, expectedContext) -> RootOpenResult`
 
-root配下を走査し、Explorer表示用のツリーを返す。
+canonical Rootのtreeとdirectory設定を準備した後にRootSnapshotとcontextをcommitする。キャンセル・準備失敗は旧Rootを維持する。初回open成功時だけproject設定を生成する。返却は`tree / canonicalRootPath / settings / context / presentation / warnings`。Root成功後のOS size/title失敗はwarningとし、File > Reapply Window Settingsから再適用できる。
 
-成功したtree構築後だけ`DocumentStore.current_root`をcanonical rootへ切り替える。失敗時は旧rootを維持する。case-insensitiveな`.html`を列挙し、`.htm`は除外する。
+### `reload_root(context) -> { tree, settings, warnings }`
+
+現在Rootを再走査し最新settingsを再読込する。両方成功してから反映し、rootGenerationとwindow sizeは変更しない。
 
 除外ディレクトリ:
 
@@ -128,9 +138,9 @@ root配下を走査し、Explorer表示用のツリーを返す。
 - `.venv`
 - `__pycache__`
 
-### `open_document(path: String) -> Result<OpenDocumentResponse, String>`
+### `open_document(context, path) -> Result<OpenDocumentResponse, ViewerError>`
 
-`DocumentStore.current_root`配下のUTF-8 documentを開く。Markdownは`sourceText`、HTMLはRust生成のroot-relative`previewUrl`だけを返す。root未設定、root外、directory、unsupported extension、非UTF-8は`Err(String)`とする。旧`read_text_file` commandは提供しない。
+contextと照合した単一`RootSnapshot`配下のUTF-8 documentを開く。Markdownは`sourceText`、HTMLはRust生成のroot-relative`previewUrl`だけを返す。root未設定、root外、directory、unsupported extension、非UTF-8はtyped `ViewerError`とする。旧`read_text_file` commandは提供しない。
 
 `OpenDocumentResponse`:
 
@@ -139,16 +149,17 @@ root配下を走査し、Explorer表示用のツリーを返す。
 
 ### `mvhtml` custom protocol
 
-- URL: macOS / Linuxは`mvhtml://localhost/document/<segments>`、Windowsは`http://mvhtml.localhost/document/<segments>`。
+- URL: macOS / Linuxは`mvhtml://localhost/document/<generation>/<segments>`、Windowsは`http://mvhtml.localhost/document/<generation>/<segments>`。
+- generationはpath内のcanonical十進値。現在snapshotと不一致は410、未指定・不正値は400。旧世代の要求が新Rootの同名fileを読まない。
 - method: `GET` / `HEAD`。`OPTIONS`を含むその他は405。
 - path: segment単位で一度だけpercent-decodeし、空、`.`、`..`、NUL、decode後separator、drive / UNC注入を拒否する。root join後にcanonicalizeし、root外symlinkを403で拒否する。
 - resource: HTML、CSS、JS/MJS、JSON、SVG、PNG、JPEG、GIF、WebP、BMP、ICO、AVIF、WOFF/WOFF2だけを固定MIMEで配信する。
 - CORS: Origin不在または厳密な`Origin: null`だけを許可し、success responseへ`Access-Control-Allow-Origin: null`を返す。JSONはsimple GETだけを対象とする。
 - HTML: response CSPとViewer bridgeを注入し、`ready` / user-clicked `openExternal` messageだけをparentへ送る。
 
-### `render_plantuml_diagrams(sources: Vec<String>) -> Result<PlantUmlRenderResponse, String>`
+### `render_plantuml_diagrams(context, sources) -> Result<PlantUmlRenderResponse, ViewerError>`
 
-PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。app config読込、明示jar missing、automatic discovery失敗などblocking task開始前のruntime解決失敗はcommand全体の`Err(String)`とする。runtime解決後のPlantUML構文エラー、Java process error、timeoutなどは図ごとの`PlantUmlDiagramResult`の`ok: false`として返す。frontendはcommand全体の`Err`でも全PlantUML placeholderをerror表示へ変換し、Markdown / Mermaid表示を維持する。
+PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。sessionのin-memory settingsからjarをsnapshotする。明示jar missing、automatic discovery失敗などblocking task開始前のruntime解決失敗はcommand全体の`Err(String)`とする。runtime解決後のPlantUML構文エラー、Java process error、timeoutなどは図ごとの`PlantUmlDiagramResult`の`ok: false`として返す。frontendはcommand全体の`Err`でも全PlantUML placeholderをerror表示へ変換し、Markdown / Mermaid表示を維持する。
 
 `PlantUmlRenderResponse`:
 
@@ -161,29 +172,36 @@ PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTML�
 - `html: string`
 - `error: string | null`
 
-### `load_recent_folders() -> Result<Vec<RecentFolderEntry>, String>`
+### `load_recent_folders() -> Result<Vec<RecentFolderEntry>, ViewerError>`
 
 app config JSON から Recent Folders を読み込み、保存順の配列で返す。設定ファイルが存在しない場合は空配列を返す。
 
-### `record_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, String>`
+### `record_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, ViewerError>`
 
 `path` を canonicalize し、directory であることを確認した上で Recent Folders の先頭へ保存する。同一 canonical path の既存 entry は削除してから先頭へ移動する。最大件数は 10 件。
 
-### `remove_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, String>`
+### `remove_recent_folder(path: String) -> Result<Vec<RecentFolderEntry>, ViewerError>`
 
 指定 `path` と一致する entry を Recent Folders から削除し、更新後の配列を返す。`path` の存在確認は行わない。
 
-### `load_viewer_settings() -> Result<ViewerSettingsLoadResult, String>`
+### Settings / startup / window commands
 
-Viewer settingsを読む。範囲外window sizeは既定値へ部分正規化し、`warnings`へ理由を返す。malformed JSONは`Err`。
+| command | 引数 | 戻り値・役割 |
+| --- | --- | --- |
+| load_startup_state | なし | context、settings、recentFolders、presentation、warnings、globalConfigError。Rustでdefaults size/titleを適用 |
+| load_context_settings | context | settings / warnings。現在fileを読みsession snapshotを更新 |
+| patch_context_settings | context、patch | settings / warnings。指定fieldだけを排他下で更新 |
+| new_window | なし | 成功時void、失敗時ViewerError |
+| retry_window_presentation | context | `[presentation, warnings]`。現在sessionのtitle/sizeを再適用 |
+| drain_viewer_notices | なし | `{id,message}[]`。native操作のnotice queueを取り出す |
 
-### `save_viewer_preferences(theme, plant_uml_jar_path) -> Result<ViewerSettingsLoadResult, String>`
+`SettingsContext`は`{kind: "default", rootGeneration}`または`{kind: "project", projectId, rootGeneration}`。世代は十進文字列。古いcontextを使う設定保存・render要求は拒否する。
 
-ThemeとPlantUML jar pathだけをStore lock内で部分更新する。pathは空欄を`null`、それ以外はabsolute regular fileかつASCII case-insensitiveな`.jar`としてcanonicalizeする。
+patchは`{theme?: {kind:"set",value}, windowSize?: {kind:"set",value}, plantUmlJarPath?: {kind:"set",value:string|null}}`。省略は維持、nullはjarのClear。logical sizeの有効範囲はwidth 640..10000 / height 480..10000。
 
-### `save_window_size(width, height) -> Result<WindowSize, String>`
+`presentation`は`{actualLogicalSize: WindowSize|null, sizeApplied: boolean, specialState: boolean}`。startup / Root変更中はresize保存を停止し、実測baseline設定後に再開する。native通知event `viewer-notices-available`はqueue更新の合図のみ。
 
-logical sizeを検証し、window sizeだけを部分更新する。有効範囲はwidth 640..10000、height 480..10000。
+失敗は`ViewerError {code,message,configPath?}`（英語message）。schema破損・未知version・missing設定のerrorには復旧対象の絶対pathを含める。従来のscan_directory / load_viewer_settings / save_viewer_preferences / save_window_size commandは撤去した。
 
 ## Frontend Types
 

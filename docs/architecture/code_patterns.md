@@ -30,8 +30,8 @@
 ## Rust / Tauri
 
 - フロントエンドから直接ファイルシステムを読まず、Rust command に寄せる。
-- `DocumentStore` は canonical current root の正本であり、`scan_directory`、`open_document`、`mvhtml` protocol が同じ root boundary を共有する。旧 `read_text_file` command は持たない。
-- custom protocol path は `/document/<segments>` を segment ごとに一度だけ decodeし、separator、dot segment、drive / UNC 注入を拒否した後に root へ join、canonicalize、boundary確認を行う。
+- `DocumentStore` は canonical current root の正本であり、`open_root`、`open_document`、`mvhtml` protocol が同じ root boundary を共有する。旧 `read_text_file` command は持たない。
+- custom protocol path は `/document/<generation>/<segments>` を segment ごとに一度だけ decodeし、separator、dot segment、drive / UNC 注入を拒否した後に root へ join、canonicalize、boundary確認を行う。
 - 返却モデルは `serde::Serialize` を使い、TypeScript側の型と対応させる。
 - 除外ディレクトリや拡張子判定はRust側の小さな関数へ分離する。
 - 外部プロセスはshellを介さず `Command` の引数配列で起動し、stdout / stderrはUI表示可能な文字列へ変換する。WindowsのGUI起動では`CREATE_NO_WINDOW`を指定し、子processごとのterminal window表示を抑止する。
@@ -51,3 +51,9 @@ Rust unit test と Vitest による frontend policy test を整備している�
 - C#: `FileTreeService` / `MarkdownRenderService` のユニットテスト
 - Rust: PlantUML runtimeなど未網羅領域の追加ユニットテスト
 - Frontend: Markdown renderer / component lifecycle の追加ユニットテスト
+
+## Tauriのprocess・Root・settings境界
+
+1 process 1 Viewerを維持する。DocumentStoreはpathとgenerationを単一RootSnapshotとしてcommit / cloneし、protocolはpath内generationとsnapshotを照合する。ViewerSessionのcontextを設定更新に添付し、旧contextの保存を拒否する。設定はproject別と共通defaults/Recentに分け、固定sidecar file lockでread-modify-writeを保護する。macro / command adapter以外の新規I/O責務はSettingsRepository、InstanceLauncher、WindowMenuControllerへまとめる。
+
+macOSのyieldActivationとtarget側activateだけでは前面化できない検証結果があり、requesterからactivateFromApplicationも実行する。API成功だけでなく対象windowのkey・active・onActiveSpaceを期限内に観測する。詳しくはTauri componentのdetail_design.mdを参照。

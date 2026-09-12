@@ -1964,13 +1964,19 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 name = "markdown-viewer-tauri"
 version = "0.1.0"
 dependencies = [
+ "libc",
+ "objc2",
+ "objc2-app-kit",
  "percent-encoding",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
+ "tokio",
+ "uuid",
  "windows-sys 0.61.2",
 ]
 
@@ -2133,6 +2139,7 @@ checksum = "d49e936b501e5c5bf01fda3a9452ff86dc3ea98ad5f283e1455153142d97518c"
 dependencies = [
  "bitflags 2.11.1",
  "block2",
+ "libc",
  "objc2",
  "objc2-core-foundation",
  "objc2-foundation",

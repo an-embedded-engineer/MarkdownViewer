@@ -75,3 +75,9 @@
 - app shell配下のfixed previewは`overflow: hidden`でclipされる。React root直下のsibling layerへ1つだけ置き、使用するtheme tokenをLight / Dark双方で明示供給する。
 - scrollbar APIを複数併記するとWebViewの優先規則でtrack寸法が変わり得る。本実装はWebKit pseudo-elementへ一本化し、40px外寸と6px trackを対象WebViewで確認する。
 - `:focus-within`はpointer click後もbutton focusが残り、`:has(:focus-visible)`もUA heuristicによりpointer focusへ一致し得る。native scrollbar自身をscroll elementのpointer境界にするとenter / leaveも不安定になる。scroll elementを外側shellで包み、pointer滞在と明示keyboard modalityをstateで分離して単一classへ集約し、`:hover` / `:focus-visible`をthumb表示条件に使わない。
+
+## Tauriのprocess・Root・settings境界
+
+1 process 1 Viewerを維持する。DocumentStoreはpathとgenerationを単一RootSnapshotとしてcommit / cloneし、protocolはpath内generationとsnapshotを照合する。ViewerSessionのcontextを設定更新に添付し、旧contextの保存を拒否する。設定はproject別と共通defaults/Recentに分け、固定sidecar file lockでread-modify-writeを保護する。macro / command adapter以外の新規I/O責務はSettingsRepository、InstanceLauncher、WindowMenuControllerへまとめる。
+
+macOSのyieldActivationとtarget側activateだけでは前面化できない検証結果があり、requesterからactivateFromApplicationも実行する。API成功だけでなく対象windowのkey・active・onActiveSpaceを期限内に観測する。詳しくはTauri componentのdetail_design.mdを参照。

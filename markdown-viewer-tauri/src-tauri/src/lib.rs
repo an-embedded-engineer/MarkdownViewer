@@ -1,3 +1,12 @@
+mod instance_launcher;
+#[cfg(target_os = "macos")]
+mod macos_instances;
+mod project_settings;
+mod viewer_session;
+mod window_identity;
+use project_settings::*;
+use viewer_session::*;
+
 use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
@@ -113,56 +122,6 @@ struct AppConfig {
     viewer_settings: ViewerSettings,
 }
 
-struct AppConfigStore {
-    lock: Mutex<()>,
-    temp_sequence: AtomicU64,
-}
-
-impl Default for AppConfigStore {
-    fn default() -> Self {
-        Self {
-            lock: Mutex::new(()),
-            temp_sequence: AtomicU64::new(1),
-        }
-    }
-}
-
-impl AppConfigStore {
-    fn load(&self, app: &tauri::AppHandle) -> Result<AppConfig, String> {
-        let _guard = self
-            .lock
-            .lock()
-            .map_err(|_| "Failed to lock app config store.".to_string())?;
-        read_app_config(app)
-    }
-
-    fn update<T>(
-        &self,
-        app: &tauri::AppHandle,
-        updater: impl FnOnce(&mut AppConfig) -> Result<T, String>,
-    ) -> Result<T, String> {
-        let _guard = self
-            .lock
-            .lock()
-            .map_err(|_| "Failed to lock app config store.".to_string())?;
-        let mut config = read_app_config(app)?;
-        let result = updater(&mut config)?;
-        let sequence = self.temp_sequence.fetch_add(1, Ordering::Relaxed);
-        write_app_config(app, &config, sequence)?;
-        Ok(result)
-    }
-
-    fn viewer_settings(&self, app: &tauri::AppHandle) -> Result<ViewerSettingsLoadResult, String> {
-        let config = self.load(app)?;
-        Ok(normalize_viewer_settings(&config.viewer_settings))
-    }
-
-    fn plantuml_runtime(&self, app: &tauri::AppHandle) -> Result<PlantUmlRuntimeOptions, String> {
-        let config = self.load(app)?;
-        resolve_plantuml_runtime(config.viewer_settings.plant_uml_jar_path.as_deref())
-    }
-}
-
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 enum FileNodeType {
@@ -187,9 +146,15 @@ struct OpenDocumentResponse {
     preview_url: Option<String>,
 }
 
+#[derive(Clone)]
+struct RootSnapshot {
+    path: PathBuf,
+    generation: u64,
+}
+
 #[derive(Clone, Default)]
 struct DocumentStore {
-    current_root: Arc<RwLock<Option<PathBuf>>>,
+    current_root: Arc<RwLock<Option<RootSnapshot>>>,
 }
 
 #[derive(Clone, Copy)]
@@ -270,23 +235,8 @@ const HTML_BRIDGE: &str = r##"<script data-markdown-viewer-bridge>
 })();
 </script>"##;
 
-#[tauri::command]
-fn scan_directory(
-    store: State<'_, DocumentStore>,
-    root_path: String,
-) -> Result<FileTreeNode, String> {
-    store.scan_root(root_path)
-}
-
-#[tauri::command]
-fn open_document(
-    store: State<'_, DocumentStore>,
-    path: String,
-) -> Result<OpenDocumentResponse, String> {
-    store.open_document(path)
-}
-
 impl DocumentStore {
+    #[cfg(test)]
     fn scan_root(&self, root_path: String) -> Result<FileTreeNode, String> {
         let root = normalize_path(PathBuf::from(root_path))?;
         if !root.is_dir() {
@@ -298,18 +248,45 @@ impl DocumentStore {
             .current_root
             .write()
             .map_err(|_| "Failed to lock document root for update.".to_string())?;
-        *current_root = Some(root);
+        let generation = current_root.as_ref().map_or(1, |r| r.generation + 1);
+        *current_root = Some(RootSnapshot {
+            path: root,
+            generation,
+        });
         Ok(tree)
     }
 
+    #[cfg(test)]
     fn open_document(&self, path: String) -> Result<OpenDocumentResponse, String> {
-        let current_root = self
+        let generation = self.snapshot()?.map_or(0, |r| r.generation);
+        self.open_checked(path, generation)
+    }
+
+    fn snapshot(&self) -> Result<Option<RootSnapshot>, String> {
+        Ok(self
             .current_root
             .read()
-            .map_err(|_| "Failed to lock document root for reading.".to_string())?;
-        let root = current_root
-            .as_ref()
+            .map_err(|_| "Failed to lock document root.".to_string())?
+            .clone())
+    }
+
+    #[cfg(test)]
+    fn open_checked(&self, path: String, generation: u64) -> Result<OpenDocumentResponse, String> {
+        let snapshot = self
+            .snapshot()?
             .ok_or_else(|| "Open a document folder before opening a file.".to_string())?;
+        Self::open_snapshot(path, snapshot, generation)
+    }
+
+    fn open_snapshot(
+        path: String,
+        snapshot: RootSnapshot,
+        generation: u64,
+    ) -> Result<OpenDocumentResponse, String> {
+        if snapshot.generation != generation {
+            return Err("Document request belongs to an old root.".into());
+        }
+        let root = &snapshot.path;
         let file_path = normalize_path(PathBuf::from(path))?;
 
         if !file_path.starts_with(root) {
@@ -335,7 +312,7 @@ impl DocumentStore {
                 Ok(OpenDocumentResponse {
                     document_type: DocumentType::Html,
                     source_text: None,
-                    preview_url: Some(preview_url(root, &file_path)?),
+                    preview_url: Some(preview_url(root, &file_path, generation)?),
                 })
             }
             None => Err("Selected file is not a supported document.".into()),
@@ -369,19 +346,38 @@ impl DocumentStore {
             }
         }
 
-        let current_root = self.current_root.read().map_err(|_| {
-            protocol_failure(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to lock the document root.",
-            )
+        let snapshot = self
+            .snapshot()
+            .map_err(|e| protocol_failure(StatusCode::INTERNAL_SERVER_ERROR, &e))?
+            .ok_or_else(|| {
+                protocol_failure(
+                    StatusCode::CONFLICT,
+                    "No document root is currently selected.",
+                )
+            })?;
+        let encoded = request
+            .uri()
+            .path()
+            .strip_prefix(HTML_PROTOCOL_PREFIX)
+            .ok_or_else(|| protocol_failure(StatusCode::BAD_REQUEST, "Invalid document URL."))?;
+        let (generation, relative) = encoded.split_once('/').ok_or_else(|| {
+            protocol_failure(StatusCode::BAD_REQUEST, "Missing document generation.")
         })?;
-        let root = current_root.as_ref().ok_or_else(|| {
-            protocol_failure(
-                StatusCode::CONFLICT,
-                "No document root is currently selected.",
-            )
-        })?;
-        let file_path = resolve_protocol_path(root, request.uri().path())?;
+        let parsed = generation
+            .parse::<u64>()
+            .ok()
+            .filter(|g| g.to_string() == generation)
+            .ok_or_else(|| {
+                protocol_failure(StatusCode::BAD_REQUEST, "Invalid document generation.")
+            })?;
+        if parsed != snapshot.generation {
+            return Err(protocol_failure(
+                StatusCode::GONE,
+                "The document root has changed.",
+            ));
+        }
+        let file_path =
+            resolve_protocol_path(&snapshot.path, &format!("{HTML_PROTOCOL_PREFIX}{relative}"))?;
         let descriptor = resource_descriptor(&file_path).ok_or_else(|| {
             protocol_failure(
                 StatusCode::BAD_REQUEST,
@@ -450,109 +446,6 @@ fn protocol_error_response(status: StatusCode, message: &str) -> Response<Vec<u8
         .unwrap_or_else(|_| Response::new(Vec::new()))
 }
 
-#[tauri::command]
-async fn render_plantuml_diagrams(
-    app: tauri::AppHandle,
-    store: State<'_, AppConfigStore>,
-    sources: Vec<String>,
-) -> Result<PlantUmlRenderResponse, String> {
-    let runtime = store.plantuml_runtime(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        render_plantuml_diagrams_blocking(sources, runtime)
-    })
-    .await
-    .map_err(|error| format!("PlantUML render task failed: {error}"))?
-}
-
-#[tauri::command]
-fn load_viewer_settings(
-    app: tauri::AppHandle,
-    store: State<'_, AppConfigStore>,
-) -> Result<ViewerSettingsLoadResult, String> {
-    store.viewer_settings(&app)
-}
-
-#[tauri::command]
-fn save_viewer_preferences(
-    app: tauri::AppHandle,
-    store: State<'_, AppConfigStore>,
-    theme: AppTheme,
-    plant_uml_jar_path: Option<String>,
-) -> Result<ViewerSettingsLoadResult, String> {
-    let normalized_path = normalize_configured_plantuml_path(plant_uml_jar_path)?;
-    let settings = store.update(&app, |config| {
-        config.viewer_settings.theme = theme;
-        config.viewer_settings.plant_uml_jar_path = normalized_path;
-        Ok(config.viewer_settings.clone())
-    })?;
-    Ok(normalize_viewer_settings(&settings))
-}
-
-#[tauri::command]
-fn save_window_size(
-    app: tauri::AppHandle,
-    store: State<'_, AppConfigStore>,
-    width: u32,
-    height: u32,
-) -> Result<WindowSize, String> {
-    let size = WindowSize { width, height };
-    validate_window_size(size)?;
-    store.update(&app, |config| {
-        config.viewer_settings.window_size = size;
-        Ok(size)
-    })
-}
-
-#[tauri::command]
-fn load_recent_folders(
-    app: tauri::AppHandle,
-    store: State<'_, AppConfigStore>,
-) -> Result<Vec<RecentFolderEntry>, String> {
-    Ok(store.load(&app)?.recent_folders)
-}
-
-#[tauri::command]
-fn record_recent_folder(
-    app: tauri::AppHandle,
-    store: State<'_, AppConfigStore>,
-    path: String,
-) -> Result<Vec<RecentFolderEntry>, String> {
-    let canonical_path = normalize_path(PathBuf::from(path))?;
-    if !canonical_path.is_dir() {
-        return Err("Selected path is not a directory.".into());
-    }
-
-    let canonical_path_text = path_to_string(&canonical_path);
-    let folder_name = recent_folder_name(&canonical_path);
-    store.update(&app, |config| {
-        config
-            .recent_folders
-            .retain(|entry| entry.path != canonical_path_text);
-        config.recent_folders.insert(
-            0,
-            RecentFolderEntry {
-                path: canonical_path_text,
-                name: folder_name,
-                last_opened_at: current_unix_seconds(),
-            },
-        );
-        config.recent_folders.truncate(MAX_RECENT_FOLDERS);
-        Ok(config.recent_folders.clone())
-    })
-}
-
-#[tauri::command]
-fn remove_recent_folder(
-    app: tauri::AppHandle,
-    store: State<'_, AppConfigStore>,
-    path: String,
-) -> Result<Vec<RecentFolderEntry>, String> {
-    store.update(&app, |config| {
-        config.recent_folders.retain(|entry| entry.path != path);
-        Ok(config.recent_folders.clone())
-    })
-}
-
 fn render_plantuml_diagrams_blocking(
     sources: Vec<String>,
     runtime: PlantUmlRuntimeOptions,
@@ -574,29 +467,9 @@ fn render_plantuml_diagrams_blocking(
     })
 }
 
-fn read_app_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
-    let config_path = app_config_path(app)?;
-    if !config_path.is_file() {
-        return Ok(AppConfig::default());
-    }
-
-    let content = fs::read_to_string(&config_path)
-        .map_err(|error| format!("Failed to read app config: {error}"))?;
-    serde_json::from_str(&content).map_err(|error| format!("Failed to parse app config: {error}"))
-}
-
-fn write_app_config(
-    app: &tauri::AppHandle,
-    config: &AppConfig,
-    sequence: u64,
-) -> Result<(), String> {
-    let config_path = app_config_path(app)?;
-    write_app_config_to_path(&config_path, config, sequence)
-}
-
-fn write_app_config_to_path(
+fn write_app_config_to_path<T: Serialize>(
     config_path: &Path,
-    config: &AppConfig,
+    config: &T,
     sequence: u64,
 ) -> Result<(), String> {
     let durability_warning = write_app_config_to_path_with(
@@ -612,9 +485,9 @@ fn write_app_config_to_path(
     Ok(())
 }
 
-fn write_app_config_to_path_with(
+fn write_app_config_to_path_with<T: Serialize>(
     config_path: &Path,
-    config: &AppConfig,
+    config: &T,
     sequence: u64,
     replace: impl FnOnce(&Path, &Path) -> Result<(), String>,
     sync_directory: impl FnOnce(&Path) -> Result<(), String>,
@@ -714,13 +587,6 @@ fn sync_app_config_directory(config_path: &Path) -> Result<(), String> {
 #[cfg(not(unix))]
 fn sync_app_config_directory(_config_path: &Path) -> Result<(), String> {
     Ok(())
-}
-
-fn app_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_config_dir()
-        .map(|directory| directory.join(APP_CONFIG_FILE_NAME))
-        .map_err(|error| format!("Failed to resolve app config directory: {error}"))
 }
 
 fn normalize_viewer_settings(settings: &ViewerSettings) -> ViewerSettingsLoadResult {
@@ -920,7 +786,7 @@ fn extension(path: &Path) -> Option<String> {
         .map(|value| value.to_ascii_lowercase())
 }
 
-fn preview_url(root: &Path, file_path: &Path) -> Result<String, String> {
+fn preview_url(root: &Path, file_path: &Path, generation: u64) -> Result<String, String> {
     let relative = file_path
         .strip_prefix(root)
         .map_err(|_| "Failed to create a root-relative HTML preview URL.".to_string())?;
@@ -944,7 +810,7 @@ fn preview_url(root: &Path, file_path: &Path) -> Result<String, String> {
     let base = "http://mvhtml.localhost/document/";
     #[cfg(not(windows))]
     let base = "mvhtml://localhost/document/";
-    Ok(format!("{base}{}", segments.join("/")))
+    Ok(format!("{base}{generation}/{}", segments.join("/")))
 }
 
 fn resolve_protocol_path(root: &Path, request_path: &str) -> Result<PathBuf, ProtocolFailure> {
@@ -1503,6 +1369,8 @@ mod tests {
     }
 
     fn protocol_request(method: Method, path: &str, origin: Option<&str>) -> Request<Vec<u8>> {
+        // このfixtureは初回open（generation 1）のresource pathを受け取る。
+        let path = path.replacen("/document/", "/document/1/", 1);
         let mut builder = Request::builder()
             .method(method)
             .uri(format!("mvhtml://localhost{path}"));
@@ -1570,7 +1438,7 @@ mod tests {
         assert_eq!(html.document_type, DocumentType::Html);
         assert_eq!(html.source_text, None);
         let preview_url = html.preview_url.expect("HTML preview URL must exist");
-        assert!(preview_url.contains("/document/web%20spec/"));
+        assert!(preview_url.contains("/document/1/web%20spec/"));
         assert!(preview_url.ends_with("%E4%BB%95%E6%A7%98%2EHTML"));
         fs::remove_dir_all(root).expect("test root must be removed");
     }
@@ -1849,7 +1717,10 @@ mod tests {
             .read()
             .expect("root lock must be readable");
         let canonical_root = root.canonicalize().expect("root must resolve");
-        assert_eq!(current_root.as_deref(), Some(canonical_root.as_path()));
+        assert_eq!(
+            current_root.as_ref().map(|r| r.path.as_path()),
+            Some(canonical_root.as_path())
+        );
         drop(current_root);
         fs::remove_dir_all(root).expect("test root must be removed");
     }
@@ -2118,7 +1989,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(AppConfigStore::default())
         .manage(DocumentStore::default())
         .register_asynchronous_uri_scheme_protocol("mvhtml", |context, request, responder| {
             if context.webview_label() != "main" {
@@ -2138,37 +2008,61 @@ pub fn run() {
             });
         })
         .setup(|app| {
-            let store = app.state::<AppConfigStore>();
-            match store.viewer_settings(app.handle()) {
-                Ok(result) => {
-                    for warning in result.warnings {
-                        eprintln!("Viewer settings warning: {warning}");
-                    }
-                    if let Some(window) = app.get_webview_window("main") {
-                        let size = result.settings.window_size;
-                        if let Err(error) = window.set_size(tauri::LogicalSize::new(
-                            size.width as f64,
-                            size.height as f64,
-                        )) {
-                            eprintln!("Failed to restore window size: {error}");
-                        }
-                    }
-                }
-                Err(error) => eprintln!("Failed to load viewer settings: {error}"),
+            let documents = app.state::<DocumentStore>().inner().clone();
+            let session = Arc::new(ViewerSession::new(app.path().app_config_dir()?, documents));
+            app.manage(session.clone());
+            #[cfg(target_os = "macos")]
+            if let Err(error) =
+                macos_instances::WindowMenuController::install(app.handle(), session.clone())
+            {
+                session.notice(
+                    app.handle(),
+                    format!("Window switching is unavailable: {error}"),
+                );
             }
             Ok(())
         })
+        .on_menu_event(|app, event| {
+            #[cfg(target_os = "macos")]
+            macos_instances::WindowMenuController::menu_event(app, event.id().as_ref());
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        })
+        .on_window_event(|window, event| {
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::WindowEvent::Focused(true)) {
+                macos_instances::WindowMenuController::refresh(window.app_handle());
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (window, event);
+        })
         .invoke_handler(tauri::generate_handler![
-            scan_directory,
+            load_startup_state,
+            open_root,
+            reload_root,
             open_document,
             render_plantuml_diagrams,
-            load_viewer_settings,
-            save_viewer_preferences,
-            save_window_size,
+            load_context_settings,
+            patch_context_settings,
             load_recent_folders,
             record_recent_folder,
-            remove_recent_folder
+            remove_recent_folder,
+            new_window,
+            retry_window_presentation,
+            drain_viewer_notices
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::RunEvent::Exit) {
+                if let Some(controller) =
+                    app.try_state::<Arc<macos_instances::WindowMenuController>>()
+                {
+                    controller.cleanup();
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }

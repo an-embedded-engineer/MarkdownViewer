@@ -42,3 +42,9 @@ cargo test
 
 - 開発・実行ルール: `docs/rules/development_workflow.md`
 - テスト方針: `docs/tests/strategy.md`
+
+## 複数process / directory設定
+
+Rustのproject_settings testsはtest binaryをworkerとして起動し、ready barrier後に同一projectの別fieldとRecent Foldersを同時更新する。worker待機は10秒、timeout時はkill / waitで回収する。lock保持workerの強制終了と再取得も確認する。ViewerSession testはcandidate失敗・stale context・旧HTML世代410・snapshot境界を検証する。macos_instances testsはframe上限とread deadline、Vitest projectSettings.test.tsはfield patch・queue・resize baselineを検証する。
+
+検証専用activation_spike exampleとscripts/check_macos_activation_spike.pyは実際に2つのTauri app processを起動する。通常Viewerの設定を変更せず、GUI成立性をJSONに記録する。製品のnative menu・folder picker・Settings dialogとWindows / Linux固有挙動は手動確認に残す。

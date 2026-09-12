@@ -71,3 +71,17 @@ cargo test
 6. pane間のseparatorをdragするか、focus後にArrowLeft / ArrowRight / Home / Endで幅を調整します。
 
 splitを無効にしてもsecondary groupの順序と選択はsession内で保持され、再度有効にすると復元されます。primaryがemptyでsecondaryだけに文書が残る場合は、hidden件数と`Enable Split View`の回復案内を表示します。group、tab順、split比率は永続化せず、再起動後はsingle / empty group / 50:50へ戻ります。狭いwindowでもSplit Viewを自動解除せず、両paneを可能な範囲で等幅へ縮めます。
+
+## 複数ウィンドウとフォルダ別設定
+
+`File > New Window`でRoot未選択の別プロセスを起動します。macOSではメニューバーの`File > New Window`（Cmd+Shift+N）も使えます。各Viewerは独立して終了できます。macOSの`Window`メニューでRoot名からViewerを選び、一覧が古い時は`Refresh Window List`で更新します。Dock独自一覧やアイコンの集約は行いません。
+
+タイトルにはRoot名と親pathを表示します。同名の一覧項目にはIDが付きます。`File > Reapply Window Settings`は現在Rootのサイズ・タイトルを再適用します。最大化・最小化・フルスクリーン中にはサイズを適用・保存しません。
+
+Tauriのユーザー用app config領域に、共通`settings.json`（初期値・Recent Folders）と`projects/<path hash>/settings.json`（テーマ・サイズ・PlantUMLパス）を保存します。対象フォルダ内へ設定は書き込みません。初めて正常に開いたフォルダでは共通初期値から生成し、次回openで復元します。再起動直後は共通初期値で表示し、フォルダを選んだ時点でその設定へ切り替わります。未選択時のSettingsは新しいフォルダ用初期値を変更します。
+
+同じフォルダを複数Viewerで開いた時は、同じ設定項目への最後の保存が有効です。別の項目は保持します。Settings open / Reloadで最新値を読み、常時同期はしません。フォルダの移動・renameは別設定として扱います。
+
+旧版Viewerとの同時起動は避けてください。旧版が共通ファイルへ保存すると新版の初期値を失うため、移行前に旧版を終了してください。破損・未知schema・削除された設定は自動resetしません。errorに出る設定ファイルを、全Viewerを終了してから退避し、再起動または対象folderの再openで生成し直せます。
+
+macOS 26.6.2では検証用Tauri bundleの通常・最小化・別Spaceフルスクリーンからの切り替えを確認済みです。製品UIの操作matrixは別途確認します。Cmd+Tab / Dockに同じiconが複数現れる場合があり、Cmd+`はprocess間巡回を保証しません。dev子はVite server終了後の表示を保証しません。Windows固有build・UI、Linux UI、macOS 14未満・App Translocationは未確認です。
