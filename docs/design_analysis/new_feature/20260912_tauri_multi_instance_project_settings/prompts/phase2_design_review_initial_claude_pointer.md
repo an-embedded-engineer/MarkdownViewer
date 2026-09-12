@@ -1,0 +1,1 @@
+docs/design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/prompts/phase2_design_review_initial_claude.md を読み、あなた自身で設計レビューを開始してください。

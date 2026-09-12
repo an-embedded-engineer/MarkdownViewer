@@ -10,15 +10,25 @@ components:
   - "markdown-viewer-tauri/src-tauri/src/lib.rs"
   - "markdown-viewer-tauri/src/App.tsx"
   - "markdown-viewer-tauri/src-tauri/Cargo.toml"
+  - "markdown-viewer-tauri/src-tauri/src/project_settings.rs"
+  - "markdown-viewer-tauri/src-tauri/src/viewer_session.rs"
+  - "markdown-viewer-tauri/src-tauri/src/instance_launcher.rs"
+  - "markdown-viewer-tauri/src-tauri/src/window_identity.rs"
+  - "markdown-viewer-tauri/src-tauri/src/macos_instances.rs"
+  - "markdown-viewer-tauri/src/projectSettings.ts"
   - "markdown-viewer-tauri/README.md"
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "phase_2_design_draft"
-design_status: "draft"
+  - "docs/setup/README.md"
+  - "docs/tests/README.md"
+status: "phase_2_review_followup"
+design_status: "in_review"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits:
+  - "85fb535 : Phase 2 詳細設計初稿"
+  - "e2a846d : Phase 2 初回設計レビュー18件"
   - "fc2d085 : Phase 1 専用ブランチとmeta初期化"
   - "bb6ea91 : Phase 0 複数ウィンドウとタイトル表示の要求整理"
   - "3d1848c : Phase 0 別プロセス方式・ディレクトリ別設定へ要求更新"
@@ -36,13 +46,12 @@ related_commits:
 - ユーザー用アプリ設定領域にdirectory単位のtheme / window size / PlantUML pathを保持し、directory初回open成功時に設定を生成する。
 - 同一プロセス内で複数windowを管理する構成への変更は行わない。
 
-## Phase 2で確定する事項
+## Phase 2設計判断
 
-- macOSのpackaged app / dev実行における別プロセス起動方法と終了後の独立動作。
-- 別プロセスのwindowをDock / native menuで識別・選択する方法。一覧への自動集約は未検証。
-- directory identity、同名Rootのタイトル、Root未選択時の設定、新規設定の初期値、既存設定の移行。
-- Recent Foldersの共通保存、同directoryを開く複数プロセスの設定更新とプロセス間排他。
-- Root切替時の設定適用と非同期処理・resize保存の整合。
+- [詳細設計](design/tauri_multi_instance_project_settings_feature_design.md)に起動・設定・command / event・native menuの契約を記録。
+- 2026-09-12追加回答によりmacOSはメニューバーのWindow一覧でよい。Dock独自一覧は対象外。
+- 別instanceへのcooperative activationはPhase 3冒頭のpackaged app spikeでgo / no-goを判定する。現時点では実機未検証。
+- 初回レビュー18件は全件設計へ対応済み、reviewer再確認待ち。
 
 ## Phase 状態
 
@@ -50,7 +59,7 @@ related_commits:
 | --- | --- |
 | 0 要求整理 | 完了・2026-09-12ユーザ承認済み |
 | 1 ブランチ・meta初期化 | 完了（本初期化コミット） |
-| 2 設計・レビュー | 2026-09-12進行承認済み・設計draft作成、レビュー準備 |
+| 2 設計・レビュー | 2026-09-12進行承認済み・初回18件対応、再レビュー待ち |
 | 3 実装・恒久ドキュメント反映 | 未着手 |
 | 4 検証・完了処理 | 未着手 |
 

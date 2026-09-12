@@ -2,7 +2,7 @@
 
 ## TODO-2026-029 Tauri別プロセス起動・ディレクトリ別設定・タイトル表示
 
-- status: Phase 2 設計draft・レビュー準備
+- status: Phase 2 初回レビュー18件対応済み・再レビュー待ち
 - workflow: new-feature
 - work_branch: new-feature/tauri-multi-instance-project-settings
 - meta: [案件メタ情報](../design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/meta.md)
@@ -15,30 +15,30 @@
   - macOSで新規ウィンドウを開き、それぞれ別のディレクトリを選択して並行閲覧する。
   - Windowsのタイトルバー・タスクバーのサムネイル見出し、macOSのメニューバーのWindow一覧からディレクトリを識別して切り替える。
 - feasibility:
-  - ユーザ指定により別プロセス方式を採用する。macOSの新規application instance起動とTauriのset_titleで実現可能と判断する。packaged appで起動・Dock表示を検証する。
+  - 別プロセス方式を採用する。macOSでは自身のbundleへopen -n -aで別instanceを起動し、native titleはRustから更新する。packaged appの実機確認はPhase 3以降に行う。
   - 現行DocumentStore.current_rootは1プロセス内で共有される。1プロセス1Viewer windowを維持すればRootはプロセスのメモリ境界で分離され、window別storeへの変更は不要。
   - 各プロセスでmain windowを利用するため、mvhtmlのmain制約とcapabilityを複数window向けに拡張する必要はない。
   - 現行設定はapp_config_dir()/settings.jsonにtheme、windowSize、plantUmlJarPath、recentFoldersをまとめて保存している。Mutexはプロセス内のみ有効で、atomic replaceだけではプロセス間のread-modify-write競合による更新消失を防げない。
-  - macOS native Windowメニューは別プロセスのwindowを自動集約する前提にできない。Dockも複数instanceのicon / 一覧のまとまり方を未検証であり、VS Codeと同一の一覧になるとは断定しない。必要ならプロセス間連携を設計する。
+  - macOS native WindowメニューはIPCで自アプリinstanceを列挙し、activationを譲って対象を前面表示する。cooperative activationはPhase 3冒頭にpackaged appでgo / no-goを確認する。Dock独自一覧はユーザ回答により対象外。
 - proposed_scope:
   - アプリ内File > New WindowとmacOS native menu / Cmd+Shift+Nから別プロセスの空のViewerを起動し、Open Folder / Recent FoldersでRootを選択する。
   - Windowsにも同じアプリ内新規window導線を提供し、既存のショートカット起動を維持する。
-  - タイトル案は「ディレクトリ名 — MarkdownViewer」。未選択は「MarkdownViewer」。同名directoryは親path等で区別できる表記にする。
-  - macOSで別プロセスのwindowをRoot名で識別・選択できる導線を提供する。Dock / native menuでの集約の可否と必要な追加連携はPhase 2で検証する。
+  - タイトルは「ディレクトリ名 — 親path — MarkdownViewer」。未選択は「No Folder — MarkdownViewer」。Window一覧の重複labelにはinstance IDを付加する。
+  - macOSのメニューバーのWindow一覧から別プロセスをRoot名で識別・選択できる。起動・Root変更・focus・Refreshで一覧を更新する。
   - ユーザー用アプリ設定領域にRootディレクトリ単位の設定ファイルを持ち、初回にそのディレクトリを正常に開いた時に生成する。対象directory内には書き込まない。
   - theme、windowSize、plantUmlJarPathをdirectory別に保存・復元する。設定identityは正規化した絶対pathを基にし、同じ末尾directory名でも別pathは別設定とする。
-  - Recent Foldersはユーザー共通としてdirectory設定から分離する案とする。Root未選択時の設定、directory設定の初期値、既存設定の移行はPhase 2で確定する。
+  - Recent FoldersとRoot未選択時のdefaultsは共通settings.jsonに保持する。新projectは最新defaultsから初期生成し、既存viewerSettingsはdefaultsへ一度だけ移行する。再起動直後はdefaults、folder open時にproject設定を復元する。
   - window close時のstate破棄と、全windowを閉じた後のmacOS Dock再起動 / 再表示を扱う。
 - non_scope:
   - Avalonia版への適用、window間のtab移動、全windowのsession復元。
   - 添付VS CodeのDock上部にある最近使ったfolder一覧やfolder iconの完全再現。
-  - Dock独自のNew Window項目は初期必須範囲に含めない。メニューバーの新規作成と異なりAppKit連携の追加調査が必要であり、必要性をPhase 2で整理する。
+  - Dock独自のNew Window・window一覧・icon集約は対象外（2026-09-12ユーザ回答）。
 - completion:
   - macOSでCLIを使わず2つ以上の独立したViewerプロセスを起動し、異なるRootを同時閲覧できる。親Viewer終了後も別プロセスのViewerが利用できる。
   - 一方のRoot変更・Reload・closeが他方のtree / tabs / Markdown / HTML resourceへ影響せず、HTMLは呼出元windowのRoot外を参照できない。
-  - Root選択成功時にタイトルが更新され、キャンセル・失敗時には以前のRootとタイトルを保持する。
+  - Root選択成功時にタイトルが更新され、キャンセル・切替先準備失敗時には以前のRootとタイトルを保持する。Root commit後のOS表示適用失敗は新Rootを維持しwarning / Retryを提示する。
   - 同名directory、日本語・空白入りpath、Root未選択でもwindowを識別できる。
-  - Windowsのタイトルバー・サムネイル見出し、macOSのwindow切替導線にRoot名が表示され、対象windowを選択できることを実機確認する。macOSで別プロセスを一覧に集約する方法をPhase 2で確定し、OSの省略表示やDockの制約を記録する。
+  - Windowsのタイトルバー・サムネイル見出し、macOSのメニューバーのWindow一覧にRoot名が表示され、対象windowを選択できることを実機確認する。OSの省略表示やCmd+Tab / Dockが複数processを単一iconへまとめない場合の制約は記録する。
   - directory初回open成功時にユーザー用設定領域へ設定が生成され、同directory再open時にtheme / size / PlantUML pathが復元される。別directoryの設定を上書きしない。
   - Root切替中のresize保存や非同期処理が切替先の設定へ混線しない。同directoryの複数プロセス利用およびRecent Foldersの同時更新で更新消失を防ぐ。
   - 追加windowでもdialog、外部link、settings、Recent Folders、size復元が機能し、設定更新で他fieldを失わない。
@@ -47,7 +47,7 @@
 - success_metrics: macOSで2 directory以上を同時に開けること、Root欄を確認せずOSのwindow切替UIで対象を選択できること、window間のRoot混線が0件であること。
 - affected_components: src-tauri/src/lib.rs（別プロセス起動・lifecycle・directory設定・プロセス間排他・タイトル）、src/App.tsx（File操作・Root切替時の設定反映）、必要に応じnative起動 / menu連携、frontend / Rust tests、Tauri README / component / architecture / development workflow docs。
 - integration_points: 既存Open Folder / Recent Folders、Root読込成功処理、React App初期化、Rust setup、native menu、window close / reopen、HTML protocol。
-- phase_2_decisions: macOS別instance起動とdev実行の扱い、native menuとReact File menuの操作共有、同名Rootの表示規則、directory identity（symlink / Windows case / path変更）、未選択時設定と初期値・既存設定移行、プロセス間排他、同directoryの設定更新反映、Root切替とresize保存の順序、macOS終了 / 再起動、別プロセスのDock / Window一覧集約と追加連携の要否。
+- phase_2_decisions: 詳細設計に起動・title・directory identity・defaults / migration・file lock・settings context・RootSnapshot世代・native menu / activation handoffを確定。macOS activationの実機成立性はPhase 3冒頭spikeで判定し、不成立なら後続実装前に要求を再確認する。
 - evidence:
   - [Apple createsNewApplicationInstance](https://developer.apple.com/documentation/appkit/nsworkspace/openconfiguration/createsnewapplicationinstance)
   - [Tauri WebviewWindowBuilder](https://docs.rs/tauri/2.11.2/tauri/webview/struct.WebviewWindowBuilder.html)

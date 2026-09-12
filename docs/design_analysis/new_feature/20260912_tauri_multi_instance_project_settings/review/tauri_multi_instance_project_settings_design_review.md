@@ -11,7 +11,7 @@
 
 **初回判定**: **差し戻し (Changes Requested)**。Phase 3 へは進めない。
 **検出件数**: 18 件 = High 1 件（blocking）/ Medium 9 件（blocking 5、non-blocking 4）/ Low 8 件
-**未解決件数**: **18 件**（うち blocking 6 件: MI-DR-01〜06）
+**初回未解決件数**: **18 件**（うち blocking 6 件: MI-DR-01〜06）
 **承認条件**: blocking 6 件を設計へ反映し、MI-DR-07（TODO / meta 整合）を同じ改訂で閉じること。non-blocking の残りは設計追記で閉じるか、Phase 3 実装レビューで確認する follow-up として明記すれば承認可能とする。
 
 ---
@@ -37,24 +37,24 @@
 
 | ID | 重大度 | blocking | 工程 | 対応状態 | 要旨 |
 | --- | --- | --- | --- | --- | --- |
-| MI-DR-01 | High | Yes | design | 未対応 | macOS の Activate（前面化）が cooperative activation と tao `set_focus` 実装の制約で成立を前提にできない |
-| MI-DR-02 | Medium | Yes | design | 未対応 | custom native menu が Tauri 既定 macOS menu の既存項目（Cmd+W / Cmd+M / Full Screen / Help 等）を落とす |
-| MI-DR-03 | Medium | Yes | design | 未対応 | window size / title の適用主体と capability が未確定。maximized / fullscreen 時の Root 切替 size 適用が未定義 |
-| MI-DR-04 | Medium | Yes | design | 未対応 | HTML rootGeneration の URL 配置と、root + generation の原子的 snapshot が未定義 |
-| MI-DR-05 | Medium | Yes | design | 未対応 | 新規 / 置換 command・event 契約が未列挙で、旧 command の撤去も未記載 |
-| MI-DR-06 | Medium | Yes | design | 未対応 | 旧 context の pending resize flush 失敗で Root 切替を中止する方針が可用性を過度に損なう |
-| MI-DR-07 | Medium | No | plan | 未対応 | TODO / meta が Dock 検討・旧タイトル案を残し、設計と不整合 |
-| MI-DR-08 | Medium | No | design | 未対応 | Tauri sync command は main thread で実行されるため、scan / lock 待ちが Activate・menu 更新を塞ぐ |
-| MI-DR-09 | Medium | No | design | 未対応 | 破損・未知 schema・rootPath 不一致・project file 消失時の復旧導線と挙動が未定義 |
-| MI-DR-10 | Medium | No | design | 未対応 | 恒久 docs の置換対象行が未特定。再起動時の size / theme 復元が変わる挙動変更も未記載 |
-| MI-DR-11 | Low | No | design | 未対応 | 複数 process 間で in-app Recent Folders 表示が stale になる |
-| MI-DR-12 | Low | No | design | 未対応 | 同一表示名の重複は同一 Root に限らない（`No Folder` 複数）。一覧順序が未定義 |
-| MI-DR-13 | Low | No | design | 未対応 | muda の CheckMenuItem は click で check を自動反転する |
-| MI-DR-14 | Low | No | design | 未対応 | 旧版併用時に defaultSettings が黙って失われる具体的な失敗モードが未記載 |
-| MI-DR-15 | Low | No | design | 未対応 | OS 側の制約（Cmd+`、Cmd+Tab / Dock の同一 icon、App Translocation）の記録・確認項目がない |
-| MI-DR-16 | Low | No | design | 未対応 | Linux の扱いが「既存動作維持」と「New Window 共通経路」で矛盾 |
-| MI-DR-17 | Low | No | design | 未対応 | 複数 process テストの harness、macOS NFC / NFD path、Windows cfg code の検証手段が未記載 |
-| MI-DR-18 | Low | No | design | 未対応 | PlantUML の「最新 jar 設定」が file 再読込か session snapshot か曖昧 |
+| MI-DR-01 | High | Yes | design | 対応済み・再確認待ち | macOS の Activate（前面化）が cooperative activation と tao `set_focus` 実装の制約で成立を前提にできない |
+| MI-DR-02 | Medium | Yes | design | 対応済み・再確認待ち | custom native menu が Tauri 既定 macOS menu の既存項目（Cmd+W / Cmd+M / Full Screen / Help 等）を落とす |
+| MI-DR-03 | Medium | Yes | design | 対応済み・再確認待ち | window size / title の適用主体と capability が未確定。maximized / fullscreen 時の Root 切替 size 適用が未定義 |
+| MI-DR-04 | Medium | Yes | design | 対応済み・再確認待ち | HTML rootGeneration の URL 配置と、root + generation の原子的 snapshot が未定義 |
+| MI-DR-05 | Medium | Yes | design | 対応済み・再確認待ち | 新規 / 置換 command・event 契約が未列挙で、旧 command の撤去も未記載 |
+| MI-DR-06 | Medium | Yes | design | 対応済み・再確認待ち | 旧 context の pending resize flush 失敗で Root 切替を中止する方針が可用性を過度に損なう |
+| MI-DR-07 | Medium | No | plan | 対応済み・再確認待ち | TODO / meta が Dock 検討・旧タイトル案を残し、設計と不整合 |
+| MI-DR-08 | Medium | No | design | 対応済み・再確認待ち | Tauri sync command は main thread で実行されるため、scan / lock 待ちが Activate・menu 更新を塞ぐ |
+| MI-DR-09 | Medium | No | design | 対応済み・再確認待ち | 破損・未知 schema・rootPath 不一致・project file 消失時の復旧導線と挙動が未定義 |
+| MI-DR-10 | Medium | No | design | 対応済み・再確認待ち | 恒久 docs の置換対象行が未特定。再起動時の size / theme 復元が変わる挙動変更も未記載 |
+| MI-DR-11 | Low | No | design | 対応済み・再確認待ち | 複数 process 間で in-app Recent Folders 表示が stale になる |
+| MI-DR-12 | Low | No | design | 対応済み・再確認待ち | 同一表示名の重複は同一 Root に限らない（`No Folder` 複数）。一覧順序が未定義 |
+| MI-DR-13 | Low | No | design | 対応済み・再確認待ち | muda の CheckMenuItem は click で check を自動反転する |
+| MI-DR-14 | Low | No | design | 対応済み・再確認待ち | 旧版併用時に defaultSettings が黙って失われる具体的な失敗モードが未記載 |
+| MI-DR-15 | Low | No | design | 対応済み・再確認待ち | OS 側の制約（Cmd+`、Cmd+Tab / Dock の同一 icon、App Translocation）の記録・確認項目がない |
+| MI-DR-16 | Low | No | design | 対応済み・再確認待ち | Linux の扱いが「既存動作維持」と「New Window 共通経路」で矛盾 |
+| MI-DR-17 | Low | No | design | 対応済み・再確認待ち | 複数 process テストの harness、macOS NFC / NFD path、Windows cfg code の検証手段が未記載 |
+| MI-DR-18 | Low | No | design | 対応済み・再確認待ち | PlantUML の「最新 jar 設定」が file 再読込か session snapshot か曖昧 |
 
 ---
 
@@ -64,7 +64,7 @@
 
 **重大度**: High（blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **ドキュメント記載**: §8.1「Activate は対象 UUID を接続先で照合し、main thread へ show / unminimize / set_focus を依頼する。完了応答まで最大 2 秒」。§3「PID だけを保存して OS API で activate する案は…不採用。IPC の接続先 instance 自身が自身の window を復元する」。§12 は「他 instance の最小化 / fullscreen 復元は実装後の packaged app 確認が必要」とだけ記す。
 
@@ -87,7 +87,7 @@
 
 **重大度**: Medium（blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **ドキュメント記載**: §8.2「macOS のみ既存標準 App / Edit メニューを維持し、File に New Window、Window に `Refresh Window List`、separator、各 instance の check menu item を置く」。
 
@@ -101,7 +101,7 @@
 
 **重大度**: Medium（blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **ドキュメント記載**: §7.2-3「React の Root / tabs / split を reset し、theme / jar / logical size を適用する」。§7.2-4「programmatic resize 中は抑止し、set_size 完了後の実際の innerSize 読取と次 animation frame までを同期区間にする」。§7.2-5「window.set_title の結果と一覧 snapshot を更新」。§8「起動直後・Root commit 後・retry で Tauri set_title を実行」。§9「capability の main 制約…は維持する」。
 
@@ -117,7 +117,7 @@
 
 **重大度**: Medium（blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **ドキュメント記載**: §7.2 末尾「protocol URL へ rootGeneration を含め照合する（既存 root 境界に世代境界を追加）」。§4「ViewerSession: current Root・設定 context・世代番号… DocumentStore の root boundary は再利用」。
 
@@ -132,7 +132,7 @@
 
 **重大度**: Medium（blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **ドキュメント記載**: §5 `new_window`、§7.2 `open_root` / `RootOpenResult`、§8.2「startup load」「event」、§8「retry」が本文に散在する。
 
@@ -146,7 +146,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Medium（blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **ドキュメント記載**: §7.2-1「旧 context の pending resize を flush し、進行中設定保存 queue を待つ。失敗時は旧 Root を維持して切替を中止する」。
 
@@ -162,7 +162,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Medium（non-blocking。ただし承認条件として同じ改訂で閉じる）
 **工程**: plan
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **根拠**:
 
@@ -178,7 +178,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Medium（non-blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **根拠**: Tauri 2 では `async` でない `#[tauri::command]` は main thread で実行される。現行の `scan_directory` / `open_document` / 設定系 command はすべて sync である（`lib.rs:273-287`、`467-554`）。本設計で main thread を必要とする処理が増える。macOS の Activate（main thread で前面化）、native menu の item 更新、`set_title` / `set_size` である。巨大 directory の scan や最大 2 秒の lock retry が main thread を占有すると、他 instance からの Activate が deadline（2 秒）を超え、「失敗」と表示される。§7.1 は lock 待ちの `spawn_blocking` 化だけを述べ、scan・migration・`open` の終了待ち（§5）の実行 thread には触れていない。`setup` hook（`lib.rs:2140-2160`）で global lock 取得と migration を行う場合も、起動時の main thread を最大 2 秒塞ぐ。
 
@@ -188,7 +188,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Medium（non-blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **ドキュメント記載**: §6.2「明示 schemaVersion の未知値・不正 JSON・rootPath 不一致は上書きしない。英語 error を表示し、Settings / Root 切替の書込を止める」。
 
@@ -200,7 +200,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Medium（non-blocking）
 **工程**: design
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **根拠**: §10 は file 名と topic の列挙だけである。現行 docs には新仕様と両立しない確定記述がある。
 
@@ -218,56 +218,56 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 ### MI-DR-11 複数 process 間で in-app Recent Folders 表示が stale になる
 
-**重大度**: Low / **工程**: design / **対応状態**: 未対応
+**重大度**: Low / **工程**: design / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: in-app の Recent Folders は起動時（`App.tsx:1217-1219`）と自 process の record / remove の戻り値（`App.tsx:566-601`）でしか更新されない。§5 の完了条件は「更新消失を防ぐ」だけで、表示の鮮度を扱っていない。A を開いたまま B で folder を開いても、A の File menu に B で開いた folder が出ない。
 **推奨対応**: File menu を開く時（または window focus 時）に `load_recent_folders` 相当を再取得すると §6 に 1 行追加する。
 
 ### MI-DR-12 同一表示名の重複は同一 Root に限らない。一覧順序が未定義
 
-**重大度**: Low / **工程**: design / **対応状態**: 未対応
+**重大度**: Low / **工程**: design / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: §8 は「同一 Root の複数 instance は `[<id8>]` を付加」とする。しかし、Root 未選択の instance が複数あると、`No Folder — MarkdownViewer` が区別不能な項目として並ぶ。一覧の並び順も未定義で、refresh（focus ごと）のたびに順序が変わりうる。
 **推奨対応**: suffix 付加条件を「表示ラベルが重複する全 instance」に一般化し、並び順（例: title → instanceId の安定 sort、自 instance の位置）を §8.2 に定める。
 
 ### MI-DR-13 muda の CheckMenuItem は click で check を自動反転する
 
-**重大度**: Low / **工程**: design / **対応状態**: 未対応
+**重大度**: Low / **工程**: design / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: muda 0.19.1 の macOS 実装は、Check 型 item の click 時に `set_checked(!is_checked())` を自動実行してから event を送る（`muda-0.19.1/src/platform_impl/macos/mod.rs:1124-1126`）。他 instance の項目を選ぶとその項目にも check が付き、自 instance の項目を選ぶと check が外れる。Activate の成否にかかわらず、次の refresh まで誤表示が残る。
 **推奨対応**: menu event 受信直後に check 状態を「自 instance のみ」へ再適用すると §8.2 に明記する（または通常 item + 独自 marker にする）。
 
 ### MI-DR-14 旧版併用時に defaultSettings が黙って失われる具体的な失敗モードが未記載
 
-**重大度**: Low / **工程**: design / **対応状態**: 未対応
+**重大度**: Low / **工程**: design / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: 旧版の `AppConfig` は `#[serde(default)]` で unknown field を拒否しない（`lib.rs:109-114`）。旧版は V2 の file を問題なく読み、`viewerSettings` 欠落を既定値で補い、次の保存で `schemaVersion` / `defaultSettings` を**消した file を書き戻す**。新版はそれを legacy と判定して再 migration し、defaults は旧版の既定値へ置き換わる。error は出ない。§6.2 は「旧版は lock も V2 も理解しない」「downgrade は保証しない」と書くだけで、この無音の失敗を README に書く根拠が弱い。
 **推奨対応**: README 記載予定に上記の具体的な結果を書く。あるいは、V2 global を別 file 名にして legacy `settings.json` を migration 元として読むだけにする案を比較し、採否を §6.2 に 1 行残す。
 
 ### MI-DR-15 OS 側の制約の記録・確認項目がない
 
-**重大度**: Low / **工程**: design / **対応状態**: 未対応
+**重大度**: Low / **工程**: design / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: TODO completion は「OS の省略表示や Dock の制約を記録する」ことを求めている。別 process 方式では、macOS の Cmd+`（同一 app 内 window 巡回）が instance 間を巡回しない。Cmd+Tab / Dock には同一 icon が instance 数だけ並ぶ。これらは VS Code 型の期待と異なる制約だが、§12 / §10 に記載がない。また GitHub release 配布の未署名 app を Downloads から直接起動すると App Translocation により `current_exe` が一時 mount 配下になるため、`open -n -a <bundle>` の成否を確認する価値がある。
 **推奨対応**: §12 と README 更新予定に上記制約を追記し、§11 の macOS 手動確認に「Translocation 下（未移動の app）からの New Window」を追加する。
 
 ### MI-DR-16 Linux の扱いが「既存動作維持」と「New Window 共通経路」で矛盾
 
-**重大度**: Low / **工程**: design / **対応状態**: 未対応
+**重大度**: Low / **工程**: design / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: §2 は「Linux は既存動作を維持し、別プロセス起動の共通経路を使う」とする。一方、アプリ内 File > New Window は React menu で全 OS に出る。Linux では新機能が露出するのに、検証対象外になっている。
 **推奨対応**: Linux で New Window を表示するか（表示するなら最小の手動確認か「未確認」扱いを明記）、非表示にするかを決める。
 
 ### MI-DR-17 複数 process テストの harness、macOS NFC / NFD path、Windows cfg code の検証手段が未記載
 
-**重大度**: Low / **工程**: design / **対応状態**: 未対応
+**重大度**: Low / **工程**: design / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: §11 は「実際の子 process を使った同 project 別 field 更新」「強制終了後 lock 解放」を `cargo test` に求めるが、子 process の起動方法（test binary を env 付き・`--exact` で再実行する等）と timeout を定めていない。identity テストの「日本語」は、macOS で dialog 由来と Recent 由来の path が NFC / NFD で異なる場合に canonicalize 後の hash が一致するか、を明示していない。`#[cfg(windows)]` の新規 code（spawn flags、verbatim 正規化、lock）は macOS の `cargo check` では型検査されない。
 **推奨対応**: harness 方式を §11 に 1 行で定め、identity ケースに NFC / NFD を追加する。Windows cfg code は Windows 実機 build を必須とし、それが無い場合は「未確認」として残すと明記する（§11 末尾の方針を automated 側にも適用）。
 
 ### MI-DR-18 PlantUML の「最新 jar 設定」が file 再読込か session snapshot か曖昧
 
-**重大度**: Low / **工程**: design / **対応状態**: 未対応
+**重大度**: Low / **工程**: design / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: §6 は「同 project の他 instance へのリアルタイム同期は行わない。フォルダ open、Settings を開く時、Reload で最新設定を読む」とする。一方で「PlantUML 開始時に現在 context の最新 jar 設定を snapshot」とも書く。現行 `render_plantuml_diagrams` は毎回 config file を読む（`lib.rs:159-163`、`453-465`）。これを踏襲すると、render のたびに project lock を取り、他 instance の jar 変更が即時反映されて §6 と矛盾する。
 **推奨対応**: 「session が保持する現在 context の in-memory settings から snapshot する（file は読まない）」と明記する。
@@ -317,3 +317,29 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 ただし、**macOS で別 instance を前面化する手段は、現行 OS（macOS 14 以降の cooperative activation）と tao `set_focus` の実装（最小化中は no-op、`activateIgnoringOtherApps` 依存）の下で成立を前提にできない**（MI-DR-01）。これは Window メニュー一覧という要求の中核であるため、handoff 方式・ack 定義・Phase 3 冒頭の spike と go / no-go 条件を設計へ入れる必要がある。加えて、既定 macOS menu の欠落（MI-DR-02）、size / title の適用主体と capability（MI-DR-03）、HTML 世代の URL 配置と原子性（MI-DR-04）、command 契約と旧経路撤去（MI-DR-05）、Root 切替の中止条件（MI-DR-06）を確定すること。
 
 **判定: 差し戻し (Changes Requested)。未解決 18 件（blocking 6 件）。** blocking 6 件と MI-DR-07 を反映した改訂後に再レビューする。
+
+
+## 7. 実装担当による設計反映（2026-09-12、reviewer再確認待ち）
+
+初回判定は履歴として維持する。MI-DR-01〜18の全件を設計へ反映した。現時点の状態は対応済み・再確認待ちであり、reviewer承認やPhase 3実機確認を完了扱いにしない。
+
+| ID | 対応・参照先 |
+| --- | --- |
+| MI-DR-01 | 設計§8.1 requester handoff・AppKit API・key+active ack、§11 Phase 3冒頭spikeとgo / no-go、§4依存追加 |
+| MI-DR-02 | §8.2全native menu表・macOS cfg、§11既存shortcut回帰 |
+| MI-DR-03 | §7.2 Rustのみでsize/title適用・実測baseline・特殊window状態skip |
+| MI-DR-04 | §7.2単一RootSnapshot、path generation、400/410と相対resource、§11原子性test |
+| MI-DR-05 | §4.1 command/event/typed error/patch、旧command撤去、notice単一経路 |
+| MI-DR-06 | §7.2旧context flush失敗はwarningで続行、candidate準備失敗だけ中止 |
+| MI-DR-07 | TODOのDock・title・defaultsを同期、meta components/commit/決定事項更新、§1完了条件 |
+| MI-DR-08 | §7.2 async/spawn_blocking、setup登録のみ、native dispatch時gate解放 |
+| MI-DR-09 | §6.2 errorにpath、手動退避復旧、global破損時既存project可、file消失は明示openまで再生成なし |
+| MI-DR-10 | §10現行行と置換要旨表、§6復元タイミング変更、§11手動確認 |
+| MI-DR-11 | §6 File menu open時Recent再取得・失敗表示 |
+| MI-DR-12 | §8 No Folderを含む重複label全般、§8.2安定sort |
+| MI-DR-13 | §8.2 click直後checkをselfのみへ再設定 |
+| MI-DR-14 | §6.2旧版によるschema/defaults消失を明記、別filename案の不採用理由 |
+| MI-DR-15 | §12 OS巡回・icon集約非保証、§11 App Translocation確認 |
+| MI-DR-16 | §2 Linux New Window提供を明示、§11実機なければ未確認 |
+| MI-DR-17 | §11 child test harness/deadline/回収、NFC/NFD、Windows実機build必須 |
+| MI-DR-18 | §6 in-memory settings snapshotからjar取得、更新契機を限定 |
