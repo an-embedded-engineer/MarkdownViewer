@@ -2,16 +2,18 @@
 
 ## TODO-2026-029 Tauri別プロセス起動・ディレクトリ別設定・タイトル表示
 
-- status: Phase 1 完了・Phase 2 未着手
+- status: Phase 2 設計draft・レビュー準備
 - workflow: new-feature
 - work_branch: new-feature/tauri-multi-instance-project-settings
 - meta: [案件メタ情報](../design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/meta.md)
 - phase_0_approval: 2026-09-12 ユーザ承認済み。別プロセス方式・ディレクトリ別設定を含む要求に対しPhase 1への進行指示を受領。
+- phase_2_approval: 2026-09-12 Phase 2進行承認済み。macOSはメニューバーのWindow一覧・選択でよいと回答受領。Dock独自一覧は対象外に確定。
+- design: [詳細設計](../design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/design/tauri_multi_instance_project_settings_feature_design.md)
 - summary: macOSでアプリ操作から別プロセスを起動し、macOS / Windows共通でディレクトリ別の設定を保持し、ウィンドウ切替時にRootを識別できるようにする。
 - target_users: 複数のプロジェクトや仕様書ディレクトリを並行して閲覧するTauri版利用者。
 - use_cases:
   - macOSで新規ウィンドウを開き、それぞれ別のディレクトリを選択して並行閲覧する。
-  - Windowsのタイトルバー・タスクバーのサムネイル見出し、macOSのWindowメニュー・Dockの開いているウィンドウ一覧からディレクトリを識別して切り替える。
+  - Windowsのタイトルバー・タスクバーのサムネイル見出し、macOSのメニューバーのWindow一覧からディレクトリを識別して切り替える。
 - feasibility:
   - ユーザ指定により別プロセス方式を採用する。macOSの新規application instance起動とTauriのset_titleで実現可能と判断する。packaged appで起動・Dock表示を検証する。
   - 現行DocumentStore.current_rootは1プロセス内で共有される。1プロセス1Viewer windowを維持すればRootはプロセスのメモリ境界で分離され、window別storeへの変更は不要。

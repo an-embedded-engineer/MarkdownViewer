@@ -14,11 +14,12 @@ components:
   - "docs/components/tauri_viewer"
   - "docs/architecture"
   - "docs/rules/development_workflow.md"
-status: "phase_1_complete"
-design_status: "not_started"
+status: "phase_2_design_draft"
+design_status: "draft"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits:
+  - "fc2d085 : Phase 1 専用ブランチとmeta初期化"
   - "bb6ea91 : Phase 0 複数ウィンドウとタイトル表示の要求整理"
   - "3d1848c : Phase 0 別プロセス方式・ディレクトリ別設定へ要求更新"
 ---
@@ -49,7 +50,7 @@ related_commits:
 | --- | --- |
 | 0 要求整理 | 完了・2026-09-12ユーザ承認済み |
 | 1 ブランチ・meta初期化 | 完了（本初期化コミット） |
-| 2 設計・レビュー | 未着手 |
+| 2 設計・レビュー | 2026-09-12進行承認済み・設計draft作成、レビュー準備 |
 | 3 実装・恒久ドキュメント反映 | 未着手 |
 | 4 検証・完了処理 | 未着手 |
 
