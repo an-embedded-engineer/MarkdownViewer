@@ -27,6 +27,8 @@ design_status: "done"
 impl_status: "in_review"
 completion_status: "not_started"
 related_commits:
+  - "ff84654 : 初回実装レビュー8件への対応"
+  - "2f292ac : Round 1 全8件解決確認・追加Low 1件"
   - "75a7ac7 : Phase 2 完了記録"
   - "78039cd : Phase 3 実装・テスト・恒久docs初稿"
   - "dc34e0b : Phase 3 初回実装レビュー8件"

@@ -63,11 +63,11 @@ Tauri README、component basic / detail / interface / README、architecture over
 
 ## 実装レビュー
 
-レビュー準備中。
+Round 1（2f292ac）で初回8件の解決確認・承認。追加Low 1件の最終再確認中。
 
 ## 初回実装レビュー対応
 
-review commit: dc34e0b。MI-IR-01〜08へ対応し、再確認待ち。
+review commit: dc34e0b。MI-IR-01〜08へ対応し、2f292acで全件解決確認済み。
 
 | ID | 対応 |
 | --- | --- |
@@ -98,3 +98,7 @@ review commit: dc34e0b。MI-IR-01〜08へ対応し、再確認待ち。
 | Windows cfg build・release / Linux UI / macOS14未満 | 未実施（該当環境なし） | Windows / Linux / 対象macOSの実機で確認し、未確認を成功扱いにしない |
 
 Unix socketのbindはsandboxでOperation not permittedとなったため、同じcargo testをsandbox外で再実行して検証した。テストをskipして成功扱いにはしていない。
+
+## Round 1追加指摘対応
+
+MI-IR-09: window_identity.rsのtest moduleをファイル末尾へ移動。製品コードの動作変更なし。cargo fmt -- --check、タイトルの対象test（1件）、cargo clippy --offline --all-targetsが成功。新規warningは0件、lib.rsの既存warning 2件（derivable_impls / items_after_test_module）のみ。最終再確認待ち。
