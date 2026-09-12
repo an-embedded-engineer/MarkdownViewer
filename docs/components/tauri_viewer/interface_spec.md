@@ -159,7 +159,7 @@ contextと照合した単一`RootSnapshot`配下のUTF-8 documentを開く。Mar
 
 ### `render_plantuml_diagrams(context, sources) -> Result<PlantUmlRenderResponse, ViewerError>`
 
-PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。sessionのin-memory settingsからjarをsnapshotする。明示jar missing、automatic discovery失敗などblocking task開始前のruntime解決失敗はcommand全体の`Err(String)`とする。runtime解決後のPlantUML構文エラー、Java process error、timeoutなどは図ごとの`PlantUmlDiagramResult`の`ok: false`として返す。frontendはcommand全体の`Err`でも全PlantUML placeholderをerror表示へ変換し、Markdown / Mermaid表示を維持する。
+PlantUML source配列を受け取り、各図をSVG HTMLまたはエラーHTMLへ変換して返す。sessionのin-memory settingsからjarをsnapshotする。明示jar missing、automatic discovery失敗などblocking task開始前のruntime解決失敗はcommand全体の`ViewerError`とする。runtime解決後のPlantUML構文エラー、Java process error、timeoutなどは図ごとの`PlantUmlDiagramResult`の`ok: false`として返す。frontendはcommand全体の`Err`でも全PlantUML placeholderをerror表示へ変換し、Markdown / Mermaid表示を維持する。
 
 `PlantUmlRenderResponse`:
 
@@ -188,7 +188,7 @@ app config JSON から Recent Folders を読み込み、保存順の配列で返
 
 | command | 引数 | 戻り値・役割 |
 | --- | --- | --- |
-| load_startup_state | なし | context、settings、recentFolders、presentation、warnings、globalConfigError。Rustでdefaults size/titleを適用 |
+| load_startup_state | なし | context、canonicalRootPath、tree、settings、recentFolders、presentation、warnings、globalConfigError。Rustでdefaults size/titleを適用 |
 | load_context_settings | context | settings / warnings。現在fileを読みsession snapshotを更新 |
 | patch_context_settings | context、patch | settings / warnings。指定fieldだけを排他下で更新 |
 | new_window | なし | 成功時void、失敗時ViewerError |
@@ -256,3 +256,5 @@ Markdown / HTML / PlantUML responseは`tabId + revision`が現在値と一致す
 - `ready`は`event.source === iframe.contentWindow`、`event.origin === "null"`、発生paneのselected tab / revision、exact message shapeを満たす最初の1回だけ受理する。5秒以内に届かなければ当該pane runtimeだけをerrorにする。
 - `openExternal`は上記に加え、absolute `http:` / `https:`、transient user activation、duplicate guardを満たす場合だけ`openUrl`へ渡す。`file:`、`javascript:`、`data:`、`mailto:`、custom schemeは拒否する。
 - reject理由はdevelopment consoleへ残し、messageを信頼境界とはみなさない。active pane条件はsecurity判定へ追加せず、pane間はiframe sourceとtab / revisionで区別する。HTMLは利用者が信頼するdocumentに限定する。
+
+WebView再読み込み時は同じRust sessionのRoot path / tree / contextを返して画面を復元する。初期プロセス起動だけがNo Folderであり、再読み込みでProject contextをdefaultsと表示しない。IPC初期化が失敗してもnative New Window / Refreshは残し、一覧にWindow list is unavailableを表示する。

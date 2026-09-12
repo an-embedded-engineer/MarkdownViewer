@@ -63,6 +63,8 @@ pub(crate) struct Presentation {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StartupState {
     context: SettingsContext,
+    canonical_root_path: Option<String>,
+    tree: Option<FileTreeNode>,
     settings: ViewerSettings,
     recent_folders: Vec<RecentFolderEntry>,
     presentation: Presentation,
@@ -149,8 +151,21 @@ impl ViewerSession {
             }
             Vec::new()
         });
+        let snapshot = self.documents.snapshot()?;
+        let canonical_root_path = snapshot.as_ref().map(|root| path_to_string(&root.path));
+        let tree = snapshot
+            .as_ref()
+            .and_then(|root| match build_tree(&root.path, &root.path) {
+                Ok(tree) => Some(tree),
+                Err(error) => {
+                    warnings.push(error);
+                    None
+                }
+            });
         Ok(StartupState {
             context: state.context.clone(),
+            canonical_root_path,
+            tree,
             settings: state.settings.clone(),
             recent_folders,
             presentation: Presentation::default(),
@@ -195,6 +210,7 @@ impl ViewerSession {
             root_generation: generation.to_string(),
         };
         state.settings = loaded.settings.clone();
+        state.initialized = true;
         Ok(RootOpenResult {
             tree,
             canonical_root_path: path_to_string(&root),
@@ -466,6 +482,132 @@ pub(crate) fn drain_viewer_notices(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn context_generation_requires_canonical_decimal() {
+        for value in ["01", "-1", "1.0", "", "18446744073709551616"] {
+            assert!(SettingsContext::Default {
+                root_generation: value.into()
+            }
+            .generation()
+            .is_err());
+        }
+        assert_eq!(
+            SettingsContext::Default {
+                root_generation: "0".into()
+            }
+            .generation()
+            .unwrap(),
+            0
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn root_symlink_reuses_the_same_project_settings() {
+        let directory = std::env::temp_dir().join(format!("mv-root-link-{}", uuid::Uuid::new_v4()));
+        let root = directory.join("root");
+        let link = directory.join("alias");
+        fs::create_dir_all(&root).unwrap();
+        std::os::unix::fs::symlink(&root, &link).unwrap();
+        let session = ViewerSession::new(directory.join("config"), DocumentStore::default());
+        let first = session
+            .open(
+                root.to_string_lossy().into_owned(),
+                SettingsContext::Default {
+                    root_generation: "0".into(),
+                },
+            )
+            .unwrap();
+        session
+            .settings(
+                &first.context,
+                Some(SettingsPatch {
+                    theme: PatchField::Set(AppTheme::Dark),
+                    ..Default::default()
+                }),
+            )
+            .unwrap();
+        let second = session
+            .open(link.to_string_lossy().into_owned(), first.context)
+            .unwrap();
+        assert_eq!(second.canonical_root_path, first.canonical_root_path);
+        assert_eq!(second.settings.theme, AppTheme::Dark);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn startup_reports_corrupt_global_without_overwriting_it() {
+        let directory = std::env::temp_dir().join(format!("mv-startup-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("settings.json");
+        fs::write(&path, "broken").unwrap();
+        let session = ViewerSession::new(directory.clone(), DocumentStore::default());
+        let startup = session.startup().unwrap();
+        assert_eq!(startup.global_config_error.unwrap().code, "invalidConfig");
+        assert_eq!(startup.settings, ViewerSettings::default());
+        assert!(startup.canonical_root_path.is_none());
+        assert!(startup.tree.is_none());
+        assert_eq!(fs::read_to_string(path).unwrap(), "broken");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn webview_reattach_restores_root_and_reload_preserves_generation() {
+        let directory = std::env::temp_dir().join(format!("mv-reattach-{}", uuid::Uuid::new_v4()));
+        let root = directory.join("root");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("readme.md"), "Hello").unwrap();
+        let session = ViewerSession::new(directory.join("config"), DocumentStore::default());
+        let initial = session.startup().unwrap();
+        let opened = session
+            .open(root.to_string_lossy().into_owned(), initial.context)
+            .unwrap();
+        let reattached = session.startup().unwrap();
+        assert_eq!(reattached.context, opened.context);
+        assert_eq!(
+            reattached.canonical_root_path,
+            Some(opened.canonical_root_path)
+        );
+        assert!(reattached.tree.is_some());
+        session
+            .settings(
+                &reattached.context,
+                Some(SettingsPatch {
+                    theme: PatchField::Set(AppTheme::Dark),
+                    ..Default::default()
+                }),
+            )
+            .unwrap();
+        assert_eq!(
+            session.repository.defaults().unwrap().theme,
+            AppTheme::Light
+        );
+        let generation = session.documents.snapshot().unwrap().unwrap().generation;
+        let size = session.lock().unwrap().settings.window_size;
+        let reload = session.reload(&reattached.context).unwrap();
+        assert_eq!(reload.settings.window_size, size);
+        assert_eq!(
+            session.documents.snapshot().unwrap().unwrap().generation,
+            generation
+        );
+        for resource in [
+            "/document/index.html",
+            "/document/01/index.html",
+            "/document/-1/index.html",
+            "/document/18446744073709551616/index.html",
+        ] {
+            let request = Request::builder()
+                .uri(format!("mvhtml://localhost{resource}"))
+                .body(Vec::new())
+                .unwrap();
+            assert_eq!(
+                session.documents.serve_protocol_request(&request).status(),
+                StatusCode::BAD_REQUEST
+            );
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn root_commit_preserves_failures_and_rejects_stale_settings_and_html() {

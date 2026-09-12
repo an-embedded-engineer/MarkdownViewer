@@ -11,7 +11,7 @@
 
 **判定**: **差し戻し (Changes Requested)**。Phase 4 へは進めない。
 **検出件数**: 8 件 = Medium 2 件（blocking 1、non-blocking 1）/ Low 6 件
-**未解決件数**: **8 件**（うち blocking 1 件: MI-IR-01）
+**初回未解決件数**: **8 件**（うち blocking 1 件: MI-IR-01）
 **承認条件**: MI-IR-01 を解消すること。設計 §11 の必須自動ケースのうち GUI 不要なものを追加し、GUI や実機が必要なものは実装記録に「未実施・理由・確認先」として明記する。non-blocking 7 件は同じ改訂で閉じるか、Phase 4 / completion の追跡項目として実装記録へ明記すれば承認可能とする。
 
 ---
@@ -48,14 +48,14 @@ reviewer は次を自分で再実行した。いずれも tracked file を変更
 
 | ID | 重大度 | blocking | 工程 | 対応状態 | 要旨 |
 | --- | --- | --- | --- | --- | --- |
-| MI-IR-01 | Medium | Yes | impl | 未対応 | 設計 §11 の必須自動ケースの多くが未実装で、実装記録にも未実施として残っていない |
-| MI-IR-02 | Medium | No | impl | 未対応 | WebView 再読込後、Rust は Project context / title を保持し frontend は No Folder になり、Settings が表示と異なる対象へ保存される |
-| MI-IR-03 | Low | No | impl | 未対応 | `open` / `reload` が scan と project I/O の間も session gate を保持しており、設計 §7.2-2 の「準備は gate 外、commit だけ gate 内」と異なる |
-| MI-IR-04 | Low | No | impl | 未対応 | native menu の設置が IPC runtime の成功に依存し、runtime 異常時に Cmd+Shift+N と Refresh が消える |
-| MI-IR-05 | Low | No | impl | 未対応 | listener の accept error で accept loop が恒久停止し、その instance が全一覧から消える |
-| MI-IR-06 | Low | No | impl | 未対応 | `CREATE_NO_WINDOW` を literal で重複定義し、comment も実際の効果と異なる |
-| MI-IR-07 | Low | No | impl（docs） | 未対応 | 恒久 docs に旧説明・誤リンク・architecture 3 文書への同一段落の重複が残る |
-| MI-IR-08 | Low | No | impl（記録） | 未対応 | Phase 2 からの申し送り（起動時 size 適用の見え方）と WebView 再読込が、実装記録の未確認・Phase 4 確認項目に無い |
+| MI-IR-01 | Medium | Yes | impl | 対応済み・再確認待ち | 設計 §11 の必須自動ケースの多くが未実装で、実装記録にも未実施として残っていない |
+| MI-IR-02 | Medium | No | impl | 対応済み・再確認待ち | WebView 再読込後、Rust は Project context / title を保持し frontend は No Folder になり、Settings が表示と異なる対象へ保存される |
+| MI-IR-03 | Low | No | impl | 対応済み・再確認待ち | `open` / `reload` が scan と project I/O の間も session gate を保持しており、設計 §7.2-2 の「準備は gate 外、commit だけ gate 内」と異なる |
+| MI-IR-04 | Low | No | impl | 対応済み・再確認待ち | native menu の設置が IPC runtime の成功に依存し、runtime 異常時に Cmd+Shift+N と Refresh が消える |
+| MI-IR-05 | Low | No | impl | 対応済み・再確認待ち | listener の accept error で accept loop が恒久停止し、その instance が全一覧から消える |
+| MI-IR-06 | Low | No | impl | 対応済み・再確認待ち | `CREATE_NO_WINDOW` を literal で重複定義し、comment も実際の効果と異なる |
+| MI-IR-07 | Low | No | impl（docs） | 対応済み・再確認待ち | 恒久 docs に旧説明・誤リンク・architecture 3 文書への同一段落の重複が残る |
+| MI-IR-08 | Low | No | impl（記録） | 対応済み・再確認待ち | Phase 2 からの申し送り（起動時 size 適用の見え方）と WebView 再読込が、実装記録の未確認・Phase 4 確認項目に無い |
 
 ---
 
@@ -65,7 +65,7 @@ reviewer は次を自分で再実行した。いずれも tracked file を変更
 
 **重大度**: Medium（blocking）
 **工程**: impl（test）
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **根拠**: 本差分で追加されたテストは Rust 8 件と Vitest 4 件である。
 
@@ -95,7 +95,7 @@ reviewer は次を自分で再実行した。いずれも tracked file を変更
 
 **重大度**: Medium（non-blocking）
 **工程**: impl
-**対応状態**: 未対応
+**対応状態**: 対応済み・再確認待ち
 
 **根拠**: `ViewerSession::startup`（`viewer_session.rs:131-160`）は初回だけ defaults を読み、2 回目以降は現在の `state.context` と `state.settings` をそのまま返す。Root path と tree は返さない。`load_startup_state` はその context で `present` を行うため、title は Root 名のままで、size は project の値が再適用される。
 
@@ -115,35 +115,35 @@ reviewer は次を自分で再実行した。いずれも tracked file を変更
 
 ### MI-IR-03 `open` / `reload` が scan と project I/O の間も session gate を保持している
 
-**重大度**: Low / **工程**: impl / **対応状態**: 未対応
+**重大度**: Low / **工程**: impl / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: `ViewerSession::open`（`viewer_session.rs:162-206`）と `reload`（同 `224-240`）は、関数の冒頭で state mutex を取り、`build_tree`（大きな directory では長時間）と `open_project` / `load`（file lock を最大 2 秒待つ）を gate 内で実行する。設計 §7.2-2 は「candidate を準備した後、session gate 内で commit する」、`detail_design.md` は「tree 準備成功後」とする。実装では準備全体が gate に入っている。その間、旧 context の `open_document` / `render_plantuml_diagrams` / `patch_context_settings` は gate を待ってから stale で拒否される。UI は busy で、IPC Info / Activate は gate を使わないため、現時点で機能上の不具合は無い。ただし、設計・docs と実装の記述が一致していない。
 **推奨対応**: 準備（canonicalize / scan / project open）を gate 外で行い、commit 直前に gate 内で context を再照合する構成へ寄せる。あるいは、現構成を採る理由（commit までの直列化を優先する）を `detail_design.md` と設計に記録する。
 
 ### MI-IR-04 native menu の設置が IPC runtime の成功に依存している
 
-**重大度**: Low / **工程**: impl / **対応状態**: 未対応
+**重大度**: Low / **工程**: impl / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: `WindowMenuController::install`（`macos_instances.rs:94-128`）は、runtime dir の作成・検証と socket の bind を先に行い、失敗すると menu を組む前に `Err` を返す。setup はこれを `Window switching is unavailable` の notice にするだけである。この場合、Tauri 既定 menu が残り、native File > New Window（Cmd+Shift+N）と Refresh Window List が無くなる。in-app の File > New Window は動く。原因は、他 user が同名 dir を先に作った場合や `/tmp` の異常などである。設計 §5 の「native File > New Window の Cmd+Shift+N も同じ InstanceLauncher を呼ぶ」は IPC とは独立した要件である。
 **推奨対応**: menu（New Window と既定項目）の設置を IPC runtime から独立させ、IPC 失敗時は Window submenu に disabled の `Window list is unavailable` を出す。notice は現行どおり残す。
 
 ### MI-IR-05 listener の accept error で accept loop が恒久停止する
 
-**重大度**: Low / **工程**: impl / **対応状態**: 未対応
+**重大度**: Low / **工程**: impl / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: `macos_instances.rs:199-217` は `listener.accept()` の `Err` を一度でも受けると notice を出して `break` する。`EMFILE` / `ECONNABORTED` のような一時的な error でも、その instance は以後すべての instance の一覧から消える。再起動するまで回復しない。
 **推奨対応**: 一時的な error は短い backoff を置いて `continue` し、回復不能なもの（listener 自体の invalid 等）だけ停止する。
 
 ### MI-IR-06 `CREATE_NO_WINDOW` の literal 重複と comment の不正確さ
 
-**重大度**: Low / **工程**: impl / **対応状態**: 未対応
+**重大度**: Low / **工程**: impl / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: `instance_launcher.rs:55` は `creation_flags(0x08000000)` を直書きしている。同じ値の定数 `CREATE_NO_WINDOW` が `lib.rs:187` にあり、PlantUML 起動（`lib.rs:1019`）が使っている。comment の「GUI binary の親 console を継承しない」も不正確である。このフラグは console subsystem の process（debug build）に効き、release の GUI subsystem では無視される。Windows 上の build は未確認（実装記録どおり）。
 **推奨対応**: 既存定数を使い、comment を「debug（console subsystem）で console window を作らない。release の GUI subsystem では影響しない」に改める。Windows 実機確認の項目に含める。
 
 ### MI-IR-07 恒久 docs に旧説明・誤リンク・同一段落の重複が残る
 
-**重大度**: Low / **工程**: impl（docs） / **対応状態**: 未対応
+**重大度**: Low / **工程**: impl（docs） / **対応状態**: 対応済み・再確認待ち
 
 **根拠**:
 
@@ -156,7 +156,7 @@ reviewer は次を自分で再実行した。いずれも tracked file を変更
 
 ### MI-IR-08 Phase 2 からの申し送りと WebView 再読込が、実装記録の未確認・Phase 4 確認項目に無い
 
-**重大度**: Low / **工程**: impl（記録） / **対応状態**: 未対応
+**重大度**: Low / **工程**: impl（記録） / **対応状態**: 対応済み・再確認待ち
 
 **根拠**: 設計レビュー §10 と meta で申し送った「起動時の size 適用の見え方」について、実装記録の未確認項目にも `development_workflow.md` の手動確認にも記載が無い。global load を setup から frontend の startup command へ移したため、起動直後に `tauri.conf.json` の 800x600 で見えている時間が現行より長くなりうる。MI-IR-02 の WebView 再読込も同様に記載が無い。
 **推奨対応**: Phase 4 の確認項目に「起動直後の 800x600 → defaults の表示遷移」と「WebView 再読込後の Root 表示・title・Settings 保存先」を追加する。前者が目立つ場合は、window を非表示で作成し presentation 適用後に表示する方式を follow-up とする。
@@ -219,3 +219,18 @@ reviewer は次を自分で再実行した。いずれも tracked file を変更
 ただし、設計 §11 が必須とした自動ケースの多くが実装されていない。特に IPC の runtime 検証・UUID / version 照合、一覧 label、bundle 判定、startup の global 破損時が欠けており、実装記録にもその欠落が書かれていない（MI-IR-01）。これを解消するまで Phase 4 へは進めない。
 
 **判定: 差し戻し (Changes Requested)。未解決 8 件（blocking 1 件: MI-IR-01）。** MI-IR-01 の対応後に再レビューする。non-blocking 7 件は同じ改訂で閉じるか、実装記録へ追跡項目として明記すること。
+
+## 7. 実装担当の対応（reviewer再確認待ち）
+
+| ID | 対応 |
+| --- | --- |
+| MI-IR-01 | 非GUIのruntime検証・IPC・一覧を分離して各境界テストを追加。launcher / title / context / startup異常 / readonly / 初回競合 / Root失敗のテストと、impl記録の設計§11対応表を追加 |
+| MI-IR-02 | startupへ現在Root pathとtreeを追加し、frontendの表示・Settings対象を復元。再接続回帰test追加 |
+| MI-IR-03 | gate内準備の採用理由を設計とdetail docsへ記録。I/Oは背景thread、IPCはgate非依存 |
+| MI-IR-04 | native menuをruntimeより先に設置し、runtime異常時はunavailable表示。New Window / Refreshは維持 |
+| MI-IR-05 | 一時的errorを分類し100ms backoff retry。永久停止時は再起動案内。分類test追加 |
+| MI-IR-06 | 既存CREATE_NO_WINDOWを再利用しconsole/GUIのcomment修正 |
+| MI-IR-07 | componentの返却型・説明・リンクとViewerErrorを修正。architectureの重複を役割別に整理。meta主要commit追加 |
+| MI-IR-08 | startup表示遷移・WebView再読込を実装記録/開発workflowのPhase 4確認へ追加 |
+
+GUIとWindows等の未確認項目は明示的な確認matrixへ残し、auto testで確認したとは扱っていない。

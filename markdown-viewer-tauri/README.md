@@ -85,3 +85,5 @@ Tauriのユーザー用app config領域に、共通`settings.json`（初期値�
 旧版Viewerとの同時起動は避けてください。旧版が共通ファイルへ保存すると新版の初期値を失うため、移行前に旧版を終了してください。破損・未知schema・削除された設定は自動resetしません。errorに出る設定ファイルを、全Viewerを終了してから退避し、再起動または対象folderの再openで生成し直せます。
 
 macOS 26.6.2では検証用Tauri bundleの通常・最小化・別Spaceフルスクリーンからの切り替えを確認済みです。製品UIの操作matrixは別途確認します。Cmd+Tab / Dockに同じiconが複数現れる場合があり、Cmd+`はprocess間巡回を保証しません。dev子はVite server終了後の表示を保証しません。Windows固有build・UI、Linux UI、macOS 14未満・App Translocationは未確認です。
+
+WebViewを再読み込みしても、選択済みRootと設定対象を復元します。IPCの初期化に失敗した場合でもNew Windowは利用でき、Window一覧には利用不可を表示します。一時的な通信受付エラーは再試行し、停止した場合はエラーに従ってそのViewerを再起動してください。

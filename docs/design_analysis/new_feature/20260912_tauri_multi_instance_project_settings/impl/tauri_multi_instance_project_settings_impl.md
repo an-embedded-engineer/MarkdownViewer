@@ -2,7 +2,7 @@
 
 ## 状態
 
-Phase 3実装draft。実装レビュー前。Phase 4のユーザー動作確認は未実施。
+初回実装レビュー8件へ対応済み。再レビュー待ち。Phase 4のユーザー動作確認は未実施。
 
 ## Activation spikeのgo判定
 
@@ -48,9 +48,9 @@ Tauri README、component basic / detail / interface / README、architecture over
 | cargo build --offline --example activation_spike | 成功 |
 | macOS packaged activation spike | 上記3条件成功、初回失敗と修正の記録あり |
 | npm run build | 成功（Viteの既存chunk size warningあり） |
-| npm test -- --run | 117件成功 |
+| npm test -- --run | 118件成功 |
 | cargo check --offline | 成功 |
-| cargo test --offline | 31件成功。子processによる同時保存・Recent更新・lock timeout・強制終了後unlockを含む |
+| cargo test --offline（socket bind許可環境） | 46件成功。子processによる同時保存・Recent更新・lock timeout・強制終了後unlockを含む |
 | cargo fmt -- --check | 成功 |
 | CARGO_NET_OFFLINE=true npm run tauri -- build --bundles app --ci | 成功。target/release/bundle/macos/markdown-viewer-tauri.app |
 
@@ -64,3 +64,37 @@ Tauri README、component basic / detail / interface / README、architecture over
 ## 実装レビュー
 
 レビュー準備中。
+
+## 初回実装レビュー対応
+
+review commit: dc34e0b。MI-IR-01〜08へ対応し、再確認待ち。
+
+| ID | 対応 |
+| --- | --- |
+| MI-IR-01 | InstanceDirectory / InstanceProtocol / WindowListを非GUI境界へ分離してテスト追加。下表で未確認matrixも明示 |
+| MI-IR-02 | StartupStateにcanonicalRootPath / treeを追加し、WebView再読み込みでRootと設定対象を復元。回帰test追加 |
+| MI-IR-03 | 準備からcommitまでgateを保持する理由を設計 / detail docsへ明記（競合初期化の直列化を優先） |
+| MI-IR-04 | native menu設置をruntime準備の前へ移動。失敗時もNew WindowとRefreshを残しunavailable表示 |
+| MI-IR-05 | 一時的accept errorは100ms backoffで再試行、回復不能時は明示停止・再起動案内。分類test追加 |
+| MI-IR-06 | CREATE_NO_WINDOW定数を再利用し、debug console / release GUIの効果をcommentで訂正 |
+| MI-IR-07 | component説明・リンク・ViewerErrorを修正し、architecture各文書を役割別に整理。主要commitもmetaへ追加 |
+| MI-IR-08 | 起動時の表示遷移とWebView再読み込みをPhase 4確認matrixへ追加 |
+
+### 設計§11の検証対応表
+
+| ケース | 自動検証 / 状態 | 未実施の理由・確認先 |
+| --- | --- | --- |
+| 初回生成 / migration / defaults分離 / schema異常 / missing project / readonly | repository tests（readonlyはmacOS非root） | Windowsのreadonly / atomic replaceはWindows実機でPhase 4確認 |
+| 同process/別processのfield更新、Recent、初回create競合、lock timeout / 強制終了解放 | actual child worker tests | 実ユーザー設定のmigrationは旧Viewerを終了した上でPhase 4確認 |
+| contextの非canonical値、candidate失敗・stale保存・Root alias、WebView再接続、Reload世代 | session tests | WebViewの実際の再読込操作と表示・保存先は製品UIでPhase 4確認 |
+| 旧HTML世代410、generation欠落/不正400、相対resource、root外拒否 | document / session tests | 製品iframe / Mermaid / PlantUMLの表示matrixはPhase 4確認 |
+| 2サービスのInfo / Activate応答、UUID / version / remaining_ms、stale cleanup、timeout、partial | Unix listener/streamのprotocol tests。native callbackだけテスト用応答 | 製品IPC + AppKitのend-to-endは製品bundleでPhase 4確認。spikeはfile経由のため代替としない |
+| runtime owner / mode / symlink / path長 | InstanceDirectory tests（other ownerは期待uid不一致で検証） | 実際のnative menuがunavailable表示でもNew WindowできることはPhase 4確認 |
+| No Folder重複 / UUID prefix衝突 / sort / self check | WindowList pure tests | AppKitのチェック自動反転と再描画・keyboardは製品menuでPhase 4確認 |
+| title root / 同名異path / 日本語・空白、bundle判定 / argv | identity / launcher tests | NFC/NFD・Windows drive/UNC/case・Translocationは各実機のPhase 4確認 |
+| queue直列化 / Root失敗保持 / 旧flush失敗後の移動 / startup・特殊state baseline / field patch | Vitest | Settings modal対象表示・focus・実resize / startup適用時に保存しないことはPhase 4確認 |
+| native通常 / 最小化 / 別Space fullscreen activation | packaged Tauri spikeで確認 | 製品経路、非表示、親終了、失効item、Cmd+W/M/Q/Full ScreenはPhase 4確認 |
+| 起動直後800x600→defaults表示遷移 | 未実施（native視覚確認が必要） | Phase 4で目立つ場合は初期非表示→presentation後表示をfollow-up検討 |
+| Windows cfg build・release / Linux UI / macOS14未満 | 未実施（該当環境なし） | Windows / Linux / 対象macOSの実機で確認し、未確認を成功扱いにしない |
+
+Unix socketのbindはsandboxでOperation not permittedとなったため、同じcargo testをsandbox外で再実行して検証した。テストをskipして成功扱いにはしていない。

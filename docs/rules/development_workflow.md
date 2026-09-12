@@ -249,3 +249,7 @@ cargo build --example activation_spike
 cd ../..
 python3 scripts/check_macos_activation_spike.py --binary markdown-viewer-tauri/src-tauri/target/debug/examples/activation_spike --output /tmp/mv-activation-results --strategy yield-explicit
 ```
+
+- Phase 4では起動直後の800x600からdefaults sizeへ移る見え方を確認する。目立つ場合は初期非表示→presentation完了後表示をfollow-upとして検討する。
+- WebViewを再読込した後もRoot表示・native title・Settingsの対象と保存先が一致し、treeと初期documentを再表示できることを確認する。
+- Unix socketをbindするRust integration testsは、実行環境のsandboxによりOperation not permittedになる場合がある。その場合は許可を得てsandbox外で同じcargo testを実行し、テスト自体をskipして成功扱いにしない。

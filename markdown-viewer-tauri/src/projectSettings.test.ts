@@ -2,6 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import { SettingsQueue, preferencesPatch } from "./projectSettings";
 
 describe("project settings boundaries", () => {
+  it("preserves context and baseline after candidate failure, and permits leaving after a flush error", async () => {
+    const q = new SettingsQueue();
+    const old = { kind: "project" as const, projectId: "a", rootGeneration: "1" };
+    const presentation = { actualLogicalSize: { width: 1000, height: 700 }, sizeApplied: true, specialState: false };
+    q.apply(old, presentation); q.busy = false;
+    await expect(q.changeRoot(async (context) => { expect(context).toBe(old); throw new Error("scan failed"); }, () => {})).rejects.toThrow("scan failed");
+    expect(q.context).toBe(old); expect(q.busy).toBe(false);
+    expect(q.observe(presentation.actualLogicalSize, false)).toBe(false);
+    const errors: unknown[] = [];
+    q.schedule(async () => { throw new Error("old file is read-only"); }, () => {});
+    const next = { ...old, projectId: "b", rootGeneration: "2" };
+    await q.changeRoot(async () => ({ context: next, presentation }), (error) => errors.push(error));
+    expect(errors).toHaveLength(1); expect(q.context).toBe(next);
+  });
   it("patches only fields changed by the user and preserves explicit jar clear", () => {
     expect(preferencesPatch({ theme: "light", plantUmlJarPath: "/a.jar" }, { theme: "dark", plantUmlJarPath: "/a.jar" }))
       .toEqual({ theme: { kind: "set", value: "dark" } });

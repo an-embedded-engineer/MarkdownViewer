@@ -456,3 +456,9 @@ native errorはRust queueのid/messageをdrainして既存ErrorBannerへ表示�
 Markdown本文の`.markdown-body`は、固定px最大幅を持たず、containing blockである各`.preview-pane`のcontent boxを基準に`calc(100% - 48px)`で幅を決め、`margin: 0 auto`で左右24pxのgutterを確保する。window viewportが760px以下の場合だけ既存media queryにより`calc(100% - 28px)`へ切り替え、左右gutterを14pxとする。本文widthの基準はpaneだがgutterのbreakpointはwindow viewportであるため、viewportが760px超のままsplitで個別paneだけが狭くなっても24pxを維持する。table、code block、Mermaid、PlantUMLは必要時の要素内横scroll、imageとPlantUML SVGは`max-width: 100%`による縮小を維持する。MermaidはApp所有queueで直列描画し、paneを含むrender IDを指定する。trusted HTML iframeはpane全幅を使い、iframe内文書自身の`width` / `max-width`はViewerから上書きしない。
 
 テーマは `document.documentElement.dataset.theme` に `"light" \| "dark"` を書き込み、`App.css` の `:root[data-theme=...]` で CSS 変数を切り替える。
+
+## Gate保持と再接続
+
+open / Reloadはcandidateの走査・設定I/Oからcommitまでsession gateを保持する。UIがbusyである期間の直列化を優先し、競合openの敗者が設定を先に生成することや、準備中のsettings更新との再照合を増やさないためである。処理はspawn_blocking上にあり、IPC Info / Activateはgateを取らないので他Viewerへの切り替えを妨げない。
+
+WebView再読込のstartupは現在Root pathとtreeをcontextと共に返す。tree読込失敗はwarningとしRoot表示・設定対象は保持する。native menuはIPC初期化の前に設置し、IPC失敗時は一覧をunavailable表示にする。acceptの一時的エラー（EMFILE / ECONNABORTED等）は100ms backoffで再試行し、回復不能時は再起動案内とunavailable表示を出す。

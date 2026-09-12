@@ -87,8 +87,8 @@ docs/
 - Avalonia Viewer: `docs/components/avalonia_viewer/README.md`
 - Tauri Viewer: `docs/components/tauri_viewer/README.md`
 
-## Tauriのprocess・Root・settings境界
+## Tauriのprocess構成
 
-1 process 1 Viewerを維持する。DocumentStoreはpathとgenerationを単一RootSnapshotとしてcommit / cloneし、protocolはpath内generationとsnapshotを照合する。ViewerSessionのcontextを設定更新に添付し、旧contextの保存を拒否する。設定はproject別と共通defaults/Recentに分け、固定sidecar file lockでread-modify-writeを保護する。macro / command adapter以外の新規I/O責務はSettingsRepository、InstanceLauncher、WindowMenuControllerへまとめる。
+1 processにつき1つのViewerSessionとmain windowを持つ。ViewerSessionはDocumentStoreのRootSnapshotと設定contextを調停し、SettingsRepositoryへ永続化を委任する。InstanceLauncherは別process起動、macOSのWindowMenuControllerは自アプリinstanceの一覧と前面化を担当する。process間で共有するのはユーザー用の設定ファイルと限定したUnix socket protocolである。
 
-macOSのyieldActivationとtarget側activateだけでは前面化できない検証結果があり、requesterからactivateFromApplicationも実行する。API成功だけでなく対象windowのkey・active・onActiveSpaceを期限内に観測する。詳しくはTauri componentのdetail_design.mdを参照。
+詳細は[component設計](../components/tauri_viewer/detail_design.md)を参照。

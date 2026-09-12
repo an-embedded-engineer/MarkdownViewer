@@ -63,7 +63,7 @@ Rust `SettingsContext`はserdeのtagged enum、TSは`{ kind: "default", rootGene
 
 | command | 引数 | 戻り値 / 操作 | 旧経路 |
 | --- | --- | --- | --- |
-| `load_startup_state` | なし | context、settings、recentFolders、presentation、warnings、globalConfigError。RustがNo Folder titleとdefaults sizeを適用し実測baselineを返す | `load_viewer_settings`のstartup用途を置換 |
+| `load_startup_state` | なし | context、canonicalRootPath、tree、settings、recentFolders、presentation、warnings、globalConfigError。RustがNo Folder titleとdefaults sizeを適用し実測baselineを返す | `load_viewer_settings`のstartup用途を置換 |
 | `open_root` | path、expectedContext | RootOpenResult（§7）。旧contextと照合後candidate準備・commit | `scan_directory`のopen用途を置換 |
 | `reload_root` | context | tree、sessionへ反映したsettings、warnings。Root世代不変・size非適用 | `scan_directory`のReload用途を置換 |
 | `load_context_settings` | context | settings、warnings。file読込後session snapshotを更新 | `load_viewer_settings`を置換 |
@@ -160,7 +160,7 @@ Rust ViewerSessionが§4.1の現在contextを発行し、frontendから任意pat
 Root切替:
 
 1. UIのRoot / 設定操作をbusyにし、新規resize debounce受付を止める。旧contextのpending resizeをflushし、進行中設定保存queueを待つ。旧context保存の失敗はwarningとして表示しpendingを破棄して切替を続行する。切替中止はcandidate scan / 設定準備の失敗に限定し、旧設定の破損・lock timeoutでそのprocessを閉じ込めない。
-2. `open_root` commandでcandidate treeとproject設定を準備する。DocumentStoreのscan_rootをprepare / commitに分離し、失敗時にcurrent rootを先に変えない。設定生成が成功した後にsession gate内でRootとcontext世代をcommitする。
+2. `open_root` commandはsession gate内でcontextを照合し、candidate treeとproject設定を準備してからRootとcontext世代をcommitする。失敗時にcurrent rootを先に変えない。Phase 3では、競合openの敗者による設定先行生成を避け、準備中のsettings更新も直列化するため準備全体でgateを保持する方針に明確化した。I/Oはspawn_blockingで、IPC Info / Activateはこのgateを使わない。
 3. Root commit後、Rustがmain thread上でnative titleとlogical sizeを適用して実測sizeを読む。応答`RootOpenResult { tree, canonicalRootPath, settings, context, presentation: { actualLogicalSize, sizeApplied, specialState }, warnings }`でReactのRoot / tabs / splitをresetしtheme / jarを反映する。frontendはsetSize / setTitleを直接呼ばず、capability追加は不要。context交換時に旧timer・pendingを破棄する。
 4. Root切替busy中のresize eventは破棄し、応答の実測sizeを保存不要のbaselineとする。busy解除後はevent payloadの古いサイズを使わずgettersで現在sizeを再取得し、取得開始時contextと現在contextが一致しbaselineと異なる場合だけ保存する。animation frame等の時間窓は使わない。maximized / fullscreen / minimized中はRootのsize適用も保存もしない。通常状態へ戻った際の現在実測sizeを新baselineとして受け入れ、戻る操作自体ではproject設定を上書きしない。次の利用者resizeから新contextへ保存する。特殊状態から戻った際のproject size自動適用は行わず、必要なら通常状態でfolderを開き直す。
 5. 一覧snapshotを更新し初期documentを開く。タイトル・OS size適用失敗はRoot成功後のUI適用warningとして表示し、成功したRootを別Rootへrollbackしない。Retryは`retry_window_presentation`へ現在contextを渡し、Rustが現在sessionのtitle / sizeだけを再適用する。baseline更新はopen_rootと共通化し、その間のresizeを抑止する。一覧には新Rootの正しいsnapshotを出す。
@@ -183,6 +183,7 @@ Root / identity snapshotはRustを正本にし、document.titleの更新だけ�
 各processがUUID v4のinstanceIdを生成し、Unix domain socketを1つ持つ。RustのmacOS専用InstanceDirectoryが管理し、webview / HTMLへsocket pathやIPC権限を公開しない。
 
 - Runtime領域は短い`/tmp/mv-<uid>-<app identifier SHA256先頭16桁>/`、mode0700。UIDはOS APIで取得。directoryはsymlink_metadataでowner、種別、modeを検証し、他owner / symlink / 不正modeなら作成・通信を拒否する。socket名は`<UUID>.sock`。Unix socket path上限を事前検証する。
+- native menuはruntime初期化から独立して先に設置する。runtimeが使えない場合はWindow list is unavailableを表示しNew Windowを維持する。一時的accept errorは100ms backoffで再試行し、永久停止時は再起動案内を出す。
 - socket一覧を列挙して直接問い合わせるためPIDレジストリや常駐brokerは不要。同ユーザー・同appid・同protocol versionのinstanceだけを扱う。devは別namespace suffixとし配布版へ混在させない。
 - typed protocol V1: `Info { version }` → `{id, pid, title, version}`、`Activate { version, id, remaining_ms }` → focused / error。通常Infoは1接続1要求。選択時は同じlive接続上でInfoを再取得してUUID / PIDを照合し、次にActivateを送る2段階handshakeを許す。length prefix付きJSON、最大16KiB。不正型・未知version・過大frameを拒否する。
 - Tokioでconnect / 完全frame read-writeをdeadline付きで行い、Infoは1相手250ms、一覧全体2秒、同時接続8件まで。部分一覧時は`Some windows could not be reached`をdisabled menu itemで示す。readerの小分け送信でdeadlineを延長しない。
@@ -310,3 +311,7 @@ Windows cfgのspawn / lock / path codeはWindows上のcargo check / cargo test /
 | MI-DR-18 | §6 PlantUMLはin-memory snapshot |
 | MI-DR-19 | §4.1 startup presentation・共通baseline・global異常時のsize、§11保存抑止test |
 | MI-DR-20 | §10 protocol lock・open_document / renderの恒久docs置換行を追加 |
+
+## Phase 3での再接続仕様
+
+WebView再読み込みではRust sessionを保持し、startupが現在Root path / tree / contextを一緒に返す。Reactはこれらを復元し、Settingsの表示と保存先を一致させる。tree読込失敗時もRoot表示は維持しwarningを出す。新しいprocessだけがNo Folderから始まる。

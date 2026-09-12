@@ -6,6 +6,28 @@ pub(crate) struct WindowIdentity {
     pub title: String,
     pub root_path: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn titles_identify_same_names_and_unicode_paths() {
+        let base = std::env::temp_dir();
+        let a = WindowIdentity::for_root(Some(&base.join("a/日本語 folder")));
+        let b = WindowIdentity::for_root(Some(&base.join("b/日本語 folder")));
+        assert!(a.title.starts_with("日本語 folder — "));
+        assert_ne!(a.title, b.title);
+        assert_eq!(
+            WindowIdentity::for_root(None).title,
+            "No Folder — MarkdownViewer"
+        );
+        #[cfg(unix)]
+        assert_eq!(
+            WindowIdentity::for_root(Some(Path::new("/"))).title,
+            "/ — MarkdownViewer"
+        );
+    }
+}
 impl WindowIdentity {
     pub fn for_root(root: Option<&Path>) -> Self {
         let Some(root) = root else {

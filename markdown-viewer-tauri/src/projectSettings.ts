@@ -35,6 +35,20 @@ export class SettingsQueue {
     return result;
   }
 
+  async changeRoot<T extends { context: SettingsContext; presentation: Presentation }>(
+    operation: (context: SettingsContext) => Promise<T>,
+    onFlushError: (error: unknown) => void,
+  ): Promise<T> {
+    if (this.busy) throw new Error("The selected folder is already changing.");
+    this.busy = true;
+    try {
+      try { await this.flush(); } catch (error) { onFlushError(error); }
+      const result = await operation(this.context);
+      this.apply(result.context, result.presentation);
+      return result;
+    } finally { this.busy = false; }
+  }
+
   observe(size: LogicalSize, special: boolean): boolean {
     if (this.busy) return false;
     if (special) { this.wasSpecial = true; return false; }

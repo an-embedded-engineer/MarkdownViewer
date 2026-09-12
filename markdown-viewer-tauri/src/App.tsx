@@ -539,16 +539,13 @@ function App() {
   async function loadRoot(path: string, options: { recordRecent?: boolean } = {}) {
     const queue = settingsQueueRef.current;
     if (queue.busy) return;
-    queue.busy = true;
     setIsRootLoading(true);
     setRootOperationError(null);
     const warnings: string[] = [];
     try {
-      try { await queue.flush(); } catch (error) { warnings.push(toErrorMessage(error)); }
-      const result = await invoke<ViewerSettingsLoadResult & {
+      const result = await queue.changeRoot((context) => invoke<ViewerSettingsLoadResult & {
         tree: FileTreeNode; canonicalRootPath: string; context: SettingsContext; presentation: Presentation;
-      }>("open_root", { path, expectedContext: queue.context });
-      queue.apply(result.context, result.presentation);
+      }>("open_root", { path, expectedContext: context }), (error) => warnings.push(toErrorMessage(error)));
       setRootPath(result.canonicalRootPath);
       setFileTree(result.tree);
       setViewerSettings(result.settings);
@@ -567,7 +564,6 @@ function App() {
       setRootOperationError(toErrorMessage(error));
     } finally {
       if (warnings.length > 0) setAppConfigError(warnings.join(" "));
-      queue.busy = false;
       setIsRootLoading(false);
     }
   }
@@ -1264,16 +1260,23 @@ function App() {
         unlisten = dispose;
         const loaded = await invoke<ViewerSettingsLoadResult & {
           context: SettingsContext; presentation: Presentation; recentFolders: RecentFolderEntry[];
+          canonicalRootPath: string | null; tree: FileTreeNode | null;
           globalConfigError: { message: string } | null;
         }>("load_startup_state");
         if (cancelled) return;
         queue.apply(loaded.context, loaded.presentation);
+        setRootPath(loaded.canonicalRootPath);
+        setFileTree(loaded.tree);
         setViewerSettings(loaded.settings);
         setTheme(loaded.settings.theme);
         document.documentElement.dataset.theme = loaded.settings.theme;
         setRecentFolders(loaded.recentFolders);
         if (loaded.presentation.actualLogicalSize) setCurrentWindowSize(loaded.presentation.actualLogicalSize);
         setAppConfigError([...loaded.warnings, loaded.globalConfigError?.message].filter(Boolean).join(" ") || null);
+        if (loaded.tree) {
+          const initialFile = findReadme(loaded.tree) ?? findFirstMarkdown(loaded.tree) ?? findFirstHtml(loaded.tree);
+          if (initialFile) openOrActivateTab("primary", initialFile.path);
+        }
         await drain();
       } catch (error) {
         if (!cancelled) setAppConfigError(toErrorMessage(error));

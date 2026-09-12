@@ -128,6 +128,10 @@ mod tests {
             assert!(start.elapsed() < Duration::from_secs(10));
             thread::sleep(Duration::from_millis(5));
         }
+        if role.starts_with("create-") {
+            repo.open_project(&root).unwrap();
+            return;
+        }
         for _ in 0..20 {
             let patch = if role == "theme" {
                 SettingsPatch {
@@ -217,6 +221,71 @@ mod tests {
             }
         );
         assert_eq!(repo.recent().unwrap().len(), 2);
+        repo.patch(
+            Some(&root),
+            SettingsPatch {
+                theme: PatchField::Set(AppTheme::Light),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(repo.load(Some(&root)).unwrap().theme, AppTheme::Light);
+    }
+
+    #[test]
+    fn competing_processes_initialize_one_project_file() {
+        let f = Fixture::new();
+        let root = f.project("project");
+        let repo = f.repo();
+        repo.patch(
+            None,
+            SettingsPatch {
+                theme: PatchField::Set(AppTheme::Dark),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut a = Worker::start(&f, "create-a");
+        let mut b = Worker::start(&f, "create-b");
+        a.wait_ready(&f, "create-a");
+        b.wait_ready(&f, "create-b");
+        fs::write(f.0.join("go"), "go").unwrap();
+        a.finish();
+        b.finish();
+        assert_eq!(repo.load(Some(&root)).unwrap().theme, AppTheme::Dark);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn read_only_directory_failure_preserves_project_file() {
+        use std::os::unix::fs::PermissionsExt;
+        struct RestoreMode(PathBuf, fs::Permissions);
+        impl Drop for RestoreMode {
+            fn drop(&mut self) {
+                let _ = fs::set_permissions(&self.0, self.1.clone());
+            }
+        }
+        let f = Fixture::new();
+        let root = f.project("project");
+        let repo = f.repo();
+        repo.open_project(&root).unwrap();
+        let path = repo.project_path(&root).unwrap();
+        let parent = path.parent().unwrap();
+        let before = fs::read(&path).unwrap();
+        let _restore = RestoreMode(
+            parent.to_path_buf(),
+            fs::metadata(parent).unwrap().permissions(),
+        );
+        fs::set_permissions(parent, fs::Permissions::from_mode(0o500)).unwrap();
+        let result = repo.patch(
+            Some(&root),
+            SettingsPatch {
+                theme: PatchField::Set(AppTheme::Dark),
+                ..Default::default()
+            },
+        );
+        assert!(result.is_err(), "Read-only test requires a non-root user.");
+        assert_eq!(fs::read(&path).unwrap(), before);
     }
 
     #[test]

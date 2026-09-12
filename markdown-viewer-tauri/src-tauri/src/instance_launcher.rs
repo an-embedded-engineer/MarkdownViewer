@@ -27,10 +27,7 @@ impl InstanceLauncher {
         let exe = std::env::current_exe().map_err(|e| ViewerError::new("launch", e.to_string()))?;
         #[cfg(target_os = "macos")]
         if let Some(bundle) = Self::bundle_path(&exe)? {
-            let output = Command::new("/usr/bin/open")
-                .args(["-n", "-a"])
-                .arg(&bundle)
-                .stdin(Stdio::null())
+            let output = Self::bundle_command(&bundle)
                 .output()
                 .map_err(|e| ViewerError::new("launch", e.to_string()))?;
             return if output.status.success() {
@@ -52,7 +49,7 @@ impl InstanceLauncher {
             .stdout(Stdio::null())
             .stderr(Stdio::null());
         #[cfg(windows)]
-        command.creation_flags(0x08000000); // CREATE_NO_WINDOW: GUI binaryの親consoleを継承しない。
+        command.creation_flags(CREATE_NO_WINDOW); // debugのconsole subsystemでconsoleを作らない。releaseのGUI subsystemでは無視される。
         let mut child = command
             .spawn()
             .map_err(|e| ViewerError::new("launch", e.to_string()))?;
@@ -62,6 +59,12 @@ impl InstanceLauncher {
             }
         });
         Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    fn bundle_command(bundle: &Path) -> Command {
+        let mut command = Command::new("/usr/bin/open");
+        command.args(["-n", "-a"]).arg(bundle).stdin(Stdio::null());
+        command
     }
     #[cfg(target_os = "macos")]
     fn bundle_path(exe: &Path) -> Result<Option<PathBuf>, ViewerError> {
@@ -87,5 +90,38 @@ impl InstanceLauncher {
             ));
         }
         Ok(Some(bundle.to_path_buf()))
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+    #[test]
+    fn bundle_detection_and_argv_do_not_fall_back_or_use_a_shell() {
+        let directory = std::env::temp_dir().join(format!("mv-launch-{}", uuid::Uuid::new_v4()));
+        let bundle = directory.join("Viewer ; $literal.app");
+        let executable = bundle.join("Contents/MacOS/viewer");
+        fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        assert!(InstanceLauncher::bundle_path(&executable).is_err());
+        fs::write(bundle.join("Contents/Info.plist"), "test fixture").unwrap();
+        assert_eq!(
+            InstanceLauncher::bundle_path(&executable).unwrap(),
+            Some(bundle.clone())
+        );
+        assert_eq!(
+            InstanceLauncher::bundle_path(&directory.join("target/debug/viewer")).unwrap(),
+            None
+        );
+        let command = InstanceLauncher::bundle_command(&bundle);
+        assert_eq!(command.get_program(), "/usr/bin/open");
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            vec![
+                std::ffi::OsStr::new("-n"),
+                std::ffi::OsStr::new("-a"),
+                bundle.as_os_str()
+            ]
+        );
+        fs::remove_dir_all(directory).unwrap();
     }
 }

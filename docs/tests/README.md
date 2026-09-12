@@ -48,3 +48,5 @@ cargo test
 Rustのproject_settings testsはtest binaryをworkerとして起動し、ready barrier後に同一projectの別fieldとRecent Foldersを同時更新する。worker待機は10秒、timeout時はkill / waitで回収する。lock保持workerの強制終了と再取得も確認する。ViewerSession testはcandidate失敗・stale context・旧HTML世代410・snapshot境界を検証する。macos_instances testsはframe上限とread deadline、Vitest projectSettings.test.tsはfield patch・queue・resize baselineを検証する。
 
 検証専用activation_spike exampleとscripts/check_macos_activation_spike.pyは実際に2つのTauri app processを起動する。通常Viewerの設定を変更せず、GUI成立性をJSONに記録する。製品のnative menu・folder picker・Settings dialogとWindows / Linux固有挙動は手動確認に残す。
+
+追加の非GUIテストは、InstanceProtocolのUUID / version / remaining_ms、stale cleanup、partial list、InstanceDirectoryのowner / symlink / mode、WindowListの重複 / sort / check、bundle判定とshell非使用argv、startup破損global、WebView再接続、readonly保存失敗、初回create競合、Root失敗時queue保持を対象にする。native activation callbackはテスト用応答に置き換えてprotocol境界を検証し、製品のAppKit表示成功を証明したとは扱わない。GUI・OS固有の未確認matrixは案件impl記録に対応表を置く。
