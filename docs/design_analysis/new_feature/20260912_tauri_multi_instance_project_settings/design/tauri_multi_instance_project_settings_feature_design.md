@@ -63,7 +63,7 @@ Rust `SettingsContext`はserdeのtagged enum、TSは`{ kind: "default", rootGene
 
 | command | 引数 | 戻り値 / 操作 | 旧経路 |
 | --- | --- | --- | --- |
-| `load_startup_state` | なし | context、settings、recentFolders、warnings、globalConfigError。global破損時は表示用既定値と明示errorを返す | `load_viewer_settings`のstartup用途を置換 |
+| `load_startup_state` | なし | context、settings、recentFolders、presentation、warnings、globalConfigError。RustがNo Folder titleとdefaults sizeを適用し実測baselineを返す | `load_viewer_settings`のstartup用途を置換 |
 | `open_root` | path、expectedContext | RootOpenResult（§7）。旧contextと照合後candidate準備・commit | `scan_directory`のopen用途を置換 |
 | `reload_root` | context | tree、sessionへ反映したsettings、warnings。Root世代不変・size非適用 | `scan_directory`のReload用途を置換 |
 | `load_context_settings` | context | settings、warnings。file読込後session snapshotを更新 | `load_viewer_settings`を置換 |
@@ -81,6 +81,8 @@ patchはTSのoptional fieldsとRustの明示PatchField enumで`未指定` / `Set
 `scan_directory` / `load_viewer_settings` / `save_viewer_preferences` / `save_window_size`は登録・実装・呼出・テストから撤去する。既存Recent commandsは保存先をV2へ一本化する。native menuのrefresh / activateはRust内部methodのみで、不要なfrontend commandを追加しない。
 
 noticeはRust queueを正本とし、`viewer-notices-available` eventは取り出しの通知だけに使う。frontendはlistenerを登録後にstartup loadとdrainを行い、その後eventでdrainする。未登録時もqueueに残り、native dialogとの二重表示経路は持たない。startup global errorはstartup応答にだけ載せる。close時には当該processのqueueを破棄する。
+
+startupはRust側でglobal load / migrationをbackground実行後、main threadで`No Folder — MarkdownViewer`とdefaults logical sizeを適用する。maximized / fullscreen / minimized中はsizeを適用しない。global破損時は表示用既定値のsizeを適用するがJSONへ保存せず明示errorを返す。`presentation { actualLogicalSize: WindowSize | null, sizeApplied: boolean }`を返し、frontendは応答までstartup busyとしてresize eventを破棄し、実測sizeをbaselineに設定してからbusyを解除する。startup・Root open・Retryは§7.2の共通presentation policyを使う。getter失敗時はactualLogicalSize=nullとwarningを返し、最初に取得できた実測値をbaselineにするだけで保存しない。startup適用によるresizeでdefaultsを書き戻さない。
 
 ## 5. 起動と終了
 
@@ -223,8 +225,8 @@ directory設定とruntime socketは別責務。設定schemaのversionを明示�
 | --- | --- |
 | markdown-viewer-tauri/README.md:47 設定の保存 | directory別保存、再起動はdefaults / folder openで復元、New Window / Window、手動復旧・旧版併用によるdefaults消失、dev / OS制約 |
 | docs/components/tauri_viewer/README.md:88 AppConfigStore | SettingsRepository / ViewerSession / launcher / IPCと責務表 |
-| docs/components/tauri_viewer/interface_spec.md:17,24,30-36 Settings / File、166-182 commands | scope表示、field patch、§4.1のcommand・event、native menu全構成 |
-| docs/components/tauri_viewer/detail_design.md:371,387,420 設定store / RMW / busy | global / project schema、sidecar lock、RootSnapshot、settings snapshot、gate・thread・notice queue・activation |
+| docs/components/tauri_viewer/interface_spec.md:17,24,30-36 Settings / File、133 open_document、151 render_plantuml_diagrams、166-182 settings commands | scope表示、field patch、§4.1のcontext引数・session snapshot・command / event、native menu全構成 |
+| docs/components/tauri_viewer/detail_design.md:318 protocol read中lock保持、371,387,420 設定store / RMW / busy | 単一RootSnapshotをclone後lock解放しsnapshotでI/O、global / project schema、sidecar lock、settings snapshot、gate・thread・notice queue・activation |
 | docs/rules/development_workflow.md:38 単一settings.json | 共通defaults / Recent + projects保存に置換 |
 | docs/rules/development_workflow.md:207 再起動size復元 | 再起動直後defaults、folder openでproject復元、特殊window状態の適用skip、複数process検証 |
 | docs/architecture/overview.md / code_patterns.md / common_pitfalls.md | process単位Root、context・世代・file lock、HTML新URLと旧経路撤去 |
@@ -250,7 +252,7 @@ directory設定とruntime socketは別責務。設定schemaのversionを明示�
 
 多process test harnessはRust test binaryを専用worker testの`--exact` + テスト専用envで再起動し、temp directoryとready barrierを渡す。親がreadyを確認して競合を発生させ、各child / barrierに10秒、case全体30秒のdeadlineを設ける。timeoutはkill / waitで回収しtest失敗。強制終了と再lock取得も実processで確認し、通常appの隠しtest modeは作らない。
 
-追加自動ケース: 相対HTML subresourceのgeneration継承、RootSnapshotの原子的read / commit、旧保存失敗でも新Rootへ移れること、special window stateのsize適用・保存skip、global破損時の既存project open / 初回生成失敗、current project file消失、Recent再読込、No Folder重複、check反転の復旧、NFC / NFD path。NFC / NFDがOSで同じ実体を指す場合はcanonical path / hashが一致するか実機でも確認し、別実体は別identityを保つ。
+追加自動ケース: startup size/title適用と実測baseline・defaultsへ保存しないこと・破損global / getter失敗時の明示error、相対HTML subresourceのgeneration継承、RootSnapshotの原子的read / commit、旧保存失敗でも新Rootへ移れること、special window stateのsize適用・保存skip、global破損時の既存project open / 初回生成失敗、current project file消失、Recent再読込、No Folder重複、check反転の復旧、NFC / NFD path。NFC / NFDがOSで同じ実体を指す場合はcanonical path / hashが一致するか実機でも確認し、別実体は別identityを保つ。
 
 Phase 3の最初に小さなpackaged activation spikeを実装し、macOS 14以降で通常 / 最小化 / 別Space fullscreenの3状態のkey・activeをdeadline内に観測できることをgo条件とする。requester / target双方の結果を記録し、成立しない場合は後続の設定統合へ進まず実際の失敗をユーザーへ報告して導線・要件を再確認する。OSによるfocus制約を成功扱いで隠さない。14未満のAPI分岐はavailable checkで型・呼出を確認し、実機がなければ未確認を残す。
 
@@ -284,7 +286,7 @@ Windows cfgのspawn / lock / path codeはWindows上のcargo check / cargo test /
 
 ## 14. レビュー対応履歴
 
-初回レビュー`e2a846d`の18件を設計へ反映。全件design上の対応済み、reviewer再確認待ち。Phase 3の実機spike自体は未実施。
+初回レビュー`e2a846d`の18件は`f5fafe3`で解決確認・設計承認済み。追加MI-DR-19 / 20も設計へ反映し再確認待ち。Phase 3の実機spike自体は未実施。
 
 | 指摘 | 反映先 |
 | --- | --- |
@@ -306,3 +308,5 @@ Windows cfgのspawn / lock / path codeはWindows上のcargo check / cargo test /
 | MI-DR-16 | §2 Linux提供範囲・§11未確認扱い |
 | MI-DR-17 | §11 worker harness / timeout / NFC・NFD / Windows build |
 | MI-DR-18 | §6 PlantUMLはin-memory snapshot |
+| MI-DR-19 | §4.1 startup presentation・共通baseline・global異常時のsize、§11保存抑止test |
+| MI-DR-20 | §10 protocol lock・open_document / renderの恒久docs置換行を追加 |

@@ -27,6 +27,8 @@ design_status: "in_review"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits:
+  - "4814fbf : Phase 2 初回18件の設計指摘対応"
+  - "f5fafe3 : Phase 2 再レビュー承認・追加non-blocking 2件"
   - "85fb535 : Phase 2 詳細設計初稿"
   - "e2a846d : Phase 2 初回設計レビュー18件"
   - "fc2d085 : Phase 1 専用ブランチとmeta初期化"
@@ -51,7 +53,7 @@ related_commits:
 - [詳細設計](design/tauri_multi_instance_project_settings_feature_design.md)に起動・設定・command / event・native menuの契約を記録。
 - 2026-09-12追加回答によりmacOSはメニューバーのWindow一覧でよい。Dock独自一覧は対象外。
 - 別instanceへのcooperative activationはPhase 3冒頭のpackaged app spikeでgo / no-goを判定する。現時点では実機未検証。
-- 初回レビュー18件は全件設計へ対応済み、reviewer再確認待ち。
+- 初回18件は解決確認済み・設計承認済み。追加2件も設計へ対応し最終確認待ち。
 
 ## Phase 状態
 
@@ -59,7 +61,7 @@ related_commits:
 | --- | --- |
 | 0 要求整理 | 完了・2026-09-12ユーザ承認済み |
 | 1 ブランチ・meta初期化 | 完了（本初期化コミット） |
-| 2 設計・レビュー | 2026-09-12進行承認済み・初回18件対応、再レビュー待ち |
+| 2 設計・レビュー | 初回18件解決・承認済み、追加2件対応の最終確認待ち |
 | 3 実装・恒久ドキュメント反映 | 未着手 |
 | 4 検証・完了処理 | 未着手 |
 

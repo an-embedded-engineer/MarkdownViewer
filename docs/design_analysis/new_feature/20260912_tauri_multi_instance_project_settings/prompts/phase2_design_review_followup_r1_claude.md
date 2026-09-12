@@ -1,0 +1,10 @@
+初回レビューの全18件を設計へ反映しました。再委譲せず、あなた自身で対応確認をお願いします。
+
+対応commit: 4814fbf
+前回review commit: e2a846d
+対象: docs/design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/design/tauri_multi_instance_project_settings_feature_design.md とTODO/meta
+レビュー文書: docs/design_analysis/new_feature/20260912_tauri_multi_instance_project_settings/review/tauri_multi_instance_project_settings_design_review.md
+
+レビュー文書§7と設計§14に全IDの対応表があります。まず対応差分を確認し、追加調査は未解決の論点に限定してください。特にmacOS handoff/key+active ack/spikeのgo-no-go、native全menu、Rust size/title適用とbaseline、単一RootSnapshotとpath generation、command/event表、旧保存失敗でのRoot切替継続を確認してください。
+
+全指摘の状態と未解決件数・承認可否をレビュー文書へ反映し、その文書のみをコミットしてください。Phase 2設計レビューとして、Phase 3の実機spike実施済みとは扱わないでください。実装は行わないでください。

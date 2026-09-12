@@ -59,8 +59,8 @@
 | MI-DR-16 | Low | No | design | 解決済み | Linux の扱いが「既存動作維持」と「New Window 共通経路」で矛盾 |
 | MI-DR-17 | Low | No | design | 解決済み | 複数 process テストの harness、macOS NFC / NFD path、Windows cfg code の検証手段が未記載 |
 | MI-DR-18 | Low | No | design | 解決済み | PlantUML の「最新 jar 設定」が file 再読込か session snapshot か曖昧 |
-| MI-DR-19 | Medium | No | design | 未対応（Round 1 新規） | global load を setup から外した結果、起動時の defaults size / title の適用主体と resize baseline が §4.1 に無い |
-| MI-DR-20 | Low | No | design | 未対応（Round 1 新規） | §10 置換表に `detail_design.md:318`（protocol read 中の read lock 保持）と `interface_spec.md:133` / `:151`（`open_document` / `render_plantuml_diagrams` 契約）が無い |
+| MI-DR-19 | Medium | No | design | 対応済み・再確認待ち（§9） | global load を setup から外した結果、起動時の defaults size / title の適用主体と resize baseline が §4.1 に無い |
+| MI-DR-20 | Low | No | design | 対応済み・再確認待ち（§9） | §10 置換表に `detail_design.md:318`（protocol read 中の read lock 保持）と `interface_spec.md:133` / `:151`（`open_document` / `render_plantuml_diagrams` 契約）が無い |
 
 ---
 
@@ -390,7 +390,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Medium（non-blocking）
 **工程**: design
-**対応状態**: 未対応（Phase 3 着手時に設計へ 1 行追記、または Phase 3 実装レビューで確認）
+**対応状態**: 対応済み・再確認待ち（§9）
 
 **根拠**: 現行は `setup` hook が global settings を読み、frontend の resize listener 登録前に `set_size` で起動時 size を復元している（`lib.rs:2140-2160`）。Round 1 で MI-DR-08 に対応するため、設計 §7.2 は「setup では service / listener / menu 登録だけを行い、global load / migration は frontend startup command へ移す」とした。その結果、次の点が未定義になった。
 
@@ -406,7 +406,7 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 
 **重大度**: Low（non-blocking）
 **工程**: design
-**対応状態**: 未対応（Phase 3 の docs 反映時に対応、実装レビューで確認）
+**対応状態**: 対応済み・再確認待ち（§9）
 
 **根拠**: 次の現行記述が §10 の表に含まれていない。
 
@@ -432,3 +432,9 @@ menu error についても、§8.2 の「未準備なら native dialog へ表示
 1. 本承認は Phase 2 設計レビューとしての判定であり、**macOS activation handoff の実機成立は確認していない**。設計 §11 のとおり、Phase 3 の最初に packaged spike を実施し、macOS 14 以降の通常 / 最小化 / 別 Space fullscreen で key・active を deadline 内に観測できなければ、後続実装へ進まずユーザへ報告して要件を再確認すること。spike の結果（requester / target 双方）は Phase 3 の記録に残し、成功扱いで隠さないこと。
 2. MI-DR-19 は Phase 3 着手時に設計 §4.1 へ追記し、MI-DR-20 は Phase 3 の恒久 docs 反映で閉じる。いずれも Phase 3 実装レビューで確認する。
 3. Phase 3 実装レビューでは、§8.1 MI-DR-04 に記した `open_document` の context 検証元（I/O と同じ snapshot clone）も確認する。
+
+## 9. 実装担当による追加2件の設計反映（reviewer再確認待ち）
+
+- MI-DR-19: 設計§4.1でstartup commandがRustからNo Folder title / defaults sizeを適用しpresentationを返すと明記。frontendのstartup busyと共通実測baselineで適用時resizeを保存しない。global破損時は表示用既定sizeと明示error、getter失敗はnull baselineとwarningを返す。§11へ対応testを追加。
+- MI-DR-20: 設計§10の恒久docs置換表にdetail_design.md:318とinterface_spec.md:133 / :151を追加。protocolはsnapshot clone後lock解放、document / renderはcontextとsession snapshotへ更新すると明記。
+- 上記は設計上の対応であり、Phase 3の実装・恒久docs反映・実機spikeは未実施。
