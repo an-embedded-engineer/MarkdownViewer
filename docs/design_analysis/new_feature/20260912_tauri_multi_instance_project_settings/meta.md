@@ -22,11 +22,13 @@ components:
   - "docs/rules/development_workflow.md"
   - "docs/setup/README.md"
   - "docs/tests/README.md"
-status: "phase_2_review_followup"
-design_status: "in_review"
+status: "phase_2_complete_awaiting_phase_3_approval"
+design_status: "done"
 impl_status: "not_started"
 completion_status: "not_started"
 related_commits:
+  - "8034327 : Phase 2 追加2件の設計指摘対応"
+  - "c4bf9c7 : Phase 2 最終レビュー承認・全20件解決"
   - "4814fbf : Phase 2 初回18件の設計指摘対応"
   - "f5fafe3 : Phase 2 再レビュー承認・追加non-blocking 2件"
   - "85fb535 : Phase 2 詳細設計初稿"
@@ -53,7 +55,8 @@ related_commits:
 - [詳細設計](design/tauri_multi_instance_project_settings_feature_design.md)に起動・設定・command / event・native menuの契約を記録。
 - 2026-09-12追加回答によりmacOSはメニューバーのWindow一覧でよい。Dock独自一覧は対象外。
 - 別instanceへのcooperative activationはPhase 3冒頭のpackaged app spikeでgo / no-goを判定する。現時点では実機未検証。
-- 初回18件は解決確認済み・設計承認済み。追加2件も設計へ対応し最終確認待ち。
+- 初回18件・追加2件の全20件を解決し、c4bf9c7で最終設計レビュー承認。未解決0件。
+- [レビュー結果](review/tauri_multi_instance_project_settings_design_review.md)を参照。Phase 3の進行はユーザ承認待ち。
 
 ## Phase 状態
 
@@ -61,7 +64,7 @@ related_commits:
 | --- | --- |
 | 0 要求整理 | 完了・2026-09-12ユーザ承認済み |
 | 1 ブランチ・meta初期化 | 完了（本初期化コミット） |
-| 2 設計・レビュー | 初回18件解決・承認済み、追加2件対応の最終確認待ち |
+| 2 設計・レビュー | 完了・最終レビュー承認、未解決0件 |
 | 3 実装・恒久ドキュメント反映 | 未着手 |
 | 4 検証・完了処理 | 未着手 |
 
@@ -71,3 +74,11 @@ related_commits:
 - mainの`3d1848c`から専用ブランチを作成した。
 - このPhaseはTODOとmetaのみを変更し、ソースコードの変更や実装検証は行わない。
 - Phase 1のcommit hashは自己参照を避け、後続Phaseまたはcompletionでrelated_commitsへ追記する。
+
+## Phase 2確認とPhase 3への引継ぎ
+
+- 設計・レビュー前後の更新をコミットし、git diff --checkとローカルリンク参照先を確認した。
+- 変更はドキュメントのみ。npm / cargoの実装build・testとUI動作確認は未実施。
+- Phase 3最初の作業はmacOS packaged activation spike。通常 / 最小化 / 別Space fullscreenでkey・activeをdeadline内に観測する。失敗時は後続実装前に要件を再確認する。
+- 実装レビューではopen_documentのcontext照合がI/Oと同じRootSnapshotを使うこと、presentationの共通nullable型、起動時サイズ適用の見え方、恒久docs更新を確認する。
+- Claude review sessionは後続Phaseで再利用するため維持する。Phase 3実装を開始した意味ではない。

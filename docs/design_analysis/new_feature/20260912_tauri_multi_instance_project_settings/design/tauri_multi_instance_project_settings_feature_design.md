@@ -286,7 +286,7 @@ Windows cfgのspawn / lock / path codeはWindows上のcargo check / cargo test /
 
 ## 14. レビュー対応履歴
 
-初回レビュー`e2a846d`の18件は`f5fafe3`で解決確認・設計承認済み。追加MI-DR-19 / 20も設計へ反映し再確認待ち。Phase 3の実機spike自体は未実施。
+初回レビュー`e2a846d`の18件は`f5fafe3`で解決確認。追加MI-DR-19 / 20も含む全20件が`c4bf9c7`で解決確認され、設計レビュー承認・未解決0件。Phase 3の実機spike自体は未実施。
 
 | 指摘 | 反映先 |
 | --- | --- |
