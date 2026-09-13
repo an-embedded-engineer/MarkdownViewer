@@ -106,3 +106,5 @@ related_commits:
 ## Phase 4-a進捗
 
 ユーザーのPhase4進行承認を受領。macOSでtitle、新規別process起動、別Root閲覧、theme / sizeの再open復元が確認済みと報告を受けた。[動作確認記録](impl/user_verification.md)へ反映。残りの確認とWindows実機結果を待つ。4-b / mergeは未着手。
+
+- macOSの追加提示4項目についてユーザーから「OKと思います」と報告を受領。報告範囲を動作確認記録へ反映。Windowsは実施後に別途報告予定のためPhase 4-aを継続する。

@@ -9,15 +9,22 @@ Phase 4進行承認を受領。実装レビューは全9件解決済み。ユー
 - 各ウィンドウで異なるディレクトリを開ける。
 - 各ウィンドウのテーマ・サイズを変更し、閉じた後に同じディレクトリを開くと復元される。
 
-確認に使用したOS version / build hashは未採取。上記以外を確認済みとは扱わない。
+追加報告: ユーザーから「mac側の4件はOKと思います」と回答を受領。直前に提示した以下の4項目をOKとして記録する。
+
+- Windowメニューから通常・最小化・非表示・別Space fullscreenの対象へ切り替え。
+- 起動元終了後の独立動作、および一方のRoot変更・Reloadが他方へ影響しないこと。
+- PlantUMLパスのdirectory別復元、fullscreen解除後の通常size保持。
+- 同名別directory・未選択windowの識別、終了済み項目の一覧更新後の消去。
+
+確認に使用したOS version / build hashは未採取。以下の詳細matrixは上記報告に含まれる範囲だけ反映し、個別に依頼していない追加条件まで成功とは扱わない。Windows側は実施後に別途報告予定。
 
 ## macOS 追加確認
 
 | ID | 操作 | 期待結果 | 結果 |
 | --- | --- | --- | --- |
-| M1 | Windowメニューから別Rootのwindowを選択。対象を最小化・非表示・別Spaceのfullscreenにして再試行 | ディレクトリ名で識別でき、選択先が復帰・前面化する | 未確認 |
-| M2 | 同名の別directory、同じRoot、未選択windowを複数開く | 親path / instance IDで一覧を区別できる。現在windowにチェック。終了したwindowはfocus / Refresh後に消える | 未確認 |
-| M3 | Cmd+Shift+Nで起動し、起動元をCmd+Qで終了 | 別processのwindowは操作できる。Cmd+W / Cmd+M / Full Screenも機能し、全終了後はDock / Finderから再起動できる | 未確認 |
+| M1 | Windowメニューから別Rootのwindowを選択。対象を最小化・非表示・別Spaceのfullscreenにして再試行 | ディレクトリ名で識別でき、選択先が復帰・前面化する | macOS OK（ユーザー報告） |
+| M2 | 同名の別directory、同じRoot、未選択windowを複数開く | 親path / instance IDで一覧を区別できる。現在windowにチェック。終了したwindowはfocus / Refresh後に消える | macOS: 同名別directory・未選択・終了後消去はOK。同Root重複 / checkは個別未確認 |
+| M3 | Cmd+Shift+Nで起動し、起動元をCmd+Qで終了 | 別processのwindowは操作できる。Cmd+W / Cmd+M / Full Screenも機能し、全終了後はDock / Finderから再起動できる | macOS: 起動元終了後の独立動作はOK。shortcut / 全終了後の再起動は個別未確認 |
 | M4 | 起動直後のsizeとRootを開いた後のsizeを見る | defaults→project設定が適用され、表示の跳ねが目立たない | 未確認 |
 | M5 | WebViewを再読込できる開発環境で再読込（アプリの文書Reloadとは別） | Root・title・Settings対象・tree・保存先が一致する | 未確認（操作可能な環境が必要） |
 
@@ -25,11 +32,11 @@ Phase 4進行承認を受領。実装レビューは全9件解決済み。ユー
 
 | ID | 操作 | 期待結果 | 結果 |
 | --- | --- | --- | --- |
-| C1 | A/Bを別windowで開き、一方でRoot変更・文書Reload・close | 他方のtree / tabs / previewは変化しない | 未確認 |
+| C1 | A/Bを別windowで開き、一方でRoot変更・文書Reload・close | 他方のtree / tabs / previewは変化しない | macOS OK、Windows待ち |
 | C2 | A→B→Aと同windowで移動。folder dialogもcancelする | 設定が各Rootに追従し、cancel時はRoot / title / 設定を保持 | 未確認 |
-| C3 | AでPlantUML jar明示指定、Bで別設定またはClear。閉じて再open | 各設定が復元され図が描画される。Clearはruntime探索へ戻る。invalid pathは明示error | 未確認 |
+| C3 | AでPlantUML jar明示指定、Bで別設定またはClear。閉じて再open | 各設定が復元され図が描画される。Clearはruntime探索へ戻る。invalid pathは明示error | macOS: directory別jar復元はOK。Clear / invalidは個別未確認。Windows待ち |
 | C4 | 同じRootを2processで開き、一方でtheme、他方でsizeを変更し再open | 変更した別fieldが両方残る。別Rootの設定も保持する（他windowへの即時同期は要求しない） | 未確認 |
-| C5 | 通常sizeを設定→最大化 / fullscreen→通常表示→再起動・同Root open | 通常sizeが復元し、特殊状態のsizeで上書きしない | 未確認 |
+| C5 | 通常sizeを設定→最大化 / fullscreen→通常表示→再起動・同Root open | 通常sizeが復元し、特殊状態のsizeで上書きしない | macOS: fullscreen解除後の通常size保持はOK。Windows待ち |
 | C6 | Root切替とresizeを続けて行い、A/Bを再open | 旧Rootのsizeや非同期previewが新Rootへ混線しない | 未確認 |
 | C7 | sample_docsのMarkdown / HTML / 相対画像 / Mermaid / PlantUMLを表示、Reload・splitを操作 | 既存previewが動作し、Root切替後も前RootのHTML resourceを使わない | 未確認 |
 | C8 | 両processで別folderを開き、Fileメニューを開き直す | Recent Foldersに両方残る | 未確認 |
