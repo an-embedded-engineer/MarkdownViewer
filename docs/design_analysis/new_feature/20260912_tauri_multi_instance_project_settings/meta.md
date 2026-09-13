@@ -22,7 +22,7 @@ components:
   - "docs/rules/development_workflow.md"
   - "docs/setup/README.md"
   - "docs/tests/README.md"
-status: "implemented"
+status: "phase_4_user_verification"
 design_status: "done"
 impl_status: "done"
 completion_status: "not_started"
@@ -73,7 +73,7 @@ related_commits:
 | 1 ブランチ・meta初期化 | 完了（本初期化コミット） |
 | 2 設計・レビュー | 完了・最終レビュー承認、未解決0件 |
 | 3 実装・恒久ドキュメント反映 | 完了・最終レビュー承認、全9件解決 |
-| 4 検証・完了処理 | 未着手・Phase 4-aユーザ承認待ち |
+| 4 検証・完了処理 | 進行承認済み・4-a macOS一部確認済み、追加確認とWindows結果待ち |
 
 ## Phase 1確認
 
@@ -102,3 +102,7 @@ related_commits:
 - npm build / Vitest 118件、cargo check / Rust 46件、fmt、release app bundle buildが成功。Clippyの新規warningは0件（既存2件）。
 - 確認用bundle: `publish/tauri/TODO-2026-029/markdown-viewer-tauri.app`。ff84654のrelease成果物を配置した。以降のsource差分はcfg(test)の配置のみで製品binaryへの変更なし。
 - 製品GUI / Windows等の未確認項目は実装記録のmatrixに残す。Phase 4-aはユーザ承認待ち。
+
+## Phase 4-a進捗
+
+ユーザーのPhase4進行承認を受領。macOSでtitle、新規別process起動、別Root閲覧、theme / sizeの再open復元が確認済みと報告を受けた。[動作確認記録](impl/user_verification.md)へ反映。残りの確認とWindows実機結果を待つ。4-b / mergeは未着手。
